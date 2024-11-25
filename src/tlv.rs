@@ -190,14 +190,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 let tag = read_tag(tagctrl, cursor)?;
                 let item = TlvItem {
                     tag,
-                    value: TlvItemValue::Bool(false)
-                };
-                container.push(item);
-            },
-            8 => {
-                let tag = read_tag(tagctrl, cursor)?;
-                let item = TlvItem {
-                    tag,
                     value: TlvItemValue::Bool(true)
                 };
                 container.push(item);

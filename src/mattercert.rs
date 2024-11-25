@@ -54,17 +54,17 @@ pub fn get_subject_node_id_from_x509(fname: &str) -> Result<u64> {
     Err(anyhow::anyhow!("matter subject/node not found in x509"))
 }
 
-pub fn convert_x509_to_matter(fname: &str) -> Result<Vec<u8>> {
+pub fn convert_x509_to_matter(fname: &str, ca_pubkey: &[u8]) -> Result<Vec<u8>> {
     let x509_raw = cryptoutil::read_data_from_pem(fname)?;
-    convert_x509_bytes_to_matter(&x509_raw)
+    convert_x509_bytes_to_matter(&x509_raw, ca_pubkey)
 }
 
-pub fn convert_x509_bytes_to_matter(bytes: &[u8]) -> Result<Vec<u8>> {
+pub fn convert_x509_bytes_to_matter(bytes: &[u8], ca_pubkey: &[u8]) -> Result<Vec<u8>> {
     let x509 = x509_cert::Certificate::from_der(bytes)?;
-    convert_x509_to_matter_int(&x509)
+    convert_x509_to_matter_int(&x509, ca_pubkey)
 }
 
-fn convert_x509_to_matter_int(cert: &CertificateInner) -> Result<Vec<u8>> {
+fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Result<Vec<u8>> {
 
     let mut enc = tlv::TlvBuffer::new();
     enc.write_anon_struct()?;
@@ -107,9 +107,8 @@ fn convert_x509_to_matter_int(cert: &CertificateInner) -> Result<Vec<u8>> {
         enc.write_struct_end()?;
     }
 
-    let cakey = crate::cryptoutil::read_pub_key_from_pem("pem2/ca-private.pem")?;
     // do-sha1
-    let cakey_sha1 = crate::cryptoutil::sha1_enc(&cakey);
+    let cakey_sha1 = crate::cryptoutil::sha1_enc(&ca_pubkey);
 
     enc.write_octetstring(4, &extract_extension(&cert.tbs_certificate, "2.5.29.14")?[2..])?;
     enc.write_octetstring(5, &cakey_sha1)?;

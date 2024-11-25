@@ -4,6 +4,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use anyhow::{Context, Result};
 
 
+use messages::ProtocolMessageHeader;
 use rand::RngCore;
 use session::Session;
 use transport::Transport;
@@ -19,6 +20,7 @@ mod fabric;
 mod cryptoutil;
 mod session;
 mod sigma;
+mod certmanager;
 
 
 fn get_next_message(transport: &transport::Transport, session: &mut Session) -> Result<messages::Message> {
@@ -54,6 +56,10 @@ fn spake_flow(transport: &Transport, session: &mut Session, pin: u32) -> Result<
 
     // get pbkdf response
     let pbkdf_response = get_next_message(transport, session)?;
+    if pbkdf_response.protocol_header.protocol_id != ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+        || pbkdf_response.protocol_header.opcode != ProtocolMessageHeader::OPCODE_PBKDF_RESP {
+            return Err(anyhow::anyhow!("pbkdf response not received"))
+        }
 
     let iterations = pbkdf_response.tlv.get_int(&[4, 1]).context("pbkdf_response - iterations missing")?;
     let salt = pbkdf_response.tlv.get_octet_string(&[4, 2]).context("pbkdf_response - salt missing")?;
@@ -69,6 +75,10 @@ fn spake_flow(transport: &Transport, session: &mut Session, pin: u32) -> Result<
 
     // receive pake2
     let pake2 = get_next_message(transport, session)?;
+    if pake2.protocol_header.protocol_id != ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+        || pake2.protocol_header.opcode != ProtocolMessageHeader::OPCODE_PBKDF_PAKE2 {
+            return Err(anyhow::anyhow!("pake2 not received"))
+        }
     let pake2_pb = pake2.tlv.get_octet_string(&[1]).context("pake2 pb tlv missing")?;
     ctx.y = p256::EncodedPoint::from_bytes(pake2_pb)?;
 
@@ -97,7 +107,7 @@ fn spake_flow(transport: &Transport, session: &mut Session, pin: u32) -> Result<
 }
 
 
-fn comission(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, node_id: u64, controller_id: u64) -> Result<()> {
+fn comission(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, cm: &dyn certmanager::CertManager, node_id: u64, controller_id: u64) -> Result<()> {
 
     // node operational credentials procedure
 
@@ -121,7 +131,9 @@ fn comission(transport: &Transport, session: &mut Session, fabric: &fabric::Fabr
 
 
     // step 3 push ca cert
-    let mcert = mattercert::convert_x509_to_matter("pem2/ca-cert.pem")?;
+    let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
+    let ca_cert = cm.get_ca_cert()?;
+    let mcert = mattercert::convert_x509_bytes_to_matter(&ca_cert, &ca_pubkey)?;
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_octetstring(0, &mcert)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0xb, 1, &tlv.data, false)?;
@@ -136,9 +148,9 @@ fn comission(transport: &Transport, session: &mut Session, fabric: &fabric::Fabr
     // step 4 push device cert
     let ca_id = fabric.ca_id;
     let node_public_key = csrd.info.public_key.subject_public_key.as_bytes().context("can't extract pubkey from csr")?;
-    let ca_private = cryptoutil::read_private_key_from_pem("pem2/ca-private.pem")?;
+    let ca_private = cm.get_ca_key()?;
     let noc_x509 = cert::encode_x509(node_public_key, node_id, fabric.id, ca_id, &ca_private, false)?;
-    let noc = mattercert::convert_x509_bytes_to_matter(&noc_x509)?;
+    let noc = mattercert::convert_x509_bytes_to_matter(&noc_x509, &ca_pubkey)?;
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_octetstring(0, &noc)?;
     tlv.write_octetstring(2, &fabric.ipk_epoch_key)?;
@@ -155,10 +167,11 @@ fn comission(transport: &Transport, session: &mut Session, fabric: &fabric::Fabr
 
 
 
-fn sigma(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, node_id: u64) -> Result<session::Session> {
+fn sigma(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, cm: &dyn certmanager::CertManager, node_id: u64, controller_id: u64) -> Result<session::Session> {
 
     let mut ctx = sigma::SigmaContext::new(node_id);
-    sigma::sigma1(fabric, &mut ctx)?;
+    let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
+    sigma::sigma1(fabric, &mut ctx, &ca_pubkey)?;
     let s1 = messages::sigma1(11, &ctx.sigma1_payload)?;
     let out = session.encode_message(&s1)?;
     transport.send(&out);
@@ -169,13 +182,13 @@ fn sigma(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, 
     ctx.responder_session = sigma2.tlv.get_int(&[2]).context("responder session tlv missing in sigma2")? as u16;
     ctx.responder_public = sigma2.tlv.get_octet_string(&[3]).context("responder public tlv missing in sigma2")?.to_vec();
 
-    let controller_id = mattercert::get_subject_node_id_from_x509("pem2/100-cert.pem")?;
-    let controller_private = cryptoutil::read_private_key_bytes_from_pem("pem2/100-private.pem")?;
-    let controller_matter_cert = mattercert::convert_x509_to_matter("pem2/100-cert.pem")?;
+    let controller_private = cm.get_user_key(controller_id)?;
+    let controller_x509 = cm.get_user_cert(controller_id)?;
+    let controller_matter_cert = mattercert::convert_x509_bytes_to_matter(&controller_x509, &ca_pubkey)?;
 
 
     // send sigma3
-    sigma::sigma3(fabric, &mut ctx, &controller_private, &controller_matter_cert)?;
+    sigma::sigma3(fabric, &mut ctx, &controller_private.to_sec1_der()?, &controller_matter_cert)?;
     let sigma3 = messages::sigma3(11, &ctx.sigma3_payload)?;
     let out = session.encode_message(&sigma3)?;
     transport.send(&out);
@@ -214,14 +227,15 @@ fn main() {
     let transport = transport::Transport::new("192.168.5.77:5540");
 
     let fabric = fabric::Fabric::new(0x110);
+    let cm: Box<dyn certmanager::CertManager> = Box::new(certmanager::FileCertManager::new(0x110));
 
  
     spake_flow(&transport, &mut session, 123456).unwrap();
-    comission(&transport, &mut session, &fabric, 600, 100).unwrap();
+    comission(&transport, &mut session, &fabric, cm.as_ref(), 600, 100).unwrap();
 
     let mut session = Session::new();
     session.counter = 100;
-    let mut ses2 = sigma(&transport, &mut session, &fabric, 600).unwrap();
+    let mut ses2 = sigma(&transport, &mut session, &fabric, cm.as_ref(), 600, 100).unwrap();
 
     println!("x1 {:?}", transport.receive().unwrap()); // ack
 

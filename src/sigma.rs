@@ -33,7 +33,7 @@ impl SigmaContext {
     }
 }
 
-pub fn sigma1(fabric: &fabric::Fabric, ctx: &mut SigmaContext) -> Result<()> {
+pub fn sigma1(fabric: &fabric::Fabric, ctx: &mut SigmaContext, ca_pubkey: &[u8]) -> Result<()> {
     let mut initator_random = [0; 32];
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut initator_random);
 
@@ -45,8 +45,7 @@ pub fn sigma1(fabric: &fabric::Fabric, ctx: &mut SigmaContext) -> Result<()> {
     tlv.write_uint16(2, ctx.session_id)?;
     let mut dst = Vec::new();
     dst.write_all(&initator_random)?;
-    let ca_pubkey = cryptoutil::read_pub_key_from_pem("pem2/ca-private.pem")?;
-    dst.write_all(&ca_pubkey)?;
+    dst.write_all(ca_pubkey)?;
     dst.write_u64::<LittleEndian>(fabric.id)?;
     dst.write_u64::<LittleEndian>(ctx.node_id)?;
 
