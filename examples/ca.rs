@@ -4,15 +4,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use anyhow::Result;
 
-
-#[path="../cert.rs"]
-mod cert;
-
-#[path="../asn1.rs"]
-mod asn1;
-
-#[path="../cryptoutil.rs"]
-mod cryptoutil;
+use matc::cryptoutil;
+use matc::cert;
 
 
 

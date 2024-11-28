@@ -4,23 +4,9 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use anyhow::{Context, Result};
 
 
-use messages::ProtocolMessageHeader;
+use matc::{cert, certmanager, cryptoutil, fabric, mattercert, messages::{self, ProtocolMessageHeader}, session::Session, sigma, spake2p, tlv, transport::{self, Transport}};
 use rand::RngCore;
-use session::Session;
-use transport::Transport;
 
-mod messages;
-mod tlv;
-mod transport;
-mod spake2p;
-mod cert;
-mod asn1;
-mod mattercert;
-mod fabric;
-mod cryptoutil;
-mod session;
-mod sigma;
-mod certmanager;
 
 
 fn get_next_message(transport: &transport::Transport, session: &mut Session) -> Result<messages::Message> {
@@ -167,7 +153,7 @@ fn comission(transport: &Transport, session: &mut Session, fabric: &fabric::Fabr
 
 
 
-fn sigma(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, cm: &dyn certmanager::CertManager, node_id: u64, controller_id: u64) -> Result<session::Session> {
+fn sigma(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, cm: &dyn certmanager::CertManager, node_id: u64, controller_id: u64) -> Result<Session> {
 
     let mut ctx = sigma::SigmaContext::new(node_id);
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
@@ -224,7 +210,7 @@ fn sigma(transport: &Transport, session: &mut Session, fabric: &fabric::Fabric, 
 
 fn main() {
     let mut session = Session::new();
-    let transport = transport::Transport::new("192.168.5.77:5540");
+    let transport = transport::Transport::new("192.168.5.77:5540").unwrap();
 
     let fabric = fabric::Fabric::new(0x110);
     let cm: Box<dyn certmanager::CertManager> = Box::new(certmanager::FileCertManager::new(0x110));

@@ -1,5 +1,6 @@
 use std::net::UdpSocket;
 use std::io::Result;
+use std::time::Duration;
 
 
 
@@ -10,11 +11,13 @@ pub struct Transport {
 
 
 impl Transport {
-    pub fn new(remote: &str) -> Self {
-        Self {
-            socket: UdpSocket::bind("0.0.0.0:5555").unwrap(),
+    pub fn new(remote: &str) -> Result<Self> {
+        let socket = UdpSocket::bind("0.0.0.0:5555")?;
+        socket.set_read_timeout(Some(Duration::from_secs(3)))?;
+        Ok(Self {
+            socket,
             remote: remote.to_owned()
-        }
+        })
     }
     pub fn send(&self, data: &[u8]) {
         self.socket.send_to(data, &self.remote).unwrap();
