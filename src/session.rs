@@ -75,11 +75,7 @@ impl Session {
     }
 
     fn make_nonce3(&self) -> Result<Vec<u8>> {
-        let mut out = Vec::with_capacity(128);
-        out.write_u8(0)?;
-        out.write_u32::<LittleEndian>(self.counter)?;
-        out.write_all(&self.local_node)?;
-        Ok(out)
+        Self::make_nonce3_extern(self.counter, &self.local_node)
     }
 
     fn make_nonce3_extern(counter: u32, node: &[u8]) -> Result<Vec<u8>> {
@@ -92,5 +88,11 @@ impl Session {
             out.write_all(&[0,0,0,0,0,0,0,0])?;
         }
         Ok(out)
+    }
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self::new()
     }
 }

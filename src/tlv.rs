@@ -95,6 +95,12 @@ impl TlvBuffer {
 
 }
 
+impl Default for TlvBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub enum TlvItemValue {
     Int(u64),
@@ -141,6 +147,19 @@ impl TlvItem {
             Some(o)
         } else {
             None
+        }
+    }
+    pub fn dump(&self, indent: usize) {
+        match &self.value {
+            TlvItemValue::List(vec) => {
+                println!("{} {}", " ".to_owned().repeat(indent), self.tag);
+                for v in vec {
+                    v.dump(indent+1);
+                }
+            },
+            _ => {
+                println!("{} {} {:?}", " ".to_owned().repeat(indent), self.tag, self.value );
+            }
         }
     }
 }

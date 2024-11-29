@@ -8,6 +8,7 @@ pub trait CertManager {
     fn create_user(&self, id: u64) -> Result<()>;
     fn get_ca_cert(&self) -> Result<Vec<u8>>;
     fn get_ca_key(&self) -> Result<p256::SecretKey>;
+    fn get_ca_public_key(&self) -> Result<Vec<u8>>;
     fn get_user_cert(&self, id: u64) -> Result<Vec<u8>>;
     fn get_user_key(&self, id: u64) -> Result<p256::SecretKey>;
 }
@@ -75,5 +76,9 @@ impl CertManager for FileCertManager {
 
     fn get_user_key(&self, id: u64) -> Result<p256::SecretKey> {
         cryptoutil::read_private_key_from_pem(&Self::user_key_fname(id))
+    }
+
+    fn get_ca_public_key(&self) -> Result<Vec<u8>> {
+        Ok(self.get_ca_key()?.public_key().to_sec1_bytes().to_vec())
     }
 }

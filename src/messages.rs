@@ -144,12 +144,35 @@ impl ProtocolMessageHeader {
     }
 }
 
+
+#[derive(Debug)]
+pub struct StatusReportInfo {
+    general_code: u16,
+    protocol_id: u32,
+    protocol_code: u16
+}
+impl StatusReportInfo {
+    fn parse(data: &[u8]) -> Result<Self>{
+        let mut cursor = std::io::Cursor::new(data);
+        let general_code = cursor.read_u16::<LittleEndian>()?;
+        let protocol_id = cursor.read_u32::<LittleEndian>()?;
+        let protocol_code = cursor.read_u16::<LittleEndian>()?;
+        Ok(Self { general_code, protocol_id, protocol_code})
+    }
+    pub fn is_ok(&self) -> bool{
+        self.general_code == 0 
+            && self.protocol_id == 0
+            && self.protocol_code == 0
+    }
+}
+
 #[derive(Debug)]
 pub struct Message {
     pub message_header: MessageHeader,
     pub protocol_header: ProtocolMessageHeader,
     pub payload: Vec<u8>,
-    pub tlv: TlvItem
+    pub tlv: TlvItem,
+    pub status_report_info: Option<StatusReportInfo>
 }
 
 impl Message {
@@ -158,6 +181,7 @@ impl Message {
         let (protocol_header, rest) = ProtocolMessageHeader::decode(&rest)?;
         if (protocol_header.protocol_id == ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL)
             && (protocol_header.opcode == ProtocolMessageHeader::OPCODE_STATUS) {
+                let status_report_info = StatusReportInfo::parse(&rest)?;
                 return Ok(Self {
                     message_header,
                     protocol_header,
@@ -165,7 +189,8 @@ impl Message {
                     tlv: TlvItem {
                         tag: 0,
                         value: tlv::TlvItemValue::Invalid(),
-                    }
+                    },
+                    status_report_info: Some(status_report_info)
                 })
             }
         let tlv = tlv::decode_tlv(&rest).unwrap();
@@ -173,7 +198,8 @@ impl Message {
             message_header,
             protocol_header,
             payload: rest,
-            tlv
+            tlv,
+            status_report_info: None
         })
     }
     /*pub fn decode2(data: &[u8]) -> Self {
