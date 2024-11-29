@@ -1,10 +1,13 @@
-use byteorder::{LittleEndian, WriteBytesExt};
-use p256::elliptic_curve::{scalar::FromUintUnchecked, sec1::{FromEncodedPoint, ToEncodedPoint}, Curve, Field};
-use std::ops::Mul;
 use anyhow::Result;
+use byteorder::{LittleEndian, WriteBytesExt};
+use p256::elliptic_curve::{
+    scalar::FromUintUnchecked,
+    sec1::{FromEncodedPoint, ToEncodedPoint},
+    Curve, Field,
+};
+use std::ops::Mul;
 
 use crate::cryptoutil::sha256;
-
 
 pub struct Context {
     w0: p256::Scalar,
@@ -14,19 +17,20 @@ pub struct Context {
     pub y: p256::EncodedPoint,
     pub ca: Vec<u8>,
     pub decrypt_key: Vec<u8>,
-    pub encrypt_key: Vec<u8>
+    pub encrypt_key: Vec<u8>,
 }
 
 pub struct Engine {
     m: p256::AffinePoint,
-    n: p256::AffinePoint
+    n: p256::AffinePoint,
 }
 
 impl Engine {
-
     fn p256_scalar_from_40_bytes(bytes: &[u8]) -> p256::Scalar {
         let int = crypto_bigint::U320::from_be_slice(bytes);
-        let modulo = int.rem(&crypto_bigint::NonZero::from_uint(crypto_bigint::U320::from(&p256::NistP256::ORDER)));
+        let modulo = int.rem(&crypto_bigint::NonZero::from_uint(
+            crypto_bigint::U320::from(&p256::NistP256::ORDER),
+        ));
         let u256 = crypto_bigint::U256::from(&modulo);
         p256::Scalar::from_uint_unchecked(u256)
     }
@@ -44,7 +48,10 @@ impl Engine {
         if let Some(r) = res {
             Ok(r)
         } else {
-            Err(anyhow::anyhow!(format!("can't convert point to projective {:?}", e)))
+            Err(anyhow::anyhow!(format!(
+                "can't convert point to projective {:?}",
+                e
+            )))
         }
     }
     pub fn start(&self, key: &[u8], salt: &[u8], iterations: u32) -> Result<Context> {
@@ -54,13 +61,12 @@ impl Engine {
         let w0_scalar = Self::p256_scalar_from_40_bytes(&kdf.as_slice()[..40]);
         let w1_scalar = Self::p256_scalar_from_40_bytes(&kdf[40..80]);
 
-
         let x_random_scalar = p256::Scalar::random(rand::thread_rng());
 
-        let t_pp  = p256::ProjectivePoint::GENERATOR.mul(x_random_scalar);
+        let t_pp = p256::ProjectivePoint::GENERATOR.mul(x_random_scalar);
 
         let p = self.m.mul(&w0_scalar);
-        let px2= p.add(&t_pp);
+        let px2 = p.add(&t_pp);
 
         let px2enc = px2.to_encoded_point(false);
         Ok(Context {
@@ -71,11 +77,11 @@ impl Engine {
             y: p256::EncodedPoint::identity(),
             ca: Vec::new(),
             decrypt_key: Vec::new(),
-            encrypt_key: Vec::new()
+            encrypt_key: Vec::new(),
         })
     }
 
-    fn append_to_tt(buf: &mut Vec<u8>, data: &[u8]) -> Result<()>{
+    fn append_to_tt(buf: &mut Vec<u8>, data: &[u8]) -> Result<()> {
         buf.write_u64::<LittleEndian>(data.len() as u64)?;
         buf.extend_from_slice(data);
         Ok(())
@@ -102,7 +108,6 @@ impl Engine {
         Self::append_to_tt(&mut tt, v.to_encoded_point(false).as_bytes())?;
         Self::append_to_tt(&mut tt, ctx.w0.to_bytes().as_slice())?;
 
-      
         let result = crate::cryptoutil::sha256(&tt);
         let ka = &result[..16];
         let ke = &result[16..32];
@@ -112,10 +117,9 @@ impl Engine {
         ctx.ca = crate::cryptoutil::hmac_sha256(ctx.y.as_bytes(), &okm[..16])?;
         let _cb = crate::cryptoutil::hmac_sha256(ctx.x.as_bytes(), &okm[16..])?;
 
-
-        let xcrypt = crate::cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16*3)?;
+        let xcrypt = crate::cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16 * 3)?;
         ctx.decrypt_key = xcrypt[16..32].to_vec();
-	    ctx.encrypt_key = xcrypt[..16].to_vec();
+        ctx.encrypt_key = xcrypt[..16].to_vec();
 
         Ok(())
     }
@@ -125,14 +129,11 @@ impl Engine {
         let mbin = hex::decode(mhex)?;
         let m = p256::EncodedPoint::from_bytes(mbin)?;
         let m = Self::encoded_point_to_affine(&m)?;
-        
+
         let nhex = "03d8bbd6c639c62937b04d997f38c3770719c629d7014d49a24b4f98baa1292b49";
         let nbin = hex::decode(nhex)?;
         let n = p256::EncodedPoint::from_bytes(nbin)?;
         let n = Self::encoded_point_to_affine(&n)?;
-        Ok(Self {
-            m,
-            n
-        })
+        Ok(Self { m, n })
     }
 }

@@ -1,16 +1,10 @@
-
-
-
-use clap::{Parser, Subcommand, ValueEnum};
 use anyhow::Result;
+use clap::{Parser, Subcommand, ValueEnum};
 
-use matc::cryptoutil;
 use matc::cert;
+use matc::cryptoutil;
 
-
-
-
-fn ca_create() -> Result<()>{
+fn ca_create() -> Result<()> {
     std::fs::create_dir("./pem2")?;
 
     let secret_key = p256::SecretKey::random(&mut rand::thread_rng());
@@ -24,7 +18,7 @@ fn ca_create() -> Result<()>{
     Ok(())
 }
 
-fn controller_create() -> Result<()>{
+fn controller_create() -> Result<()> {
     let ca_private = cryptoutil::read_private_key_from_pem("./pem2/ca-private.pem")?;
     let secret_key = p256::SecretKey::random(&mut rand::thread_rng());
     let data = cryptoutil::secret_key_to_rfc5915(&secret_key)?;
@@ -37,25 +31,22 @@ fn controller_create() -> Result<()>{
     Ok(())
 }
 
-
 #[derive(Parser, Debug)]
 #[command()]
-struct Cli {    
+struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    CaCreate {
-
-    },
+    CaCreate {},
 }
 fn main() {
     let cli = Cli::parse();
     println!("{:?}", cli);
     match cli.command {
-        Commands::CaCreate {  } => {
+        Commands::CaCreate {} => {
             ca_create().unwrap();
             controller_create().unwrap();
         }

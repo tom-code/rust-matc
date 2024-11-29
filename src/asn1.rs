@@ -241,11 +241,11 @@ impl Encoder {
                 self.buffer[a.pos + 1] = s as u8;
             } else if s <= 0xff {
                 self.buffer[a.pos + 1] = 0x81;
-                self.buffer.insert(a.pos+2, s as u8);
+                self.buffer.insert(a.pos + 2, s as u8);
             } else {
                 self.buffer[a.pos + 1] = 0x82;
-                self.buffer.insert(a.pos+2, (s>>8) as u8);
-                self.buffer.insert(a.pos+3, s as u8);
+                self.buffer.insert(a.pos + 2, (s >> 8) as u8);
+                self.buffer.insert(a.pos + 3, s as u8);
             }
         }
     }
@@ -273,7 +273,10 @@ impl Encoder {
     pub fn write_oid(&mut self, val: &str) -> Result<()> {
         match const_oid::ObjectIdentifier::new(val) {
             Ok(o) => self.write_octet_string_with_tag(0x6, o.as_bytes()),
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("can't parse oid {:?}", e))),
+            Err(e) => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("can't parse oid {:?}", e),
+            )),
         }
     }
 

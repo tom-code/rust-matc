@@ -4,16 +4,14 @@ use hmac::Mac;
 use sha1::Sha1;
 use sha2::{Digest, Sha256};
 
-
 pub fn hkdf_sha256(salt: &[u8], secret: &[u8], info: &[u8], size: usize) -> Result<Vec<u8>> {
     let hk = hkdf::Hkdf::<Sha256>::new(Some(salt), secret);
     let mut okm = vec![0u8; size];
     match hk.expand(info, &mut okm) {
         Ok(()) => Ok(okm),
-        Err(e) => Err(anyhow::anyhow!(format!("hkdf error {:?}", e)))
+        Err(e) => Err(anyhow::anyhow!(format!("hkdf error {:?}", e))),
     }
 }
-
 
 pub fn hmac_sha256(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
     if let Ok(mut hm) = hmac::Hmac::<Sha256>::new_from_slice(key) {
@@ -23,8 +21,6 @@ pub fn hmac_sha256(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
         Err(anyhow::anyhow!(format!("can't create hmac {:?}", key)))
     }
 }
-
-
 
 pub fn sha256(data: &[u8]) -> Vec<u8> {
     let mut hasher = Sha256::new();
@@ -37,7 +33,6 @@ pub fn sha1_enc(data: &[u8]) -> Vec<u8> {
     hasher.finalize().to_vec()
 }
 
-
 pub fn read_private_key_from_pem(fname: &str) -> Result<p256::SecretKey> {
     let file_contents = std::fs::read_to_string(fname)?;
     Ok(p256::SecretKey::from_sec1_pem(&file_contents)?)
@@ -49,7 +44,9 @@ pub fn read_private_key_bytes_from_pem(fname: &str) -> Result<Vec<u8>> {
 
 pub fn read_signing_key_from_pem(fname: &str) -> Result<ecdsa::SigningKey<p256::NistP256>> {
     let file_contents = std::fs::read_to_string(fname)?;
-    Ok(ecdsa::SigningKey::from(p256::SecretKey::from_sec1_pem(&file_contents)?))
+    Ok(ecdsa::SigningKey::from(p256::SecretKey::from_sec1_pem(
+        &file_contents,
+    )?))
 }
 
 pub fn read_pub_key_from_pem(fname: &str) -> Result<Vec<u8>> {

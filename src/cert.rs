@@ -1,11 +1,10 @@
-use std::time::{Duration, SystemTime};
 use byteorder::WriteBytesExt;
+use std::time::{Duration, SystemTime};
 
 use crate::asn1;
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 
-
-fn add_ext(encoder: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8]) -> Result<()>{
+fn add_ext(encoder: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8]) -> Result<()> {
     encoder.start_seq(0x30)?;
     encoder.write_oid(oid)?;
     if critical {
@@ -15,8 +14,6 @@ fn add_ext(encoder: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8])
     encoder.end_seq();
     Ok(())
 }
-
-
 
 fn encode_nodeid(id: u64) -> String {
     format!("{:0>16x}", id)
@@ -35,10 +32,14 @@ const OID_MATTER_DN_FABRIC: &str = "1.3.6.1.4.1.37244.1.5";
 
 const OID_SIG_ECDSA_WITH_SHA256: &str = "1.2.840.10045.4.3.2";
 
-
-
-
-pub fn encode_x509(node_public_key: &[u8], node_id: u64, fabric_id: u64, ca_id: u64, ca_private: &p256::SecretKey, ca: bool) -> Result<Vec<u8>> {
+pub fn encode_x509(
+    node_public_key: &[u8],
+    node_id: u64,
+    fabric_id: u64,
+    ca_id: u64,
+    ca_private: &p256::SecretKey,
+    ca: bool,
+) -> Result<Vec<u8>> {
     let mut encoder = asn1::Encoder::new();
     encoder.start_seq(0x30)?;
     encoder.start_seq(0x30)?;
@@ -66,7 +67,9 @@ pub fn encode_x509(node_public_key: &[u8], node_id: u64, fabric_id: u64, ca_id: 
 
     let now = SystemTime::now();
     encoder.write_string_with_tag(0x17, &systemtime_to_x509_time(now)?)?;
-    let not_after = now.checked_add(Duration::from_secs(60*60*24*100)).context("time continuity error")?;
+    let not_after = now
+        .checked_add(Duration::from_secs(60 * 60 * 24 * 100))
+        .context("time continuity error")?;
     encoder.write_string_with_tag(0x17, &systemtime_to_x509_time(not_after)?)?;
     encoder.end_seq();
 
@@ -122,7 +125,12 @@ pub fn encode_x509(node_public_key: &[u8], node_id: u64, fabric_id: u64, ca_id: 
     encoder.start_seq(0xa3)?;
     encoder.start_seq(0x30)?;
     // basic constraints
-    add_ext(&mut encoder, "2.5.29.19", true, &[0x30, 0x03, 0x01, 0x01, 0xFF])?;
+    add_ext(
+        &mut encoder,
+        "2.5.29.19",
+        true,
+        &[0x30, 0x03, 0x01, 0x01, 0xFF],
+    )?;
     // key usage
     if ca {
         add_ext(&mut encoder, "2.5.29.15", true, &[0x03, 0x02, 0x01, 0x06])?;
@@ -131,7 +139,15 @@ pub fn encode_x509(node_public_key: &[u8], node_id: u64, fabric_id: u64, ca_id: 
     }
     //ext key usage
     if !ca {
-        add_ext(&mut encoder, "2.5.29.37", true, &[0x30, 0x14, 0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x02, 0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01])?;
+        add_ext(
+            &mut encoder,
+            "2.5.29.37",
+            true,
+            &[
+                0x30, 0x14, 0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x02, 0x06, 0x08,
+                0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01,
+            ],
+        )?;
     }
     //subject key id
     add_ext(&mut encoder, "2.5.29.14", false, &subjectkeyidasn)?;

@@ -4,8 +4,8 @@ use ccm::{aead::Aead, KeyInit};
 use crypto_bigint::generic_array::GenericArray;
 
 use crate::messages::{self, MessageHeader};
-use std::io::Write;
 use anyhow::Result;
+use std::io::Write;
 
 pub struct Session {
     pub session_id: u16,
@@ -21,10 +21,10 @@ impl Session {
         Self {
             session_id: 0,
             counter: 0,
-            local_node: [0,0,0,0,0,0,0,0].to_vec(),
+            local_node: [0, 0, 0, 0, 0, 0, 0, 0].to_vec(),
             remote_node: Vec::new(),
             encrypt_key: Vec::new(),
-            decrypt_key: Vec::new()
+            decrypt_key: Vec::new(),
         }
     }
 
@@ -44,27 +44,35 @@ impl Session {
             let nonce = self.make_nonce3()?;
             let key = crypto_common::Key::<Aes128Ccm>::from_slice(&self.encrypt_key);
             let cipher = Aes128Ccm::new(key);
-            let enc = match cipher.encrypt(GenericArray::from_slice(&nonce),
-                                              ccm::aead::Payload{ msg: data, aad: &b }) {
-                                                Ok(o) => o,
-                                                Err(e) => return Err(anyhow::anyhow!("encrypt error {:?}", e))
-                                                                                          };
+            let enc = match cipher.encrypt(
+                GenericArray::from_slice(&nonce),
+                ccm::aead::Payload { msg: data, aad: &b },
+            ) {
+                Ok(o) => o,
+                Err(e) => return Err(anyhow::anyhow!("encrypt error {:?}", e)),
+            };
             b.extend_from_slice(&enc);
         }
-        self.counter+=1;
+        self.counter += 1;
         Ok(b)
     }
 
     pub fn decode_message(&mut self, data: &[u8]) -> Result<Vec<u8>> {
         if self.decrypt_key.is_empty() {
-            return Ok(data.to_vec())
+            return Ok(data.to_vec());
         }
         let (header, rest) = MessageHeader::decode(data)?;
         let nonce = Self::make_nonce3_extern(header.message_counter, &self.remote_node)?;
-        let add = &data[..data.len()-rest.len()];
+        let add = &data[..data.len() - rest.len()];
         let key = crypto_common::Key::<Aes128Ccm>::from_slice(&self.decrypt_key);
         let cipher = Aes128Ccm::new(key);
-        let decoded = match cipher.decrypt(GenericArray::from_slice(&nonce), ccm::aead::Payload { msg: &rest, aad: add }) {
+        let decoded = match cipher.decrypt(
+            GenericArray::from_slice(&nonce),
+            ccm::aead::Payload {
+                msg: &rest,
+                aad: add,
+            },
+        ) {
             Ok(o) => o,
             Err(e) => return Err(anyhow::anyhow!(format!("decrypt error {:?}", e))),
         };
@@ -85,7 +93,7 @@ impl Session {
         if !node.is_empty() {
             out.write_all(node)?;
         } else {
-            out.write_all(&[0,0,0,0,0,0,0,0])?;
+            out.write_all(&[0, 0, 0, 0, 0, 0, 0, 0])?;
         }
         Ok(out)
     }

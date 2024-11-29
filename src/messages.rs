@@ -1,8 +1,6 @@
-
-
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::{Read, Result, Write};
 use rand::RngCore;
+use std::io::{Read, Result, Write};
 
 use crate::tlv::{self, TlvItem};
 
@@ -13,7 +11,7 @@ pub struct MessageHeader {
     pub session_id: u16,
     pub message_counter: u32,
     pub source_node_id: Vec<u8>,
-    pub destination_node_id: Vec<u8>
+    pub destination_node_id: Vec<u8>,
 }
 
 impl MessageHeader {
@@ -59,7 +57,7 @@ impl MessageHeader {
             let dst_size = match flags & 3 {
                 Self::DSIZ_64 => 8,
                 Self::DSIZ_16 => 2,
-                _ => 0
+                _ => 0,
             };
             if dst_size > 0 {
                 destination_node_id.resize(dst_size, 0);
@@ -68,15 +66,17 @@ impl MessageHeader {
         };
         let mut rest = Vec::new();
         cursor.read_to_end(&mut rest)?;
-        Ok((Self {
-            flags,
-            security_flags,
-            session_id,
-            message_counter,
-            source_node_id,
-            destination_node_id
-        },
-        rest))
+        Ok((
+            Self {
+                flags,
+                security_flags,
+                session_id,
+                message_counter,
+                source_node_id,
+                destination_node_id,
+            },
+            rest,
+        ))
     }
 }
 
@@ -86,7 +86,7 @@ pub struct ProtocolMessageHeader {
     pub opcode: u8,
     pub exchange_id: u16,
     pub protocol_id: u16,
-    pub ack_counter: u32
+    pub ack_counter: u32,
 }
 
 impl ProtocolMessageHeader {
@@ -101,11 +101,9 @@ impl ProtocolMessageHeader {
     pub const OPCODE_PBKDF_PAKE2: u8 = 0x23;
     pub const OPCODE_PBKDF_PAKE3: u8 = 0x24;
     pub const OPCODE_STATUS: u8 = 0x40;
-    
 
-    pub const INTERACTION_OPCODE_READ_REQ :u8 = 0x2;
-    pub const INTERACTION_OPCODE_INVOKE_REQ :u8 = 0x8;
-    
+    pub const INTERACTION_OPCODE_READ_REQ: u8 = 0x2;
+    pub const INTERACTION_OPCODE_INVOKE_REQ: u8 = 0x8;
 
     pub const PROTOCOL_ID_SECURE_CHANNEL: u16 = 0;
     pub const PROTOCOL_ID_INTERACTION: u16 = 1;
@@ -132,37 +130,39 @@ impl ProtocolMessageHeader {
         }
         let mut rest = Vec::new();
         cursor.read_to_end(&mut rest)?;
-        Ok((Self {
-            exchange_flags,
-            opcode,
-            exchange_id,
-            protocol_id,
-            ack_counter
-        },
-        rest
-    ))
+        Ok((
+            Self {
+                exchange_flags,
+                opcode,
+                exchange_id,
+                protocol_id,
+                ack_counter,
+            },
+            rest,
+        ))
     }
 }
-
 
 #[derive(Debug)]
 pub struct StatusReportInfo {
     general_code: u16,
     protocol_id: u32,
-    protocol_code: u16
+    protocol_code: u16,
 }
 impl StatusReportInfo {
-    fn parse(data: &[u8]) -> Result<Self>{
+    fn parse(data: &[u8]) -> Result<Self> {
         let mut cursor = std::io::Cursor::new(data);
         let general_code = cursor.read_u16::<LittleEndian>()?;
         let protocol_id = cursor.read_u32::<LittleEndian>()?;
         let protocol_code = cursor.read_u16::<LittleEndian>()?;
-        Ok(Self { general_code, protocol_id, protocol_code})
+        Ok(Self {
+            general_code,
+            protocol_id,
+            protocol_code,
+        })
     }
-    pub fn is_ok(&self) -> bool{
-        self.general_code == 0 
-            && self.protocol_id == 0
-            && self.protocol_code == 0
+    pub fn is_ok(&self) -> bool {
+        self.general_code == 0 && self.protocol_id == 0 && self.protocol_code == 0
     }
 }
 
@@ -172,7 +172,7 @@ pub struct Message {
     pub protocol_header: ProtocolMessageHeader,
     pub payload: Vec<u8>,
     pub tlv: TlvItem,
-    pub status_report_info: Option<StatusReportInfo>
+    pub status_report_info: Option<StatusReportInfo>,
 }
 
 impl Message {
@@ -180,26 +180,27 @@ impl Message {
         let (message_header, rest) = MessageHeader::decode(data)?;
         let (protocol_header, rest) = ProtocolMessageHeader::decode(&rest)?;
         if (protocol_header.protocol_id == ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL)
-            && (protocol_header.opcode == ProtocolMessageHeader::OPCODE_STATUS) {
-                let status_report_info = StatusReportInfo::parse(&rest)?;
-                return Ok(Self {
-                    message_header,
-                    protocol_header,
-                    payload: rest,
-                    tlv: TlvItem {
-                        tag: 0,
-                        value: tlv::TlvItemValue::Invalid(),
-                    },
-                    status_report_info: Some(status_report_info)
-                })
-            }
+            && (protocol_header.opcode == ProtocolMessageHeader::OPCODE_STATUS)
+        {
+            let status_report_info = StatusReportInfo::parse(&rest)?;
+            return Ok(Self {
+                message_header,
+                protocol_header,
+                payload: rest,
+                tlv: TlvItem {
+                    tag: 0,
+                    value: tlv::TlvItemValue::Invalid(),
+                },
+                status_report_info: Some(status_report_info),
+            });
+        }
         let tlv = tlv::decode_tlv(&rest).unwrap();
         Ok(Self {
             message_header,
             protocol_header,
             payload: rest,
             tlv,
-            status_report_info: None
+            status_report_info: None,
         })
     }
     /*pub fn decode2(data: &[u8]) -> Self {
@@ -225,18 +226,19 @@ pub fn ack(exchange: u16, ack: i64) -> Result<Vec<u8>> {
         opcode: ProtocolMessageHeader::OPCODE_ACK,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: ack as u32
+        ack_counter: ack as u32,
     };
     prot.encode()
 }
 
 pub fn pbkdf_req(exchange: u16) -> Result<Vec<u8>> {
     let prot = ProtocolMessageHeader {
-        exchange_flags: ProtocolMessageHeader::FLAG_INITIATOR | ProtocolMessageHeader::FLAG_RELIABILITY,
+        exchange_flags: ProtocolMessageHeader::FLAG_INITIATOR
+            | ProtocolMessageHeader::FLAG_RELIABILITY,
         opcode: ProtocolMessageHeader::OPCODE_PBKDF_REQ,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: 0
+        ack_counter: 0,
     };
     let mut b = prot.encode()?;
     let mut tlv = tlv::TlvBuffer::new();
@@ -252,7 +254,6 @@ pub fn pbkdf_req(exchange: u16) -> Result<Vec<u8>> {
     Ok(b)
 }
 
-
 pub fn pake1(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
     let mut flags = ProtocolMessageHeader::FLAG_INITIATOR | ProtocolMessageHeader::FLAG_RELIABILITY;
     if ack >= 0 {
@@ -263,7 +264,7 @@ pub fn pake1(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
         opcode: ProtocolMessageHeader::OPCODE_PBKDF_PAKE1,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: ack as u32
+        ack_counter: ack as u32,
     };
     let mut b = prot.encode()?;
     let mut tlv = tlv::TlvBuffer::new();
@@ -275,7 +276,6 @@ pub fn pake1(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
     Ok(b)
 }
 
-
 pub fn pake3(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
     let mut flags = 0x5;
     if ack >= 0 {
@@ -286,7 +286,7 @@ pub fn pake3(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
         opcode: ProtocolMessageHeader::OPCODE_PBKDF_PAKE3,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: ack as u32
+        ack_counter: ack as u32,
     };
     let mut b = prot.encode()?;
     let mut tlv = tlv::TlvBuffer::new();
@@ -299,41 +299,45 @@ pub fn pake3(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
 }
 
 pub fn sigma1(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
-
     let prot = ProtocolMessageHeader {
         exchange_flags: 5,
         opcode: 0x30,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: 0
+        ack_counter: 0,
     };
     let mut b = prot.encode()?;
     b.write_all(payload)?;
     Ok(b)
 }
 pub fn sigma3(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
-
     let prot = ProtocolMessageHeader {
         exchange_flags: 5,
         opcode: 0x32,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: 0
+        ack_counter: 0,
     };
     let mut b = prot.encode()?;
     b.write_all(payload)?;
     Ok(b)
 }
 
-
-pub fn im_invoke_request(endpoint: u16, cluster: u32, command: u32, exchange_id: u16, payload: &[u8], timed: bool) -> Result<Vec<u8>> {
+pub fn im_invoke_request(
+    endpoint: u16,
+    cluster: u32,
+    command: u32,
+    exchange_id: u16,
+    payload: &[u8],
+    timed: bool,
+) -> Result<Vec<u8>> {
     let flags = 5;
     let prot = ProtocolMessageHeader {
         exchange_flags: flags,
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_INVOKE_REQ,
         exchange_id,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
-        ack_counter: 0
+        ack_counter: 0,
     };
 
     let mut b = prot.encode()?;
@@ -366,7 +370,7 @@ pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32) -> Result<Vec<u8>
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_READ_REQ,
         exchange_id: 0,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
-        ack_counter: 0
+        ack_counter: 0,
     };
 
     let mut b = prot.encode()?;
