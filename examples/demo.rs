@@ -40,14 +40,15 @@ fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn spake_flow(connection: &transport::Connection, session: &mut Session, pin: u32) -> Result<()> {
+fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<Session> {
+    let mut session = Session::new();
     // send pbkdf
     let pbkdf_req_protocol_message = messages::pbkdf_req(1)?;
     let pbkdf_req = session.encode_message(&pbkdf_req_protocol_message)?;
     connection.send(&pbkdf_req);
 
     // get pbkdf response
-    let pbkdf_response = get_next_message(connection, session)?;
+    let pbkdf_response = get_next_message(connection, &mut session)?;
     if pbkdf_response.protocol_header.protocol_id
         != ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         || pbkdf_response.protocol_header.opcode != ProtocolMessageHeader::OPCODE_PBKDF_RESP
@@ -76,7 +77,7 @@ fn spake_flow(connection: &transport::Connection, session: &mut Session, pin: u3
     connection.send(&pake1);
 
     // receive pake2
-    let pake2 = get_next_message(connection, session)?;
+    let pake2 = get_next_message(connection, &mut session)?;
     if pake2.protocol_header.protocol_id != ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         || pake2.protocol_header.opcode != ProtocolMessageHeader::OPCODE_PBKDF_PAKE2
     {
@@ -97,7 +98,7 @@ fn spake_flow(connection: &transport::Connection, session: &mut Session, pin: u3
     let pake3 = session.encode_message(&pake3_protocol_message)?;
     connection.send(&pake3);
 
-    let pake3_resp = get_next_message(connection, session)?;
+    let pake3_resp = get_next_message(connection, &mut session)?;
     println!("pake3_resp {:?}", pake3_resp);
     match &pake3_resp.status_report_info {
         Some(s) => {
@@ -119,10 +120,10 @@ fn spake_flow(connection: &transport::Connection, session: &mut Session, pin: u3
         //let _unk2 = messages::Message::decode(&unk);
     };
 
-    session.encrypt_key = ctx.encrypt_key;
-    session.decrypt_key = ctx.decrypt_key;
+    session.set_encrypt_key(&ctx.encrypt_key);
+    session.set_decrypt_key(&ctx.decrypt_key);
     session.session_id = p_session as u16;
-    Ok(())
+    Ok(session)
 }
 
 fn comission(
@@ -202,14 +203,15 @@ fn comission(
     Ok(())
 }
 
-fn sigma(
+fn auth_sigma(
     connection: &transport::Connection,
-    session: &mut Session,
     fabric: &fabric::Fabric,
     cm: &dyn certmanager::CertManager,
     node_id: u64,
     controller_id: u64,
 ) -> Result<Session> {
+    let mut session = Session::new();
+    session.counter = 100;
     let mut ctx = sigma::SigmaContext::new(node_id);
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     sigma::sigma1(fabric, &mut ctx, &ca_pubkey)?;
@@ -218,7 +220,7 @@ fn sigma(
     connection.send(&out);
 
     // receive sigma2
-    let sigma2 = get_next_message(connection, session)?;
+    let sigma2 = get_next_message(connection, &mut session)?;
     ctx.sigma2_payload = sigma2.payload;
     ctx.responder_session = sigma2
         .tlv
@@ -246,7 +248,7 @@ fn sigma(
     let out = session.encode_message(&sigma3)?;
     connection.send(&out);
 
-    let status = get_next_message(connection, session)?;
+    let status = get_next_message(connection, &mut session)?;
     println!("sigma status {:?}", status);
 
     //session keys
@@ -267,8 +269,8 @@ fn sigma(
     )?;
     let mut ses = Session::new();
     ses.session_id = ctx.responder_session;
-    ses.decrypt_key = keypack[16..32].to_vec();
-    ses.encrypt_key = keypack[..16].to_vec();
+    ses.set_decrypt_key(&keypack[16..32]);
+    ses.set_encrypt_key(&keypack[..16]);
     ses.local_node = Vec::new();
     ses.local_node.write_u64::<LittleEndian>(controller_id)?;
     ses.remote_node = Vec::new();
@@ -296,19 +298,16 @@ fn read_request(
 }
 
 fn main() {
-    let mut session = Session::new();
     let transport = transport::Transport::new("0.0.0.0:5555").unwrap();
     let connection = transport.create_connection("192.168.5.77:5540");
 
     let cm: Box<dyn certmanager::CertManager> = Box::new(certmanager::FileCertManager::new(0x110));
     let fabric = fabric::Fabric::new(0x110, 1, &cm.get_ca_public_key().unwrap());
 
-    spake_flow(&connection, &mut session, 123456).unwrap();
+    let mut session = auth_spake(&connection, 123456).unwrap();
     comission(&connection, &mut session, &fabric, cm.as_ref(), 600, 100).unwrap();
 
-    let mut session = Session::new();
-    session.counter = 100;
-    let mut session = sigma(&connection, &mut session, &fabric, cm.as_ref(), 600, 100).unwrap();
+    let mut session = auth_sigma(&connection, &fabric, cm.as_ref(), 600, 100).unwrap();
 
     println!("x1 {:?}", connection.receive().unwrap()); // ack
 

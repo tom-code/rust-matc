@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::{cert, cryptoutil};
 
-pub trait CertManager {
+pub trait CertManager{
     fn bootstrap(&self) -> Result<()>;
     fn create_user(&self, id: u64) -> Result<()>;
     fn get_ca_cert(&self) -> Result<Vec<u8>>;
@@ -14,11 +14,15 @@ pub trait CertManager {
 
 pub struct FileCertManager {
     fabric_id: u64,
+    path: String,
 }
 
 impl FileCertManager {
     pub fn new(fabric_id: u64) -> Self {
-        Self { fabric_id }
+        Self {
+            fabric_id,
+            path: "./pem2".to_owned(),
+        }
     }
     fn user_key_fname(id: u64) -> String {
         format!("pem2/{}-private.pem", id)
@@ -31,7 +35,7 @@ impl FileCertManager {
 const CA_NODE_ID: u64 = 1;
 impl CertManager for FileCertManager {
     fn bootstrap(&self) -> Result<()> {
-        std::fs::create_dir("./pem2")?;
+        std::fs::create_dir(&self.path)?;
 
         let secret_key = p256::SecretKey::random(&mut rand::thread_rng());
         let data = cryptoutil::secret_key_to_rfc5915(&secret_key)?;

@@ -1,9 +1,7 @@
 use aes::cipher::crypto_common;
 use byteorder::{LittleEndian, WriteBytesExt};
-use ccm::{aead::Aead, KeyInit};
-use crypto_bigint::generic_array::GenericArray;
 
-use crate::messages::{self, MessageHeader};
+use crate::{cryptoutil, messages};
 use anyhow::Result;
 use std::io::Write;
 
@@ -12,8 +10,8 @@ pub struct Session {
     pub counter: u32,
     pub local_node: Vec<u8>,
     pub remote_node: Vec<u8>,
-    pub encrypt_key: Vec<u8>,
-    pub decrypt_key: Vec<u8>,
+    pub encrypt_key: Option<crypto_common::Key::<Aes128Ccm>>,
+    pub decrypt_key: Option<crypto_common::Key::<Aes128Ccm>>,
 }
 type Aes128Ccm = ccm::Ccm<aes::Aes128, ccm::consts::U16, ccm::consts::U13>;
 impl Session {
@@ -23,9 +21,15 @@ impl Session {
             counter: 0,
             local_node: [0, 0, 0, 0, 0, 0, 0, 0].to_vec(),
             remote_node: Vec::new(),
-            encrypt_key: Vec::new(),
-            decrypt_key: Vec::new(),
+            encrypt_key: None,
+            decrypt_key: None,
         }
+    }
+    pub fn set_encrypt_key(&mut self, k: &[u8]) {
+        self.encrypt_key = Some(*crypto_common::Key::<Aes128Ccm>::from_slice(k))
+    }
+    pub fn set_decrypt_key(&mut self, k: &[u8]) {
+        self.decrypt_key = Some(*crypto_common::Key::<Aes128Ccm>::from_slice(k))
     }
 
     pub fn encode_message(&mut self, data: &[u8]) -> Result<Vec<u8>> {
@@ -38,44 +42,30 @@ impl Session {
             destination_node_id: self.remote_node.clone(),
         };
         let mut b = mg.encode()?;
-        if self.encrypt_key.is_empty() {
-            b.extend_from_slice(data);
-        } else {
-            let nonce = self.make_nonce3()?;
-            let key = crypto_common::Key::<Aes128Ccm>::from_slice(&self.encrypt_key);
-            let cipher = Aes128Ccm::new(key);
-            let enc = match cipher.encrypt(
-                GenericArray::from_slice(&nonce),
-                ccm::aead::Payload { msg: data, aad: &b },
-            ) {
-                Ok(o) => o,
-                Err(e) => return Err(anyhow::anyhow!("encrypt error {:?}", e)),
-            };
-            b.extend_from_slice(&enc);
-        }
+        match self.encrypt_key {
+            Some(key) => {
+                let nonce = self.make_nonce3()?;
+                println!("ek3: {:?}", self.encrypt_key);
+                let enc = cryptoutil::aes128_ccm_encrypt(&key, &nonce, &b, data)?;
+                b.extend_from_slice(&enc);
+            },
+            None => {
+                b.extend_from_slice(data)
+            }
+        };
+
         self.counter += 1;
         Ok(b)
     }
 
     pub fn decode_message(&mut self, data: &[u8]) -> Result<Vec<u8>> {
-        if self.decrypt_key.is_empty() {
+        if self.decrypt_key.is_none() {
             return Ok(data.to_vec());
         }
-        let (header, rest) = MessageHeader::decode(data)?;
+        let (header, rest) = messages::MessageHeader::decode(data)?;
         let nonce = Self::make_nonce3_extern(header.message_counter, &self.remote_node)?;
         let add = &data[..data.len() - rest.len()];
-        let key = crypto_common::Key::<Aes128Ccm>::from_slice(&self.decrypt_key);
-        let cipher = Aes128Ccm::new(key);
-        let decoded = match cipher.decrypt(
-            GenericArray::from_slice(&nonce),
-            ccm::aead::Payload {
-                msg: &rest,
-                aad: add,
-            },
-        ) {
-            Ok(o) => o,
-            Err(e) => return Err(anyhow::anyhow!(format!("decrypt error {:?}", e))),
-        };
+        let decoded = cryptoutil::aes128_ccm_decrypt(&self.decrypt_key.unwrap_or_default(), &nonce, add, &rest)?;
         let mut out = Vec::new();
         out.extend_from_slice(add);
         out.extend_from_slice(&decoded);

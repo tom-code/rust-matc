@@ -81,6 +81,21 @@ impl MessageHeader {
 }
 
 #[derive(Debug)]
+enum SecChannelOpcode {
+    None = 0x0,
+    Ack = 0x10,
+    PbkdfReq = 0x20,
+    PbkdfResp = 0x21,
+    Pake1 = 0x22,
+    Pake2 = 0x23,
+    Pake3 = 0x24,
+    Sigma1 = 0x30,
+    Sigma2 = 0x31,
+    Sigma3 = 0x32,
+    Status = 0x40,
+}
+
+#[derive(Debug)]
 pub struct ProtocolMessageHeader {
     exchange_flags: u8,
     pub opcode: u8,

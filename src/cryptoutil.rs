@@ -1,3 +1,4 @@
+use aes::cipher::crypto_common;
 use anyhow::Result;
 
 use hmac::Mac;
@@ -31,6 +32,41 @@ pub fn sha1_enc(data: &[u8]) -> Vec<u8> {
     let mut hasher = Sha1::new();
     hasher.update(data);
     hasher.finalize().to_vec()
+}
+
+type Aes128Ccm = ccm::Ccm<aes::Aes128, ccm::consts::U16, ccm::consts::U13>;
+pub fn aes128_ccm_encrypt(
+    key: &crypto_common::Key<Aes128Ccm>,
+    nonce: &[u8],
+    aad: &[u8],
+    msg: &[u8],
+) -> Result<Vec<u8>> {
+    let cipher = <Aes128Ccm as ccm::KeyInit>::new(key);
+    match ccm::aead::Aead::encrypt(
+        &cipher,
+        crypto_common::generic_array::GenericArray::from_slice(nonce),
+        ccm::aead::Payload { msg, aad },
+    ) {
+        Ok(o) => Ok(o),
+        Err(e) => Err(anyhow::anyhow!("encrypt error {:?}", e)),
+    }
+}
+
+pub fn aes128_ccm_decrypt(
+    key: &crypto_common::Key<Aes128Ccm>,
+    nonce: &[u8],
+    aad: &[u8],
+    msg: &[u8],
+) -> Result<Vec<u8>> {
+    let cipher = <Aes128Ccm as ccm::KeyInit>::new(key);
+    match ccm::aead::Aead::decrypt(
+        &cipher,
+        crypto_common::generic_array::GenericArray::from_slice(nonce),
+        ccm::aead::Payload { msg, aad },
+    ) {
+        Ok(o) => Ok(o),
+        Err(e) => Err(anyhow::anyhow!(format!("decrypt error {:?}", e))),
+    }
 }
 
 pub fn read_private_key_from_pem(fname: &str) -> Result<p256::SecretKey> {
