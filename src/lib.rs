@@ -10,3 +10,4 @@ pub mod sigma;
 pub mod spake2p;
 pub mod tlv;
 pub mod transport;
+pub mod controller;

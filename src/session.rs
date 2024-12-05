@@ -45,7 +45,6 @@ impl Session {
         match self.encrypt_key {
             Some(key) => {
                 let nonce = self.make_nonce3()?;
-                println!("ek3: {:?}", self.encrypt_key);
                 let enc = cryptoutil::aes128_ccm_encrypt(&key, &nonce, &b, data)?;
                 b.extend_from_slice(&enc);
             },

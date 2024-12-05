@@ -1,34 +1,13 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 
-use matc::cert;
-use matc::cryptoutil;
+use matc::certmanager::{CertManager, FileCertManager};
+
 
 fn ca_create() -> Result<()> {
-    std::fs::create_dir("./pem2")?;
-
-    let secret_key = p256::SecretKey::random(&mut rand::thread_rng());
-    let data = cryptoutil::secret_key_to_rfc5915(&secret_key)?;
-    let pem = pem::Pem::new("EC PRIVATE KEY", data);
-    std::fs::write("./pem2/ca-private.pem", pem::encode(&pem).as_bytes())?;
-    let node_public_key = secret_key.public_key().to_sec1_bytes();
-
-    let x509 = cert::encode_x509(&node_public_key, 1, 0x110, 1, &secret_key, true)?;
-    cryptoutil::write_pem("CERTIFICATE", &x509, "./pem2/ca-cert.pem")?;
-    Ok(())
-}
-
-fn controller_create() -> Result<()> {
-    let ca_private = cryptoutil::read_private_key_from_pem("./pem2/ca-private.pem")?;
-    let secret_key = p256::SecretKey::random(&mut rand::thread_rng());
-    let data = cryptoutil::secret_key_to_rfc5915(&secret_key)?;
-    let pem = pem::Pem::new("EC PRIVATE KEY", data);
-    std::fs::write("./pem2/100-private.pem", pem::encode(&pem).as_bytes())?;
-    let node_public_key = secret_key.public_key().to_sec1_bytes();
-
-    let x509 = cert::encode_x509(&node_public_key, 100, 0x110, 1, &ca_private, false)?;
-    cryptoutil::write_pem("CERTIFICATE", &x509, "./pem2/100-cert.pem")?;
-    Ok(())
+    let cm = FileCertManager::new(0x110, "./pem2");
+    cm.bootstrap()?;
+    cm.create_user(100)
 }
 
 #[derive(Parser, Debug)]
@@ -48,7 +27,6 @@ fn main() {
     match cli.command {
         Commands::CaCreate {} => {
             ca_create().unwrap();
-            controller_create().unwrap();
         }
     }
 }

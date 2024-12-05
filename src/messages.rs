@@ -218,19 +218,6 @@ impl Message {
             status_report_info: None,
         })
     }
-    /*pub fn decode2(data: &[u8]) -> Self {
-        let (message_header, rest) = MessageHeader::decode(data).unwrap();
-        let (protocol_header, rest) = ProtocolMessageHeader::decode(&rest).unwrap();
-
-
-        let tlv = tlv::decode_tlv(&[]).unwrap();
-        Self {
-            message_header,
-            protocol_header,
-            payload: rest,
-            tlv
-        }
-    }*/
 }
 
 pub fn ack(exchange: u16, ack: i64) -> Result<Vec<u8>> {
