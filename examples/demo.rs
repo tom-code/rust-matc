@@ -11,12 +11,15 @@ fn main() {
     let device_id = 600;
     let controller_id = 100;
 
-    let cm: Arc<dyn certmanager::CertManager> = Arc::new(certmanager::FileCertManager::new(fabric_id, "./pem2"));
-    let transport = transport::Transport::new(local_address).unwrap();
-    let controller = controller::Controller::new(&cm, &transport, fabric_id);
-    let connection = transport.create_connection(device_address);
-    controller.commission(&connection, pin, device_id, controller_id).unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    runtime.block_on(async {
+        let cm: Arc<dyn certmanager::CertManager> = Arc::new(certmanager::FileCertManager::new(fabric_id, "./pem2"));
+        let transport = transport::Transport::new(local_address).await.unwrap();
+        let controller = controller::Controller::new(&cm, &transport, fabric_id);
+        let connection = transport.create_connection(device_address).await;
+        controller.commission(&connection, pin, device_id, controller_id).await.unwrap();
 
-    let mut connection = controller.auth_sigma(&connection, device_id, controller_id).unwrap();
-    connection.read_request(0, 0x1d, 0).unwrap();
+        let mut connection = controller.auth_sigma(&connection, device_id, controller_id).await.unwrap();
+        connection.read_request(0, 0x1d, 0).await.unwrap();
+    });
 }

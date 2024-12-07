@@ -25,6 +25,8 @@ pem="3.0.*"
 const-oid = "0.9.*"
 anyhow = "1.0.*"
 
+tokio = {version="1.4.*", features=["sync", "net", "rt", "rt-multi-thread", "time"]}
+
 # - todo add to utils only
 clap = {version="4.4.*", features=["derive"]}
 

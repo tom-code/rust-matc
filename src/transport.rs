@@ -1,49 +1,48 @@
+
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use anyhow::Result;
-use std::collections::HashMap;
-use std::net::UdpSocket;
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+use tokio::{net::UdpSocket, sync::Mutex};
 
 struct ConnectionInfo {
-    sender: mpsc::Sender<Vec<u8>>,
+    sender: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 pub struct Transport {
-    socket: std::net::UdpSocket,
+    socket: UdpSocket,
     connections: Mutex<HashMap<String, ConnectionInfo>>,
 }
 
 pub struct Connection {
     transport: Arc<Transport>,
     remote_address: String,
-    receiver: Mutex<mpsc::Receiver<Vec<u8>>>,
+    receiver: Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>,
 }
 
+
 impl Transport {
-    pub fn new(local: &str) -> Result<Arc<Self>> {
-        let socket = UdpSocket::bind(local)?;
-        socket.set_read_timeout(Some(Duration::from_secs(3)))?;
+    pub async fn new(local: &str) -> Result<Arc<Self>> {
+        let socket = UdpSocket::bind(local).await?;
+        //socket.set_read_timeout(Some(Duration::from_secs(3)))?;
         let o = Arc::new(Self {
             socket,
             connections: Mutex::new(HashMap::new()),
         });
         let self_c = o.clone();
-        thread::spawn(move || loop {
+        tokio::spawn(async move { loop {
             let mut buf = vec![0u8; 1024];
-            let (n, addr) = self_c.socket.recv_from(&mut buf).unwrap();
+            let (n, addr) = self_c.socket.recv_from(&mut buf).await.unwrap();
             buf.resize(n, 0);
-            let cons = self_c.connections.lock().unwrap();
+            let cons = self_c.connections.lock().await;
             if let Some(c) = cons.get(&addr.to_string()) {
-                c.sender.send(buf).unwrap();
+                c.sender.send(buf).await.unwrap();
             }
-        });
+        }});
         Ok(o)
     }
 
-    pub fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<Connection> {
-        let mut clock = self.connections.lock().unwrap();
-        let (sender, receiver) = mpsc::channel();
+    pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<Connection> {
+        let mut clock = self.connections.lock().await;
+        let (sender, receiver) = tokio::sync::mpsc::channel(32);
         clock.insert(remote.to_owned(), ConnectionInfo { sender });
         Arc::new(Connection {
             transport: self.clone(),
@@ -54,14 +53,24 @@ impl Transport {
 }
 
 impl Connection {
-    pub fn send(&self, data: &[u8]) {
+    pub async fn send(&self, data: &[u8]) {
         self.transport
             .socket
             .send_to(data, &self.remote_address)
+            .await
             .unwrap();
     }
-    pub fn receive(&self) -> Result<Vec<u8>> {
-        let ch = self.receiver.lock().unwrap();
-        Ok(ch.recv()?)
+    pub async fn receive(&self) -> Result<Vec<u8>> {
+        let mut ch = self.receiver.lock().await;
+        let rec_future = ch.recv();
+        let with_timeout = tokio::time::timeout(Duration::from_secs(3), rec_future);
+        let res = match with_timeout.await {
+            Ok(res) => res,
+            Err(e) => return Err(anyhow::anyhow!("error waiting for data from transport err:{}", e)),
+        };
+        match res {
+            Some(r) => Ok(r),
+            None => Err(anyhow::anyhow!("channel eof")),
+        }
     }
 }

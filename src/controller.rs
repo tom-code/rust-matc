@@ -27,13 +27,13 @@ impl Controller {
             fabric
         })
     }
-    pub fn commission(&self, connection: &Arc<transport::Connection>, pin: u32, node_id: u64, controller_id: u64) -> Result<()>{
-        let mut session = auth_spake(connection, pin)?;
-        comission(connection, &mut session, &self.fabric, self.certmanager.as_ref(), node_id, controller_id)
+    pub async fn commission(&self, connection: &Arc<transport::Connection>, pin: u32, node_id: u64, controller_id: u64) -> Result<()>{
+        let mut session = auth_spake(connection, pin).await?;
+        comission(connection, &mut session, &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await
 
     }
-    pub fn auth_sigma(&self, connection: &Arc<transport::Connection>, node_id: u64, controller_id: u64) -> Result<Connection>{
-        let session = auth_sigma(connection, &self.fabric, self.certmanager.as_ref(), node_id, controller_id)?;
+    pub async fn auth_sigma(&self, connection: &Arc<transport::Connection>, node_id: u64, controller_id: u64) -> Result<Connection>{
+        let session = auth_sigma(connection, &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await?;
         Ok(Connection {
             connection: connection.clone(),
             session
@@ -42,22 +42,22 @@ impl Controller {
 }
 
 impl Connection {
-    pub fn read_request(
+    pub async fn read_request(
         &mut self,
         endpoint: u16,
         cluster: u32,
         attr: u32) -> Result<()>{
-            read_request(&self.connection, &mut self.session, endpoint, cluster, attr)
+            read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
 
     }
 }
 
-fn get_next_message(
+async fn get_next_message(
     connection: &transport::Connection,
     session: &mut session::Session,
 ) -> Result<messages::Message> {
     loop {
-        let resp = connection.receive()?;
+        let resp = connection.receive().await?;
         let resp = session.decode_message(&resp)?;
         let decoded = messages::Message::decode(&resp)?;
         if decoded.protocol_header.protocol_id
@@ -71,7 +71,7 @@ fn get_next_message(
             decoded.message_header.message_counter as i64,
         )?;
         let out = session.encode_message(&ack)?;
-        connection.send(&out);
+        connection.send(&out).await;
         return Ok(decoded);
     }
 }
@@ -82,15 +82,15 @@ fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::Session> {
+async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::Session> {
     let mut session = session::Session::new();
     // send pbkdf
     let pbkdf_req_protocol_message = messages::pbkdf_req(1)?;
     let pbkdf_req = session.encode_message(&pbkdf_req_protocol_message)?;
-    connection.send(&pbkdf_req);
+    connection.send(&pbkdf_req).await;
 
     // get pbkdf response
-    let pbkdf_response = get_next_message(connection, &mut session)?;
+    let pbkdf_response = get_next_message(connection, &mut session).await?;
     if pbkdf_response.protocol_header.protocol_id
         != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         || pbkdf_response.protocol_header.opcode != messages::ProtocolMessageHeader::OPCODE_PBKDF_RESP
@@ -116,10 +116,10 @@ fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::S
     let mut ctx = engine.start(&pin_to_passcode(pin)?, salt, iterations as u32)?;
     let pake1_protocol_message = messages::pake1(1, ctx.x.as_bytes(), -1)?;
     let pake1 = session.encode_message(&pake1_protocol_message)?;
-    connection.send(&pake1);
+    connection.send(&pake1).await;
 
     // receive pake2
-    let pake2 = get_next_message(connection, &mut session)?;
+    let pake2 = get_next_message(connection, &mut session).await?;
     if pake2.protocol_header.protocol_id != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         || pake2.protocol_header.opcode != messages::ProtocolMessageHeader::OPCODE_PBKDF_PAKE2
     {
@@ -138,9 +138,9 @@ fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::S
     engine.finish(&mut ctx, &hash_seed)?;
     let pake3_protocol_message = messages::pake3(1, &ctx.ca, -1)?;
     let pake3 = session.encode_message(&pake3_protocol_message)?;
-    connection.send(&pake3);
+    connection.send(&pake3).await;
 
-    let pake3_resp = get_next_message(connection, &mut session)?;
+    let pake3_resp = get_next_message(connection, &mut session).await?;
         match &pake3_resp.status_report_info {
         Some(s) => {
             if !s.is_ok() {
@@ -156,7 +156,7 @@ fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::S
     }
 
     // some leftover ack - we must get it out before we enable encryption from this endpoint
-    if connection.receive().is_err() {
+    if connection.receive().await.is_err() {
         println!("we did not get leftover ack. we assume it will not come");
         //let _unk2 = messages::Message::decode(&unk);
     };
@@ -167,7 +167,7 @@ fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::S
     Ok(session)
 }
 
-fn comission(
+async fn comission(
     connection: &transport::Connection,
     session: &mut session::Session,
     fabric: &fabric::Fabric,
@@ -184,10 +184,10 @@ fn comission(
     tlv.write_octetstring(0, &random_csr_nonce)?;
     let csr_request = messages::im_invoke_request(0, 0x3e, 4, 1, &tlv.data, false)?;
     let csr_request = session.encode_message(&csr_request)?;
-    connection.send(&csr_request);
+    connection.send(&csr_request).await;
 
     // step 2 receive csr request response
-    let csr_msg = get_next_message(connection, session)?;
+    let csr_msg = get_next_message(connection, session).await?;
 
     let csr_tlve = csr_msg
         .tlv
@@ -207,11 +207,11 @@ fn comission(
     tlv.write_octetstring(0, &mcert)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0xb, 1, &tlv.data, false)?;
     let out = session.encode_message(&t1)?;
-    connection.send(&out);
+    connection.send(&out).await;
 
     // push ca cert response
     //println!("a1 {:?}", get_next_message(connection, session));
-    get_next_message(connection, session)?;
+    get_next_message(connection, session).await?;
 
     // step 4 push device cert
     let ca_id = fabric.ca_id;
@@ -238,16 +238,16 @@ fn comission(
     tlv.write_uint64(4, controller_id)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0x6, 1, &tlv.data, false)?;
     let out = session.encode_message(&t1)?;
-    connection.send(&out);
+    connection.send(&out).await;
 
-    get_next_message(connection, session)?;
-    connection.receive()?;
+    get_next_message(connection, session).await?;
+    connection.receive().await?;
     //println!("x1 {:?}", get_next_message(connection, session));
     //println!("x1 {:?}", connection.receive()?); // ack
     Ok(())
 }
 
-fn auth_sigma(
+async fn auth_sigma(
     connection: &transport::Connection,
     fabric: &fabric::Fabric,
     cm: &dyn certmanager::CertManager,
@@ -261,10 +261,10 @@ fn auth_sigma(
     sigma::sigma1(fabric, &mut ctx, &ca_pubkey)?;
     let s1 = messages::sigma1(11, &ctx.sigma1_payload)?;
     let out = session.encode_message(&s1)?;
-    connection.send(&out);
+    connection.send(&out).await;
 
     // receive sigma2
-    let sigma2 = get_next_message(connection, &mut session)?;
+    let sigma2 = get_next_message(connection, &mut session).await?;
     ctx.sigma2_payload = sigma2.payload;
     ctx.responder_session = sigma2
         .tlv
@@ -290,9 +290,9 @@ fn auth_sigma(
     )?;
     let sigma3 = messages::sigma3(11, &ctx.sigma3_payload)?;
     let out = session.encode_message(&sigma3)?;
-    connection.send(&out);
+    connection.send(&out).await;
 
-    let _status = get_next_message(connection, &mut session)?;
+    let _status = get_next_message(connection, &mut session).await?;
     //println!("sigma status {:?}", status);
 
     //session keys
@@ -321,14 +321,14 @@ fn auth_sigma(
     ses.remote_node.write_u64::<LittleEndian>(node_id)?;
     ses.counter = 100;
 
-    if connection.receive().is_err() {
+    if connection.receive().await.is_err() {
         println!("expected ack not received");
     }
 
     Ok(ses)
 }
 
-fn read_request(
+async fn read_request(
     connection: &transport::Connection,
     session: &mut session::Session,
     endpoint: u16,
@@ -337,9 +337,9 @@ fn read_request(
 ) -> Result<()> {
     let testm = messages::im_read_request(endpoint, cluster, attr)?;
     let out = session.encode_message(&testm)?;
-    connection.send(&out);
+    connection.send(&out).await;
 
-    let result = get_next_message(connection, session)?;
+    let result = get_next_message(connection, session).await?;
     println!("{:?}", result);
     result.tlv.dump(0);
     Ok(())
