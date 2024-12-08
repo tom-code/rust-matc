@@ -53,12 +53,12 @@ impl Transport {
 }
 
 impl Connection {
-    pub async fn send(&self, data: &[u8]) {
+    pub async fn send(&self, data: &[u8]) -> Result<()>{
         self.transport
             .socket
             .send_to(data, &self.remote_address)
-            .await
-            .unwrap();
+            .await?;
+        Ok(())
     }
     pub async fn receive(&self) -> Result<Vec<u8>> {
         let mut ch = self.receiver.lock().await;

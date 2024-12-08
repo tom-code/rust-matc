@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use matc::{certmanager, controller, transport};
 
@@ -21,5 +21,6 @@ fn main() {
 
         let mut connection = controller.auth_sigma(&connection, device_id, controller_id).await.unwrap();
         connection.read_request(0, 0x1d, 0).await.unwrap();
+        tokio::time::sleep(Duration::from_secs(1000)).await;
     });
 }

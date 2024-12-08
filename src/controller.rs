@@ -50,6 +50,14 @@ impl Connection {
             read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
 
     }
+    pub async fn invoke_request(
+        &mut self,
+        endpoint: u16,
+        cluster: u32,
+        command: u32) -> Result<()>{
+            invoke_request(&self.connection, &mut self.session, endpoint, cluster, command, &[]).await
+
+    }
 }
 
 async fn get_next_message(
@@ -71,7 +79,7 @@ async fn get_next_message(
             decoded.message_header.message_counter as i64,
         )?;
         let out = session.encode_message(&ack)?;
-        connection.send(&out).await;
+        connection.send(&out).await?;
         return Ok(decoded);
     }
 }
@@ -87,7 +95,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     // send pbkdf
     let pbkdf_req_protocol_message = messages::pbkdf_req(1)?;
     let pbkdf_req = session.encode_message(&pbkdf_req_protocol_message)?;
-    connection.send(&pbkdf_req).await;
+    connection.send(&pbkdf_req).await?;
 
     // get pbkdf response
     let pbkdf_response = get_next_message(connection, &mut session).await?;
@@ -116,7 +124,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     let mut ctx = engine.start(&pin_to_passcode(pin)?, salt, iterations as u32)?;
     let pake1_protocol_message = messages::pake1(1, ctx.x.as_bytes(), -1)?;
     let pake1 = session.encode_message(&pake1_protocol_message)?;
-    connection.send(&pake1).await;
+    connection.send(&pake1).await?;
 
     // receive pake2
     let pake2 = get_next_message(connection, &mut session).await?;
@@ -138,7 +146,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     engine.finish(&mut ctx, &hash_seed)?;
     let pake3_protocol_message = messages::pake3(1, &ctx.ca, -1)?;
     let pake3 = session.encode_message(&pake3_protocol_message)?;
-    connection.send(&pake3).await;
+    connection.send(&pake3).await?;
 
     let pake3_resp = get_next_message(connection, &mut session).await?;
         match &pake3_resp.status_report_info {
@@ -184,7 +192,7 @@ async fn comission(
     tlv.write_octetstring(0, &random_csr_nonce)?;
     let csr_request = messages::im_invoke_request(0, 0x3e, 4, 1, &tlv.data, false)?;
     let csr_request = session.encode_message(&csr_request)?;
-    connection.send(&csr_request).await;
+    connection.send(&csr_request).await?;
 
     // step 2 receive csr request response
     let csr_msg = get_next_message(connection, session).await?;
@@ -207,7 +215,7 @@ async fn comission(
     tlv.write_octetstring(0, &mcert)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0xb, 1, &tlv.data, false)?;
     let out = session.encode_message(&t1)?;
-    connection.send(&out).await;
+    connection.send(&out).await?;
 
     // push ca cert response
     //println!("a1 {:?}", get_next_message(connection, session));
@@ -234,16 +242,24 @@ async fn comission(
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_octetstring(0, &noc)?;
     tlv.write_octetstring(2, &fabric.ipk_epoch_key)?;
-    tlv.write_uint64(3, fabric.id)?;
-    tlv.write_uint64(4, controller_id)?;
+    tlv.write_uint64(3, controller_id)?;
+    tlv.write_uint64(4, 101)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0x6, 1, &tlv.data, false)?;
     let out = session.encode_message(&t1)?;
-    connection.send(&out).await;
+    connection.send(&out).await?;
 
     get_next_message(connection, session).await?;
     connection.receive().await?;
-    //println!("x1 {:?}", get_next_message(connection, session));
-    //println!("x1 {:?}", connection.receive()?); // ack
+
+
+    // send commissioning complete
+    let mut ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
+    let t1 = messages::im_invoke_request(0, 0x30, 0x4, 30, &[], false)?;
+    //let t1 = messages::im_read_request(0, 0x1d, 0)?;
+    let out = ses.encode_message(&t1)?;
+    connection.send(&out).await?;
+    get_next_message(connection, &mut ses).await?;
+    connection.receive().await?;
     Ok(())
 }
 
@@ -255,13 +271,13 @@ async fn auth_sigma(
     controller_id: u64,
 ) -> Result<session::Session> {
     let mut session = session::Session::new();
-    session.counter = 100;
+    session.counter = rand::random();
     let mut ctx = sigma::SigmaContext::new(node_id);
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     sigma::sigma1(fabric, &mut ctx, &ca_pubkey)?;
     let s1 = messages::sigma1(11, &ctx.sigma1_payload)?;
     let out = session.encode_message(&s1)?;
-    connection.send(&out).await;
+    connection.send(&out).await?;
 
     // receive sigma2
     let sigma2 = get_next_message(connection, &mut session).await?;
@@ -290,7 +306,7 @@ async fn auth_sigma(
     )?;
     let sigma3 = messages::sigma3(11, &ctx.sigma3_payload)?;
     let out = session.encode_message(&sigma3)?;
-    connection.send(&out).await;
+    connection.send(&out).await?;
 
     let _status = get_next_message(connection, &mut session).await?;
     //println!("sigma status {:?}", status);
@@ -337,7 +353,26 @@ async fn read_request(
 ) -> Result<()> {
     let testm = messages::im_read_request(endpoint, cluster, attr)?;
     let out = session.encode_message(&testm)?;
-    connection.send(&out).await;
+    connection.send(&out).await?;
+
+    let result = get_next_message(connection, session).await?;
+    println!("{:?}", result);
+    result.tlv.dump(0);
+    Ok(())
+}
+
+async fn invoke_request(
+    connection: &transport::Connection,
+    session: &mut session::Session,
+    endpoint: u16,
+    cluster: u32,
+    command: u32,
+    payload: &[u8],
+) -> Result<()> {
+    let exchange = rand::random();
+    let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
+    let out = session.encode_message(&testm)?;
+    connection.send(&out).await?;
 
     let result = get_next_message(connection, session).await?;
     println!("{:?}", result);

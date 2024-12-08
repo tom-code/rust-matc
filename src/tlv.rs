@@ -205,6 +205,15 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
+            6 => {
+                let tag = read_tag(tagctrl, cursor)?;
+                let value = cursor.read_u32::<LittleEndian>()?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Int(value as u64),
+                };
+                container.push(item);
+            }
             8 => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let item = TlvItem {
