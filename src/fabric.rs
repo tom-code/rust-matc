@@ -22,7 +22,7 @@ impl Fabric {
     pub fn compressed(&self) -> Result<Vec<u8>> {
         let mut buf_id = Vec::new();
         buf_id.write_u64::<BigEndian>(self.id)?;
-        crate::cryptoutil::hkdf_sha256(
+        crate::util::cryptoutil::hkdf_sha256(
             &buf_id,
             &self.ca_public_key.as_slice()[1..],
             "CompressedFabric".as_bytes(),
@@ -31,7 +31,7 @@ impl Fabric {
     }
 
     pub fn signed_ipk(&self) -> Result<Vec<u8>> {
-        crate::cryptoutil::hkdf_sha256(
+        crate::util::cryptoutil::hkdf_sha256(
             &self.compressed()?,
             &self.ipk_epoch_key,
             "GroupKey v1.0".as_bytes(),

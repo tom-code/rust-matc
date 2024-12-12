@@ -1,7 +1,7 @@
 use aes::cipher::crypto_common;
 use byteorder::{LittleEndian, WriteBytesExt};
 
-use crate::{cryptoutil, messages};
+use crate::{messages, util::cryptoutil};
 use anyhow::Result;
 use std::io::Write;
 
@@ -10,8 +10,8 @@ pub struct Session {
     pub counter: u32,
     pub local_node: Vec<u8>,
     pub remote_node: Vec<u8>,
-    pub encrypt_key: Option<crypto_common::Key::<Aes128Ccm>>,
-    pub decrypt_key: Option<crypto_common::Key::<Aes128Ccm>>,
+    pub encrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
+    pub decrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
 }
 type Aes128Ccm = ccm::Ccm<aes::Aes128, ccm::consts::U16, ccm::consts::U13>;
 impl Session {
@@ -47,10 +47,8 @@ impl Session {
                 let nonce = self.make_nonce3()?;
                 let enc = cryptoutil::aes128_ccm_encrypt(&key, &nonce, &b, data)?;
                 b.extend_from_slice(&enc);
-            },
-            None => {
-                b.extend_from_slice(data)
             }
+            None => b.extend_from_slice(data),
         };
 
         self.counter += 1;
@@ -64,7 +62,12 @@ impl Session {
         let (header, rest) = messages::MessageHeader::decode(data)?;
         let nonce = Self::make_nonce3_extern(header.message_counter, &self.remote_node)?;
         let add = &data[..data.len() - rest.len()];
-        let decoded = cryptoutil::aes128_ccm_decrypt(&self.decrypt_key.unwrap_or_default(), &nonce, add, &rest)?;
+        let decoded = cryptoutil::aes128_ccm_decrypt(
+            &self.decrypt_key.unwrap_or_default(),
+            &nonce,
+            add,
+            &rest,
+        )?;
         let mut out = Vec::new();
         out.extend_from_slice(add);
         out.extend_from_slice(&decoded);

@@ -1,6 +1,5 @@
-
-use std::{collections::HashMap, sync::Arc, time::Duration};
 use anyhow::Result;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::Mutex};
 
 struct ConnectionInfo {
@@ -18,7 +17,6 @@ pub struct Connection {
     receiver: Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>,
 }
 
-
 impl Transport {
     pub async fn new(local: &str) -> Result<Arc<Self>> {
         let socket = UdpSocket::bind(local).await?;
@@ -28,15 +26,17 @@ impl Transport {
             connections: Mutex::new(HashMap::new()),
         });
         let self_c = o.clone();
-        tokio::spawn(async move { loop {
-            let mut buf = vec![0u8; 1024];
-            let (n, addr) = self_c.socket.recv_from(&mut buf).await.unwrap();
-            buf.resize(n, 0);
-            let cons = self_c.connections.lock().await;
-            if let Some(c) = cons.get(&addr.to_string()) {
-                c.sender.send(buf).await.unwrap();
+        tokio::spawn(async move {
+            loop {
+                let mut buf = vec![0u8; 1024];
+                let (n, addr) = self_c.socket.recv_from(&mut buf).await.unwrap();
+                buf.resize(n, 0);
+                let cons = self_c.connections.lock().await;
+                if let Some(c) = cons.get(&addr.to_string()) {
+                    c.sender.send(buf).await.unwrap();
+                }
             }
-        }});
+        });
         Ok(o)
     }
 
@@ -53,7 +53,7 @@ impl Transport {
 }
 
 impl Connection {
-    pub async fn send(&self, data: &[u8]) -> Result<()>{
+    pub async fn send(&self, data: &[u8]) -> Result<()> {
         self.transport
             .socket
             .send_to(data, &self.remote_address)
@@ -66,11 +66,28 @@ impl Connection {
         let with_timeout = tokio::time::timeout(Duration::from_secs(3), rec_future);
         let res = match with_timeout.await {
             Ok(res) => res,
-            Err(e) => return Err(anyhow::anyhow!("error waiting for data from transport err:{}", e)),
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "error waiting for data from transport err:{}",
+                    e
+                ))
+            }
         };
         match res {
             Some(r) => Ok(r),
             None => Err(anyhow::anyhow!("channel eof")),
         }
+    }
+}
+
+impl Drop for Transport {
+    fn drop(&mut self) {
+        println!("drop transport");
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        println!("drop connection");
     }
 }

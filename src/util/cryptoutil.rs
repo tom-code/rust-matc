@@ -104,7 +104,7 @@ pub fn write_pem(tag: &str, data: &[u8], fname: &str) -> Result<()> {
 }
 
 pub fn secret_key_to_rfc5915(key: &p256::SecretKey) -> Result<Vec<u8>> {
-    let mut enc = crate::asn1::Encoder::new();
+    let mut enc = crate::util::asn1::Encoder::new();
     enc.start_seq(0x30)?;
     enc.write_int(1)?;
     enc.write_octet_string(key.to_bytes().as_slice())?;

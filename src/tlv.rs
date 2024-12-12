@@ -5,10 +5,17 @@ pub struct TlvBuffer {
     pub data: Vec<u8>,
 }
 
+const TYPE_INT_1: u8 = 0;
 const TYPE_UINT_1: u8 = 4;
 const TYPE_UINT_2: u8 = 5;
 const TYPE_UINT_4: u8 = 6;
 const TYPE_UINT_8: u8 = 7;
+const TYPE_BOOL_FALSE: u8 = 8;
+const TYPE_BOOL_TRUE: u8 = 9;
+
+const TYPE_OCTET_STRING_L1: u8 = 0x10;
+const TYPE_OCTET_STRING_L2: u8 = 0x11;
+
 impl TlvBuffer {
     pub fn new() -> Self {
         Self {
@@ -48,18 +55,23 @@ impl TlvBuffer {
     pub fn write_octetstring(&mut self, tag: u8, data: &[u8]) -> Result<()> {
         let mut ctrl: u8 = 1 << 5;
         if data.len() > 0xff {
-            ctrl |= 0x11;
+            ctrl |= TYPE_OCTET_STRING_L2;
             self.data.write_u8(ctrl)?;
             self.data.write_u8(tag)?;
             self.data.write_u16::<LittleEndian>(data.len() as u16)?;
         } else {
-            ctrl |= 0x10;
+            ctrl |= TYPE_OCTET_STRING_L1;
             self.data.write_u8(ctrl)?;
             self.data.write_u8(tag)?;
             self.data.write_u8(data.len() as u8)?;
         }
         self.data.write_all(data)?;
         Ok(())
+    }
+    pub fn write_int8(&mut self, tag: u8, value: i8) -> Result<()> {
+        self.data.write_u8((1 << 5) | TYPE_INT_1)?;
+        self.data.write_u8(tag)?;
+        self.data.write_i8(value)
     }
     pub fn write_uint8(&mut self, tag: u8, value: u8) -> Result<()> {
         self.data.write_u8((1 << 5) | TYPE_UINT_1)?;
@@ -83,9 +95,9 @@ impl TlvBuffer {
     }
     pub fn write_bool(&mut self, tag: u8, value: bool) -> Result<()> {
         if value {
-            self.data.write_u8((1 << 5) | 0x9)?;
+            self.data.write_u8((1 << 5) | TYPE_BOOL_TRUE)?;
         } else {
-            self.data.write_u8((1 << 5) | 0x8)?;
+            self.data.write_u8((1 << 5) | TYPE_BOOL_FALSE)?;
         }
         self.data.write_u8(tag)
     }
@@ -178,7 +190,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
         let tp = fb & 0x1f;
         let tagctrl = fb >> 5;
         match tp {
-            0 => {
+            TYPE_INT_1 => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u8()?;
                 let item = TlvItem {
@@ -187,7 +199,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            4 => {
+            TYPE_UINT_1 => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u8()?;
                 let item = TlvItem {
@@ -196,7 +208,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            5 => {
+            TYPE_UINT_2 => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u16::<LittleEndian>()?;
                 let item = TlvItem {
@@ -205,7 +217,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            6 => {
+            TYPE_UINT_4 => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u32::<LittleEndian>()?;
                 let item = TlvItem {
@@ -214,19 +226,19 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            8 => {
-                let tag = read_tag(tagctrl, cursor)?;
-                let item = TlvItem {
-                    tag,
-                    value: TlvItemValue::Bool(true),
-                };
-                container.push(item);
-            }
-            9 => {
+            TYPE_BOOL_FALSE => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::Bool(false),
+                };
+                container.push(item);
+            }
+            TYPE_BOOL_TRUE => {
+                let tag = read_tag(tagctrl, cursor)?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Bool(true),
                 };
                 container.push(item);
             }
@@ -244,7 +256,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 let item = TlvItem { tag, value: typ };
                 container.push(item);
             }
-            0x10 => {
+            TYPE_OCTET_STRING_L1 => {
                 // octet string
                 let tag = read_tag(tagctrl, cursor)?;
                 let size = cursor.read_u8()?;
@@ -256,7 +268,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            0x11 => {
+            TYPE_OCTET_STRING_L2 => {
                 // octet string large
                 let tag = read_tag(tagctrl, cursor)?;
                 let size = cursor.read_u16::<LittleEndian>()?;
@@ -331,5 +343,110 @@ pub fn decode_tlv(data: &[u8]) -> Result<TlvItem> {
             tag: 0,
             value: TlvItemValue::List(container),
         })
+    }
+}
+
+#[derive(Debug)]
+pub enum TlvItemValueEnc {
+    Int8(i8),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
+    Bool(bool),
+    String(String),
+    OctetString(Vec<u8>),
+    StructAnon(Vec<TlvItemEnc>),
+    Invalid(),
+}
+
+#[derive(Debug)]
+pub struct TlvItemEnc {
+    pub tag: u8,
+    pub value: TlvItemValueEnc,
+}
+
+impl TlvItemEnc {
+    fn encode_internal(&self, buf: &mut TlvBuffer) -> Result<()> {
+        match &self.value {
+            TlvItemValueEnc::Int8(i) => {
+                buf.write_int8(self.tag, *i)?;
+            }
+            TlvItemValueEnc::UInt8(i) => {
+                buf.write_uint8(self.tag, *i)?;
+            }
+            TlvItemValueEnc::UInt16(i) => {
+                buf.write_uint16(self.tag, *i)?;
+            }
+            TlvItemValueEnc::UInt32(i) => {
+                buf.write_uint32(self.tag, *i)?;
+            }
+            TlvItemValueEnc::UInt64(i) => {
+                buf.write_uint64(self.tag, *i)?;
+            }
+            TlvItemValueEnc::Bool(v) => {
+                buf.write_bool(self.tag, *v)?;
+            }
+            TlvItemValueEnc::String(_) => {}
+            TlvItemValueEnc::OctetString(vec) => {
+                buf.write_octetstring(self.tag, vec)?;
+            }
+            TlvItemValueEnc::StructAnon(vec) => {
+                buf.write_anon_struct()?;
+                for i in vec {
+                    i.encode_internal(buf)?;
+                }
+                buf.write_struct_end()?;
+            }
+            TlvItemValueEnc::Invalid() => todo!(),
+        }
+        Ok(())
+    }
+
+    pub fn encode(&self) -> Result<Vec<u8>> {
+        let mut tlv = TlvBuffer::new();
+        self.encode_internal(&mut tlv)?;
+        Ok(tlv.data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TlvBuffer, TlvItemEnc, TlvItemValueEnc};
+
+    #[test]
+    fn test_1() {
+        let t1 = TlvItemEnc {
+            tag: 0,
+            value: TlvItemValueEnc::StructAnon(vec![
+                TlvItemEnc {
+                    tag: 0,
+                    value: TlvItemValueEnc::UInt8(6),
+                },
+                TlvItemEnc {
+                    tag: 1,
+                    value: TlvItemValueEnc::UInt8(7),
+                },
+            ]),
+        };
+        let o = t1.encode().unwrap();
+        println!("{}", hex::encode(o));
+
+        let mut tlv = TlvBuffer::new();
+        tlv.write_anon_struct().unwrap();
+        tlv.write_octetstring(0x1, &[1, 2, 3]).unwrap();
+        tlv.write_struct_end().unwrap();
+        println!("{}", hex::encode(tlv.data));
+
+        let t1 = TlvItemEnc {
+            tag: 0,
+            value: TlvItemValueEnc::StructAnon(vec![TlvItemEnc {
+                tag: 1,
+                value: TlvItemValueEnc::OctetString(vec![1, 2, 3]),
+            }]),
+        }
+        .encode()
+        .unwrap();
+        println!("{}", hex::encode(t1));
     }
 }

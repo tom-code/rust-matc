@@ -7,7 +7,7 @@ use p256::elliptic_curve::{
 };
 use std::ops::Mul;
 
-use crate::cryptoutil::sha256;
+use crate::util::cryptoutil;
 
 pub struct Context {
     w0: p256::Scalar,
@@ -94,7 +94,7 @@ impl Engine {
         let z = zn.mul(ctx.x_random);
         let v = zn.mul(ctx.w1);
 
-        let result = sha256(seed);
+        let result = cryptoutil::sha256(seed);
 
         let mut tt = Vec::with_capacity(1024);
         Self::append_to_tt(&mut tt, &result)?;
@@ -108,16 +108,16 @@ impl Engine {
         Self::append_to_tt(&mut tt, v.to_encoded_point(false).as_bytes())?;
         Self::append_to_tt(&mut tt, ctx.w0.to_bytes().as_slice())?;
 
-        let result = crate::cryptoutil::sha256(&tt);
+        let result = cryptoutil::sha256(&tt);
         let ka = &result[..16];
         let ke = &result[16..32];
 
-        let okm = crate::cryptoutil::hkdf_sha256(&[], ka, "ConfirmationKeys".as_bytes(), 32)?;
+        let okm = cryptoutil::hkdf_sha256(&[], ka, "ConfirmationKeys".as_bytes(), 32)?;
 
-        ctx.ca = crate::cryptoutil::hmac_sha256(ctx.y.as_bytes(), &okm[..16])?;
-        let _cb = crate::cryptoutil::hmac_sha256(ctx.x.as_bytes(), &okm[16..])?;
+        ctx.ca = cryptoutil::hmac_sha256(ctx.y.as_bytes(), &okm[..16])?;
+        let _cb = cryptoutil::hmac_sha256(ctx.x.as_bytes(), &okm[16..])?;
 
-        let xcrypt = crate::cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16 * 3)?;
+        let xcrypt = cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16 * 3)?;
         ctx.decrypt_key = xcrypt[16..32].to_vec();
         ctx.encrypt_key = xcrypt[..16].to_vec();
 

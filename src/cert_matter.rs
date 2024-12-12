@@ -6,8 +6,8 @@ use x509_cert::{
 };
 
 use crate::{
-    cryptoutil,
     tlv::{self, TlvBuffer},
+    util::cryptoutil,
 };
 
 fn decode_dn_value(dn: &x509_cert::der::Any) -> Result<u64> {
@@ -123,7 +123,7 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
     }
 
     // do-sha1
-    let cakey_sha1 = crate::cryptoutil::sha1_enc(ca_pubkey);
+    let cakey_sha1 = cryptoutil::sha1_enc(ca_pubkey);
 
     enc.write_octetstring(
         4,

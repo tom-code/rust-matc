@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand};
 
 use matc::certmanager::{CertManager, FileCertManager};
 
-
 fn ca_create() -> Result<()> {
     let cm = FileCertManager::new(0x110, "./pem2");
     cm.bootstrap()?;

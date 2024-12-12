@@ -2,7 +2,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use rand::RngCore;
 use std::io::{Read, Result, Write};
 
-use crate::tlv::{self, TlvItem};
+use crate::tlv::{self, TlvItem, TlvItemEnc, TlvItemValueEnc};
 
 #[derive(Debug)]
 pub struct MessageHeader {
@@ -112,9 +112,12 @@ impl ProtocolMessageHeader {
     pub const OPCODE_ACK: u8 = 0x10;
     pub const OPCODE_PBKDF_REQ: u8 = 0x20;
     pub const OPCODE_PBKDF_RESP: u8 = 0x21;
-    pub const OPCODE_PBKDF_PAKE1: u8 = 0x22;
-    pub const OPCODE_PBKDF_PAKE2: u8 = 0x23;
-    pub const OPCODE_PBKDF_PAKE3: u8 = 0x24;
+    pub const OPCODE_PASE_PAKE1: u8 = 0x22;
+    pub const OPCODE_PASE_PAKE2: u8 = 0x23;
+    pub const OPCODE_PASE_PAKE3: u8 = 0x24;
+    pub const OPCODE_CASE_SIGMA1: u8 = 0x30;
+    pub const OPCODE_CASE_SIGMA2: u8 = 0x31;
+    pub const OPCODE_CASE_SIGMA3: u8 = 0x32;
     pub const OPCODE_STATUS: u8 = 0x40;
 
     pub const INTERACTION_OPCODE_READ_REQ: u8 = 0x2;
@@ -263,18 +266,23 @@ pub fn pake1(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
     }
     let prot = ProtocolMessageHeader {
         exchange_flags: flags,
-        opcode: ProtocolMessageHeader::OPCODE_PBKDF_PAKE1,
+        opcode: ProtocolMessageHeader::OPCODE_PASE_PAKE1,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
         ack_counter: ack as u32,
     };
     let mut b = prot.encode()?;
-    let mut tlv = tlv::TlvBuffer::new();
-    tlv.write_anon_struct()?;
-    tlv.write_octetstring(0x1, key)?;
-    tlv.write_struct_end()?;
 
-    b.write_all(&tlv.data)?;
+    let tlv = TlvItemEnc {
+        tag: 0,
+        value: TlvItemValueEnc::StructAnon(vec![TlvItemEnc {
+            tag: 1,
+            value: TlvItemValueEnc::OctetString(key.to_owned()),
+        }]),
+    }
+    .encode()?;
+    b.write_all(&tlv)?;
+
     Ok(b)
 }
 
@@ -285,7 +293,7 @@ pub fn pake3(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
     }
     let prot = ProtocolMessageHeader {
         exchange_flags: flags,
-        opcode: ProtocolMessageHeader::OPCODE_PBKDF_PAKE3,
+        opcode: ProtocolMessageHeader::OPCODE_PASE_PAKE3,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
         ack_counter: ack as u32,
@@ -303,7 +311,7 @@ pub fn pake3(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
 pub fn sigma1(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
     let prot = ProtocolMessageHeader {
         exchange_flags: 5,
-        opcode: 0x30,
+        opcode: ProtocolMessageHeader::OPCODE_CASE_SIGMA1,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
         ack_counter: 0,
@@ -315,7 +323,7 @@ pub fn sigma1(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
 pub fn sigma3(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
     let prot = ProtocolMessageHeader {
         exchange_flags: 5,
-        opcode: 0x32,
+        opcode: ProtocolMessageHeader::OPCODE_CASE_SIGMA3,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
         ack_counter: 0,

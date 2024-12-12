@@ -1,7 +1,8 @@
 use byteorder::WriteBytesExt;
 use std::time::{Duration, SystemTime};
 
-use crate::asn1;
+use crate::util::asn1;
+use crate::util::cryptoutil;
 use anyhow::{Context, Result};
 
 fn add_ext(encoder: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8]) -> Result<()> {
@@ -113,12 +114,12 @@ pub fn encode_x509(
     encoder.write_octet_string_with_tag(0x3, &pk2)?;
     encoder.end_seq();
 
-    let pubkey_sha1 = crate::cryptoutil::sha1_enc(node_public_key);
+    let pubkey_sha1 = cryptoutil::sha1_enc(node_public_key);
     let mut subjectkeyidasn = vec![0x04, 0x14];
     subjectkeyidasn.extend_from_slice(&pubkey_sha1);
 
     let pubkey = ca_private.public_key().to_sec1_bytes();
-    let authoritykey_sha1 = crate::cryptoutil::sha1_enc(&pubkey);
+    let authoritykey_sha1 = cryptoutil::sha1_enc(&pubkey);
     let mut authoritykey_sha1_asn = vec![0x30, 0x16, 0x80, 0x14];
     authoritykey_sha1_asn.extend_from_slice(&authoritykey_sha1);
 

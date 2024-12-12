@@ -1,42 +1,76 @@
 use std::sync::Arc;
 
-use crate::{cert, certmanager, cryptoutil, fabric, mattercert, messages, session, sigma, spake2p, tlv, transport};
+use crate::{
+    cert_matter, cert_x509, certmanager, fabric,
+    messages::{self, Message},
+    session, sigma, spake2p, tlv, transport,
+    util::cryptoutil,
+};
 use anyhow::{Context, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
 use rand::RngCore;
 
-
 pub struct Controller {
     certmanager: Arc<dyn certmanager::CertManager>,
     transport: Arc<transport::Transport>,
-    fabric: fabric::Fabric
+    fabric: fabric::Fabric,
 }
 
 pub struct Connection {
     connection: Arc<transport::Connection>,
-    session: session::Session
+    session: session::Session,
 }
-trait IsSync: Sync { } impl IsSync for Controller { }
+trait IsSync: Sync {}
+impl IsSync for Controller {}
 
 impl Controller {
-    pub fn new(certmanager: &Arc<dyn certmanager::CertManager>, transport: &Arc<transport::Transport>, fabric_id: u64) -> Arc<Self> {
+    pub fn new(
+        certmanager: &Arc<dyn certmanager::CertManager>,
+        transport: &Arc<transport::Transport>,
+        fabric_id: u64,
+    ) -> Arc<Self> {
         let fabric = fabric::Fabric::new(fabric_id, 1, &certmanager.get_ca_public_key().unwrap());
         Arc::new(Self {
             certmanager: certmanager.clone(),
             transport: transport.clone(),
-            fabric
+            fabric,
         })
     }
-    pub async fn commission(&self, connection: &Arc<transport::Connection>, pin: u32, node_id: u64, controller_id: u64) -> Result<()>{
+    pub async fn commission(
+        &self,
+        connection: &Arc<transport::Connection>,
+        pin: u32,
+        node_id: u64,
+        controller_id: u64,
+    ) -> Result<()> {
         let mut session = auth_spake(connection, pin).await?;
-        comission(connection, &mut session, &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await
-
+        comission(
+            connection,
+            &mut session,
+            &self.fabric,
+            self.certmanager.as_ref(),
+            node_id,
+            controller_id,
+        )
+        .await
     }
-    pub async fn auth_sigma(&self, connection: &Arc<transport::Connection>, node_id: u64, controller_id: u64) -> Result<Connection>{
-        let session = auth_sigma(connection, &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await?;
+    pub async fn auth_sigma(
+        &self,
+        connection: &Arc<transport::Connection>,
+        node_id: u64,
+        controller_id: u64,
+    ) -> Result<Connection> {
+        let session = auth_sigma(
+            connection,
+            &self.fabric,
+            self.certmanager.as_ref(),
+            node_id,
+            controller_id,
+        )
+        .await?;
         Ok(Connection {
             connection: connection.clone(),
-            session
+            session,
         })
     }
 }
@@ -46,17 +80,25 @@ impl Connection {
         &mut self,
         endpoint: u16,
         cluster: u32,
-        attr: u32) -> Result<()>{
-            read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
-
+        attr: u32,
+    ) -> Result<Message> {
+        read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
     }
     pub async fn invoke_request(
         &mut self,
         endpoint: u16,
         cluster: u32,
-        command: u32) -> Result<()>{
-            invoke_request(&self.connection, &mut self.session, endpoint, cluster, command, &[]).await
-
+        command: u32,
+    ) -> Result<Message> {
+        invoke_request(
+            &self.connection,
+            &mut self.session,
+            endpoint,
+            cluster,
+            command,
+            &[],
+        )
+        .await
     }
 }
 
@@ -101,7 +143,8 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     let pbkdf_response = get_next_message(connection, &mut session).await?;
     if pbkdf_response.protocol_header.protocol_id
         != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
-        || pbkdf_response.protocol_header.opcode != messages::ProtocolMessageHeader::OPCODE_PBKDF_RESP
+        || pbkdf_response.protocol_header.opcode
+            != messages::ProtocolMessageHeader::OPCODE_PBKDF_RESP
     {
         return Err(anyhow::anyhow!("pbkdf response not received"));
     }
@@ -128,8 +171,9 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
 
     // receive pake2
     let pake2 = get_next_message(connection, &mut session).await?;
-    if pake2.protocol_header.protocol_id != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
-        || pake2.protocol_header.opcode != messages::ProtocolMessageHeader::OPCODE_PBKDF_PAKE2
+    if pake2.protocol_header.protocol_id
+        != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+        || pake2.protocol_header.opcode != messages::ProtocolMessageHeader::OPCODE_PASE_PAKE2
     {
         return Err(anyhow::anyhow!("pake2 not received"));
     }
@@ -149,7 +193,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     connection.send(&pake3).await?;
 
     let pake3_resp = get_next_message(connection, &mut session).await?;
-        match &pake3_resp.status_report_info {
+    match &pake3_resp.status_report_info {
         Some(s) => {
             if !s.is_ok() {
                 return Err(anyhow::anyhow!("pake3 resp not ok), got {:?}", pake3_resp));
@@ -210,7 +254,7 @@ async fn comission(
     // step 3 push ca cert
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     let ca_cert = cm.get_ca_cert()?;
-    let mcert = mattercert::convert_x509_bytes_to_matter(&ca_cert, &ca_pubkey)?;
+    let mcert = cert_matter::convert_x509_bytes_to_matter(&ca_cert, &ca_pubkey)?;
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_octetstring(0, &mcert)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0xb, 1, &tlv.data, false)?;
@@ -230,7 +274,7 @@ async fn comission(
         .as_bytes()
         .context("can't extract pubkey from csr")?;
     let ca_private = cm.get_ca_key()?;
-    let noc_x509 = cert::encode_x509(
+    let noc_x509 = cert_x509::encode_x509(
         node_public_key,
         node_id,
         fabric.id,
@@ -238,7 +282,7 @@ async fn comission(
         &ca_private,
         false,
     )?;
-    let noc = mattercert::convert_x509_bytes_to_matter(&noc_x509, &ca_pubkey)?;
+    let noc = cert_matter::convert_x509_bytes_to_matter(&noc_x509, &ca_pubkey)?;
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_octetstring(0, &noc)?;
     tlv.write_octetstring(2, &fabric.ipk_epoch_key)?;
@@ -250,7 +294,6 @@ async fn comission(
 
     get_next_message(connection, session).await?;
     connection.receive().await?;
-
 
     // send commissioning complete
     let mut ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
@@ -295,7 +338,7 @@ async fn auth_sigma(
     let controller_private = cm.get_user_key(controller_id)?;
     let controller_x509 = cm.get_user_cert(controller_id)?;
     let controller_matter_cert =
-        mattercert::convert_x509_bytes_to_matter(&controller_x509, &ca_pubkey)?;
+        cert_matter::convert_x509_bytes_to_matter(&controller_x509, &ca_pubkey)?;
 
     // send sigma3
     sigma::sigma3(
@@ -350,15 +393,13 @@ async fn read_request(
     endpoint: u16,
     cluster: u32,
     attr: u32,
-) -> Result<()> {
+) -> Result<Message> {
     let testm = messages::im_read_request(endpoint, cluster, attr)?;
     let out = session.encode_message(&testm)?;
     connection.send(&out).await?;
 
     let result = get_next_message(connection, session).await?;
-    println!("{:?}", result);
-    result.tlv.dump(0);
-    Ok(())
+    Ok(result)
 }
 
 async fn invoke_request(
@@ -368,14 +409,12 @@ async fn invoke_request(
     cluster: u32,
     command: u32,
     payload: &[u8],
-) -> Result<()> {
+) -> Result<Message> {
     let exchange = rand::random();
     let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
     let out = session.encode_message(&testm)?;
     connection.send(&out).await?;
 
     let result = get_next_message(connection, session).await?;
-    println!("{:?}", result);
-    result.tlv.dump(0);
-    Ok(())
+    Ok(result)
 }
