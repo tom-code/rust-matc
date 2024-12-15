@@ -374,11 +374,16 @@ async fn auth_sigma(
     ses.session_id = ctx.responder_session;
     ses.set_decrypt_key(&keypack[16..32]);
     ses.set_encrypt_key(&keypack[..16]);
-    ses.local_node = Vec::new();
-    ses.local_node.write_u64::<LittleEndian>(controller_id)?;
-    ses.remote_node = Vec::new();
-    ses.remote_node.write_u64::<LittleEndian>(node_id)?;
-    ses.counter = 100;
+
+    let mut local_node = Vec::new();
+    local_node.write_u64::<LittleEndian>(controller_id)?;
+    ses.local_node = Some(local_node);
+
+    let mut remote_node = Vec::new();
+    remote_node.write_u64::<LittleEndian>(node_id)?;
+    ses.remote_node = Some(remote_node);
+
+    ses.counter = rand::random();
 
     if connection.receive().await.is_err() {
         println!("expected ack not received");

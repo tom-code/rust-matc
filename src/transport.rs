@@ -20,7 +20,6 @@ pub struct Connection {
 impl Transport {
     pub async fn new(local: &str) -> Result<Arc<Self>> {
         let socket = UdpSocket::bind(local).await?;
-        //socket.set_read_timeout(Some(Duration::from_secs(3)))?;
         let o = Arc::new(Self {
             socket,
             connections: Mutex::new(HashMap::new()),

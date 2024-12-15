@@ -8,8 +8,8 @@ use std::io::Write;
 pub struct Session {
     pub session_id: u16,
     pub counter: u32,
-    pub local_node: Vec<u8>,
-    pub remote_node: Vec<u8>,
+    pub local_node: Option<Vec<u8>>,
+    pub remote_node: Option<Vec<u8>>,
     pub encrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
     pub decrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
 }
@@ -19,8 +19,8 @@ impl Session {
         Self {
             session_id: 0,
             counter: 0,
-            local_node: [0, 0, 0, 0, 0, 0, 0, 0].to_vec(),
-            remote_node: Vec::new(),
+            local_node: Some([0, 0, 0, 0, 0, 0, 0, 0].to_vec()),
+            remote_node: None,
             encrypt_key: None,
             decrypt_key: None,
         }
@@ -60,7 +60,7 @@ impl Session {
             return Ok(data.to_vec());
         }
         let (header, rest) = messages::MessageHeader::decode(data)?;
-        let nonce = Self::make_nonce3_extern(header.message_counter, &self.remote_node)?;
+        let nonce = Self::make_nonce3_extern(header.message_counter, self.remote_node.as_deref())?;
         let add = &data[..data.len() - rest.len()];
         let decoded = cryptoutil::aes128_ccm_decrypt(
             &self.decrypt_key.unwrap_or_default(),
@@ -75,18 +75,18 @@ impl Session {
     }
 
     fn make_nonce3(&self) -> Result<Vec<u8>> {
-        Self::make_nonce3_extern(self.counter, &self.local_node)
+        Self::make_nonce3_extern(self.counter, self.local_node.as_deref())
     }
 
-    fn make_nonce3_extern(counter: u32, node: &[u8]) -> Result<Vec<u8>> {
+    fn make_nonce3_extern(counter: u32, node: Option<&[u8]>) -> Result<Vec<u8>> {
         let mut out = Vec::with_capacity(128);
         out.write_u8(0)?;
         out.write_u32::<LittleEndian>(counter)?;
-        if !node.is_empty() {
-            out.write_all(node)?;
-        } else {
-            out.write_all(&[0, 0, 0, 0, 0, 0, 0, 0])?;
-        }
+        match node {
+            Some(s) => out.write_all(s)?,
+            None => out.write_all(&[0, 0, 0, 0, 0, 0, 0, 0])?,
+        };
+
         Ok(out)
     }
 }

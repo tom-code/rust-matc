@@ -10,8 +10,8 @@ pub struct MessageHeader {
     pub security_flags: u8,
     pub session_id: u16,
     pub message_counter: u32,
-    pub source_node_id: Vec<u8>,
-    pub destination_node_id: Vec<u8>,
+    pub source_node_id: Option<Vec<u8>>,
+    pub destination_node_id: Option<Vec<u8>>,
 }
 
 impl MessageHeader {
@@ -20,24 +20,28 @@ impl MessageHeader {
     const DSIZ_16: u8 = 2;
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut flags: u8 = 0;
-        if self.source_node_id.len() == 8 {
+        if self.source_node_id.as_ref().is_some_and(|x|x.len() == 8) {
             flags |= Self::FLAG_SRC_PRESENT;
         }
-        if self.destination_node_id.len() == 2 {
-            flags |= Self::DSIZ_16
-        } else if self.destination_node_id.len() == 8 {
-            flags |= Self::DSIZ_64
+        if let Some(destination_node_id) = &self.destination_node_id {
+            if destination_node_id.len() == 2 {
+                flags |= Self::DSIZ_16
+            } else if destination_node_id.len() == 8 {
+                flags |= Self::DSIZ_64
+            }
         }
         let mut out = Vec::with_capacity(1024);
         out.write_u8(flags)?;
         out.write_u16::<LittleEndian>(self.session_id)?;
         out.write_u8(self.security_flags)?;
         out.write_u32::<LittleEndian>(self.message_counter)?;
-        if self.source_node_id.len() == 8 {
-            out.write_all(&self.source_node_id)?;
+        if let Some(sn) = &self.source_node_id {
+            if sn.len() == 8 {
+                out.write_all(sn)?;
+            }
         }
-        if !self.destination_node_id.is_empty() {
-            out.write_all(&self.destination_node_id)?;
+        if let Some(destination_node_id) = &self.destination_node_id {
+            out.write_all(destination_node_id)?;
         }
         Ok(out)
     }
@@ -47,11 +51,12 @@ impl MessageHeader {
         let session_id = cursor.read_u16::<LittleEndian>()?;
         let security_flags = cursor.read_u8()?;
         let message_counter = cursor.read_u32::<LittleEndian>()?;
-        let mut source_node_id = Vec::new();
-        let mut destination_node_id = Vec::new();
+        let mut source_node_id = None;
+        let mut destination_node_id = None;
         if (flags & Self::FLAG_SRC_PRESENT) != 0 {
-            source_node_id.resize(8, 0);
-            cursor.read_exact(source_node_id.as_mut())?;
+            let mut sn = vec![0; 8];
+            cursor.read_exact(sn.as_mut())?;
+            source_node_id = Some(sn)
         };
         if (flags & 3) != 0 {
             let dst_size = match flags & 3 {
@@ -60,8 +65,9 @@ impl MessageHeader {
                 _ => 0,
             };
             if dst_size > 0 {
-                destination_node_id.resize(dst_size, 0);
-                cursor.read_exact(destination_node_id.as_mut())?;
+                let mut dn = vec![0; dst_size];
+                cursor.read_exact(dn.as_mut())?;
+                destination_node_id = Some(dn)
             };
         };
         let mut rest = Vec::new();
@@ -125,6 +131,7 @@ impl ProtocolMessageHeader {
 
     pub const PROTOCOL_ID_SECURE_CHANNEL: u16 = 0;
     pub const PROTOCOL_ID_INTERACTION: u16 = 1;
+
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut out = Vec::with_capacity(1024);
         out.write_u8(self.exchange_flags)?;
@@ -320,6 +327,7 @@ pub fn sigma1(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
     b.write_all(payload)?;
     Ok(b)
 }
+
 pub fn sigma3(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
     let prot = ProtocolMessageHeader {
         exchange_flags: 5,

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use matc::certmanager::{CertManager, FileCertManager};
+use matc::certmanager::FileCertManager;
 
 fn ca_create() -> Result<()> {
     let cm = FileCertManager::new(0x110, "./pem2");
@@ -20,6 +20,7 @@ struct Cli {
 enum Commands {
     CaCreate {},
 }
+
 fn main() {
     let cli = Cli::parse();
     println!("{:?}", cli);

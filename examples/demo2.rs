@@ -16,7 +16,7 @@ fn main() {
         .unwrap();
     runtime.block_on(async {
         let cm: Arc<dyn certmanager::CertManager> =
-            Arc::new(certmanager::FileCertManager::new(fabric_id, "./pem2"));
+            certmanager::FileCertManager::new(fabric_id, "./pem2");
         let transport = transport::Transport::new(local_address).await.unwrap();
         let controller = controller::Controller::new(&cm, &transport, fabric_id);
         let connection = transport.create_connection(device_address).await;

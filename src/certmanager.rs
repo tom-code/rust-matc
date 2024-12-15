@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 
 use crate::{cert_x509, util::cryptoutil};
@@ -16,11 +18,11 @@ pub struct FileCertManager {
 }
 
 impl FileCertManager {
-    pub fn new(fabric_id: u64, path: &str) -> Self {
-        Self {
+    pub fn new(fabric_id: u64, path: &str) -> Arc<Self> {
+        Arc::new(Self {
             fabric_id,
             path: path.to_owned(),
-        }
+        })
     }
     fn user_key_fname(&self, id: u64) -> String {
         format!("{}/{}-private.pem", self.path, id)
