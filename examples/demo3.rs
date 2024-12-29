@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
-use matc::{certmanager::{self, FileCertManager}, controller, tlv::TlvItemValue, transport};
+use matc::{certmanager::{self, FileCertManager}, controller, tlv, transport};
 
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -96,6 +96,9 @@ enum CommandCommand {
     },
     InvokeCommandOff {
     },
+    InvokeCommandMoveToLevel {
+        level: u8
+    }
 }
 
 fn main() {
@@ -152,9 +155,9 @@ fn main() {
                 let mut connection = controller.auth_sigma(&connection, device_id, controller_id).await.unwrap();
                 let response = connection.read_request(0, 0x1d, 1).await.unwrap();
                 let resplist = response.tlv.get(&[1,0,1,2]).unwrap();
-                if let TlvItemValue::List(l) = resplist {
+                if let tlv::TlvItemValue::List(l) = resplist {
                     for c in l {
-                        if let TlvItemValue::Int(v) = c.value {
+                        if let tlv::TlvItemValue::Int(v) = c.value {
                             println!("{}", v)
                         }
                     }
@@ -192,13 +195,22 @@ fn main() {
 
                     CommandCommand::InvokeCommandOn {
                     } => {
-                        let res = connection.invoke_request(1, 0x6, 1).await.unwrap();
+                        let res = connection.invoke_request(1, 0x6, 1, &[]).await.unwrap();
                         res.tlv.dump(1);
                     },
 
                     CommandCommand::InvokeCommandOff {
                     } => {
-                        let res = connection.invoke_request(1, 0x6, 0).await.unwrap();
+                        let res = connection.invoke_request(1, 0x6, 0, &[]).await.unwrap();
+                        res.tlv.dump(1);
+                    },
+                    CommandCommand::InvokeCommandMoveToLevel {
+                        level,
+                    } => {
+                        let tlv = tlv::TlvItemEnc {
+                            tag: 0, value: tlv::TlvItemValueEnc::UInt8(level)
+                        }.encode().unwrap();
+                        let res = connection.invoke_request(1, 0x8, 0, &tlv).await.unwrap();
                         res.tlv.dump(1);
                     },
                 }

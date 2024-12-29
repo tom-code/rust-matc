@@ -89,6 +89,7 @@ impl Connection {
         endpoint: u16,
         cluster: u32,
         command: u32,
+        payload: &[u8]
     ) -> Result<Message> {
         invoke_request(
             &self.connection,
@@ -96,7 +97,7 @@ impl Connection {
             endpoint,
             cluster,
             command,
-            &[],
+            payload,
         )
         .await
     }

@@ -54,7 +54,7 @@ fn main() {
             .tlv
             .dump(0);
         connection
-            .invoke_request(1, 6, 1)
+            .invoke_request(1, 6, 1, &[])
             .await
             .unwrap()
             .tlv
