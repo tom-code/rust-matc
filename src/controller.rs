@@ -207,12 +207,6 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
         }
     }
 
-    // some leftover ack - we must get it out before we enable encryption from this endpoint
-    if connection.receive().await.is_err() {
-        println!("we did not get leftover ack. we assume it will not come");
-        //let _unk2 = messages::Message::decode(&unk);
-    };
-
     session.set_encrypt_key(&ctx.encrypt_key);
     session.set_decrypt_key(&ctx.decrypt_key);
     session.session_id = p_session as u16;
@@ -251,7 +245,7 @@ async fn comission(
         .context("csr tlv in tlv missing")?;
     let csrd = x509_cert::request::CertReq::try_from(csr)?;
 
-    // step 3 push ca cert
+    // step 3 push ca cert (AddTrustedRootCertificate)
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     let ca_cert = cm.get_ca_cert()?;
     let mcert = cert_matter::convert_x509_bytes_to_matter(&ca_cert, &ca_pubkey)?;
@@ -262,10 +256,15 @@ async fn comission(
     connection.send(&out).await?;
 
     // push ca cert response
-    //println!("a1 {:?}", get_next_message(connection, session));
-    get_next_message(connection, session).await?;
+    let resp = get_next_message(connection, session).await?;
+    let noc_status = {
+        resp.tlv.get_int(&[1, 0, 1, 1, 0]).context("can't get status for AddTrustedRootCertificate")?
+    };
+    if noc_status != 0 {
+        return Err(anyhow::anyhow!("AddTrustedRootCertificate failed with status {}", noc_status))
+    }
 
-    // step 4 push device cert
+    // step 4 push device cert (AddNOC)
     let ca_id = fabric.ca_id;
     let node_public_key = csrd
         .info
@@ -292,17 +291,26 @@ async fn comission(
     let out = session.encode_message(&t1)?;
     connection.send(&out).await?;
 
-    get_next_message(connection, session).await?;
-    connection.receive().await?;
+    let resp = get_next_message(connection, session).await?;
+    let noc_status = {
+        resp.tlv.get_int(&[1, 0, 0, 1, 0]).context("can't get status for AddNOC")?
+    };
+    if noc_status != 0 {
+        return Err(anyhow::anyhow!("AddNOC failed with status {}", noc_status))
+    }
 
     // send commissioning complete
     let mut ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
     let t1 = messages::im_invoke_request(0, 0x30, 0x4, 30, &[], false)?;
-    //let t1 = messages::im_read_request(0, 0x1d, 0)?;
     let out = ses.encode_message(&t1)?;
     connection.send(&out).await?;
-    get_next_message(connection, &mut ses).await?;
-    connection.receive().await?;
+    let resp = get_next_message(connection, &mut ses).await?;
+    let comresp_status = {
+        resp.tlv.get_int(&[1, 0, 0, 1, 0]).context("can't get status from CommissioningCompleteResponse")?
+    };
+    if comresp_status != 0 {
+        return Err(anyhow::anyhow!("CommissioningComplete failed with status {}", noc_status))
+    }
     Ok(())
 }
 
@@ -351,8 +359,10 @@ async fn auth_sigma(
     let out = session.encode_message(&sigma3)?;
     connection.send(&out).await?;
 
-    let _status = get_next_message(connection, &mut session).await?;
-    //println!("sigma status {:?}", status);
+    let status = get_next_message(connection, &mut session).await?;
+    if !status.status_report_info.context("sigma3 status resp not received")?.is_ok() {
+        return Err(anyhow::anyhow!(format!("response to sigma3 does not contain status ok {:?}", status)))
+    }
 
     //session keys
     let mut th = ctx.sigma1_payload.clone();
@@ -384,10 +394,6 @@ async fn auth_sigma(
     ses.remote_node = Some(remote_node);
 
     ses.counter = rand::random();
-
-    if connection.receive().await.is_err() {
-        println!("expected ack not received");
-    }
 
     Ok(ses)
 }

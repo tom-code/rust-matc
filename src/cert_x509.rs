@@ -17,7 +17,7 @@ fn add_ext(encoder: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8])
 }
 
 fn encode_nodeid(id: u64) -> String {
-    format!("{:0>16x}", id)
+    format!("{:0>16X}", id)
 }
 
 fn systemtime_to_x509_time(st: std::time::SystemTime) -> Result<String> {

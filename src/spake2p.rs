@@ -12,7 +12,7 @@ use crate::util::cryptoutil;
 pub struct Context {
     w0: p256::Scalar,
     w1: p256::Scalar,
-    pub x_random: p256::Scalar,
+    x_random: p256::Scalar,
     pub x: p256::EncodedPoint,
     pub y: p256::EncodedPoint,
     pub ca: Vec<u8>,

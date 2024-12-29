@@ -79,7 +79,7 @@ impl Connection {
     }
 }
 
-impl Drop for Transport {
+/*impl Drop for Transport {
     fn drop(&mut self) {
         println!("drop transport");
     }
@@ -89,4 +89,4 @@ impl Drop for Connection {
     fn drop(&mut self) {
         println!("drop connection");
     }
-}
+}*/

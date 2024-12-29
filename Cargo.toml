@@ -7,28 +7,28 @@ edition = "2021"
 license = "BSD-2-Clause"
 
 [dependencies]
-hex = "0.4.*"
 p256 = {version="0.13.0", features=["ecdh"]}
-elliptic-curve = {version="0.12.*", features=["arithmetic"]}
 ecdsa = {version="0.16.8", features=["digest", "pem"]}
 crypto-bigint = {version="0.5.*", features=["rand"]}
 pbkdf2 = "0.12.2"
-sha2 = { version = "0.10.*", features = ["oid"] }
+sha2 = { version = "0.10.*"}
 sha1 = { version = "0.10.*"}
-byteorder = "1.5.0"
-rand = "0.8.*"
 hkdf = "0.12.*"
 hmac = "0.12.*"
 ccm = {version="0.5.*"}
 aes = {version="0.8.*"}
-x509-cert = {version="0.2.4", features=["builder"]}
+x509-cert = {version="0.2.4"}
 pem="3.0.*"
+
+rand = "0.8.*"
 const-oid = "0.9.*"
 anyhow = "1.0.*"
+hex = "0.4.*"
+byteorder = "1.5.0"
+tokio = {version="1.42.*", features=["sync", "net", "rt", "rt-multi-thread", "time"]}
 
-tokio = {version="1.4.*", features=["sync", "net", "rt", "rt-multi-thread", "time"]}
 
-# - todo add to utils only
+[dev-dependencies]
 clap = {version="4.4.*", features=["derive"]}
 
 [[example]]

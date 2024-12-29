@@ -168,7 +168,7 @@ impl ProtocolMessageHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct StatusReportInfo {
     general_code: u16,
     protocol_id: u32,
@@ -231,7 +231,7 @@ impl Message {
 }
 
 pub fn ack(exchange: u16, ack: i64) -> Result<Vec<u8>> {
-    let mut flags = ProtocolMessageHeader::FLAG_INITIATOR | ProtocolMessageHeader::FLAG_RELIABILITY;
+    let mut flags = ProtocolMessageHeader::FLAG_INITIATOR;
     flags |= ProtocolMessageHeader::FLAG_ACK;
     let prot = ProtocolMessageHeader {
         exchange_flags: flags,
