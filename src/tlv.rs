@@ -78,6 +78,10 @@ impl TlvBuffer {
         self.data.write_u8(tag)?;
         self.data.write_u8(value)
     }
+    pub fn write_uint8_notag(&mut self, value: u8) -> Result<()> {
+        self.data.write_u8(TYPE_UINT_1)?;
+        self.data.write_u8(value)
+    }
     pub fn write_uint16(&mut self, tag: u8, value: u16) -> Result<()> {
         self.data.write_u8((1 << 5) | TYPE_UINT_2)?;
         self.data.write_u8(tag)?;

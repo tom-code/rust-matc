@@ -145,15 +145,12 @@ pub fn encode_x509(
     }
     //ext key usage
     if !ca {
-        add_ext(
-            &mut encoder,
-            OID_CE_EXT_KEU_USAGE,
-            true,
-            &[
-                0x30, 0x14, 0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x02, 0x06, 0x08,
-                0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01,
-            ],
-        )?;
+        let mut ext_ku_encoder = asn1::Encoder::new();
+        ext_ku_encoder.start_seq(0x30)?;
+        ext_ku_encoder.write_oid("1.3.6.1.5.5.7.3.2")?;  // client-auth
+        ext_ku_encoder.write_oid("1.3.6.1.5.5.7.3.1")?;  // server-auth
+        let ext_ku_bytes = ext_ku_encoder.encode();
+        add_ext(&mut encoder, OID_CE_EXT_KEU_USAGE, true, &ext_ku_bytes)?;
     }
     //subject key id
     add_ext(&mut encoder, OID_CE_SUBJECT_KEY_IDENTIFIER, false, &subjectkeyidasn)?;

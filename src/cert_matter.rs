@@ -126,7 +126,14 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
     let extu = extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_EXT_KEU_USAGE);
     if extu.is_ok() {
         enc.write_array(0x3)?;
-        enc.write_raw(&[4, 2, 4, 1])?;
+        let extu = x509_cert::ext::pkix::ExtendedKeyUsage::from_der(&extu?)?;
+        for u in extu.0 {
+            match u.to_string().as_str() {
+                "1.3.6.1.5.5.7.3.1" => { enc.write_uint8_notag(1)?; }  // server-auth
+                "1.3.6.1.5.5.7.3.2" => { enc.write_uint8_notag(2)?; }  // client-auth
+                _ => { return Err(anyhow::anyhow!("unsupported oid in extendedKeyUsage {:?}", u.to_string())) }
+            };
+        };
         enc.write_struct_end()?;
     }
 
