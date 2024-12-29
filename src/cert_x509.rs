@@ -33,6 +33,12 @@ const OID_MATTER_DN_FABRIC: &str = "1.3.6.1.4.1.37244.1.5";
 
 const OID_SIG_ECDSA_WITH_SHA256: &str = "1.2.840.10045.4.3.2";
 
+pub(crate) const OID_CE_SUBJECT_KEY_IDENTIFIER: &str = "2.5.29.14";
+pub(crate) const OID_CE_KEY_USAGE: &str = "2.5.29.15";
+pub(crate) const OID_CE_BASIC_CONSTRAINTS: &str = "2.5.29.19";
+pub(crate) const OID_CE_EXT_KEU_USAGE: &str = "2.5.29.37";
+
+
 pub fn encode_x509(
     node_public_key: &[u8],
     node_id: u64,
@@ -126,23 +132,22 @@ pub fn encode_x509(
     encoder.start_seq(0xa3)?;
     encoder.start_seq(0x30)?;
     // basic constraints
-    add_ext(
-        &mut encoder,
-        "2.5.29.19",
-        true,
-        &[0x30, 0x03, 0x01, 0x01, 0xFF],
-    )?;
+    if ca {
+        add_ext(&mut encoder, OID_CE_BASIC_CONSTRAINTS, true, &[0x30, 0x03, 0x01, 0x01, 0xFF])?
+    } else {
+        add_ext(&mut encoder, OID_CE_BASIC_CONSTRAINTS, true, &[0x30, 0x00])?
+    }
     // key usage
     if ca {
-        add_ext(&mut encoder, "2.5.29.15", true, &[0x03, 0x02, 0x01, 0x06])?;
+        add_ext(&mut encoder, OID_CE_KEY_USAGE, true, &[0x03, 0x02, 0x01, 0x06])?;
     } else {
-        add_ext(&mut encoder, "2.5.29.15", true, &[0x03, 0x02, 0x07, 0x80])?;
+        add_ext(&mut encoder, OID_CE_KEY_USAGE, true, &[0x03, 0x02, 0x07, 0x80])?;
     }
     //ext key usage
     if !ca {
         add_ext(
             &mut encoder,
-            "2.5.29.37",
+            OID_CE_EXT_KEU_USAGE,
             true,
             &[
                 0x30, 0x14, 0x06, 0x08, 0x2B, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x02, 0x06, 0x08,
@@ -151,7 +156,7 @@ pub fn encode_x509(
         )?;
     }
     //subject key id
-    add_ext(&mut encoder, "2.5.29.14", false, &subjectkeyidasn)?;
+    add_ext(&mut encoder, OID_CE_SUBJECT_KEY_IDENTIFIER, false, &subjectkeyidasn)?;
     //authority key id
     add_ext(&mut encoder, "2.5.29.35", false, &authoritykey_sha1_asn)?;
 

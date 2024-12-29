@@ -108,14 +108,22 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
 
     enc.write_list(10)?;
     enc.write_struct(1)?;
-    enc.write_bool(1, true)?; /////////////////////////////////////// is CA - fixme
+    let is_ca = {
+        let basicc = extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_BASIC_CONSTRAINTS);
+        if let Ok(v) = basicc {
+            v[v.len()-1] == 0xff
+        } else {
+            false
+        }
+    };
+    enc.write_bool(1, is_ca)?;
     enc.write_struct_end()?;
-    let kus = extract_extension(&cert.tbs_certificate, "2.5.29.15")?;
+    let kus = extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_KEY_USAGE)?;
     let kus = x509_cert::ext::pkix::KeyUsage::from_der(&kus)?;
 
     enc.write_uint8(2, kus.0.bits() as u8)?;
     ///////// ext key usage
-    let extu = extract_extension(&cert.tbs_certificate, "2.5.29.37");
+    let extu = extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_EXT_KEU_USAGE);
     if extu.is_ok() {
         enc.write_array(0x3)?;
         enc.write_raw(&[4, 2, 4, 1])?;
@@ -127,7 +135,7 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
 
     enc.write_octetstring(
         4,
-        &extract_extension(&cert.tbs_certificate, "2.5.29.14")?[2..],
+        &extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_SUBJECT_KEY_IDENTIFIER)?[2..],
     )?;
     enc.write_octetstring(5, &cakey_sha1)?;
     enc.write_struct_end()?;
