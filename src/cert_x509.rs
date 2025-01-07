@@ -37,7 +37,18 @@ pub(crate) const OID_CE_SUBJECT_KEY_IDENTIFIER: &str = "2.5.29.14";
 pub(crate) const OID_CE_KEY_USAGE: &str = "2.5.29.15";
 pub(crate) const OID_CE_BASIC_CONSTRAINTS: &str = "2.5.29.19";
 pub(crate) const OID_CE_EXT_KEU_USAGE: &str = "2.5.29.37";
+pub(crate) const OID_CE_AUTHORITY_KEY_IDENTIFIER: &str = "2.5.29.35";
 
+
+fn add_rdn(encoder: &mut asn1::Encoder, oid: &str, id: u64) -> Result<()> {
+    encoder.start_seq(0x31)?; //rdn
+    encoder.start_seq(0x30)?; //atv
+    encoder.write_oid(oid)?;
+    encoder.write_string(&encode_nodeid(id))?;
+    encoder.end_seq();
+    encoder.end_seq();
+    Ok(())
+}
 
 pub fn encode_x509(
     node_public_key: &[u8],
@@ -62,12 +73,7 @@ pub fn encode_x509(
     encoder.end_seq();
 
     encoder.start_seq(0x30)?; //issuer
-    encoder.start_seq(0x31)?; //rdn
-    encoder.start_seq(0x30)?; //atv
-    encoder.write_oid(OID_MATTER_DN_CA)?;
-    encoder.write_string(&encode_nodeid(ca_id))?;
-    encoder.end_seq();
-    encoder.end_seq();
+    add_rdn(&mut encoder, OID_MATTER_DN_CA, ca_id)?;
     encoder.end_seq();
 
     encoder.start_seq(0x30)?; //validity
@@ -82,28 +88,12 @@ pub fn encode_x509(
 
     if ca {
         encoder.start_seq(0x30)?; //subject
-        encoder.start_seq(0x31)?; //rdn
-        encoder.start_seq(0x30)?; //atv
-        encoder.write_oid(OID_MATTER_DN_CA)?;
-        encoder.write_string(&encode_nodeid(node_id))?;
-        encoder.end_seq();
-        encoder.end_seq();
+        add_rdn(&mut encoder, OID_MATTER_DN_CA, node_id)?;
         encoder.end_seq();
     } else {
         encoder.start_seq(0x30)?; //subject
-        encoder.start_seq(0x31)?; //rdn
-        encoder.start_seq(0x30)?; //atv
-        encoder.write_oid(OID_MATTER_DN_NODE)?;
-        encoder.write_string(&encode_nodeid(node_id))?;
-        encoder.end_seq();
-        encoder.end_seq();
-
-        encoder.start_seq(0x31)?; //rdn
-        encoder.start_seq(0x30)?; //atv
-        encoder.write_oid(OID_MATTER_DN_FABRIC)?;
-        encoder.write_string(&encode_nodeid(fabric_id))?;
-        encoder.end_seq();
-        encoder.end_seq();
+        add_rdn(&mut encoder, OID_MATTER_DN_NODE, node_id)?;
+        add_rdn(&mut encoder, OID_MATTER_DN_FABRIC, fabric_id)?;
         encoder.end_seq();
     }
 
@@ -120,14 +110,19 @@ pub fn encode_x509(
     encoder.write_octet_string_with_tag(0x3, &pk2)?;
     encoder.end_seq();
 
-    let pubkey_sha1 = cryptoutil::sha1_enc(node_public_key);
-    let mut subjectkeyidasn = vec![0x04, 0x14];
-    subjectkeyidasn.extend_from_slice(&pubkey_sha1);
+    let subjectkeyidasn = {
+        let mut encoder = asn1::Encoder::new();
+        encoder.write_octet_string(&cryptoutil::sha1_enc(node_public_key))?;
+        encoder.encode()
+    };
 
-    let pubkey = ca_private.public_key().to_sec1_bytes();
-    let authoritykey_sha1 = cryptoutil::sha1_enc(&pubkey);
-    let mut authoritykey_sha1_asn = vec![0x30, 0x16, 0x80, 0x14];
-    authoritykey_sha1_asn.extend_from_slice(&authoritykey_sha1);
+    let authoritykey_sha1_asn = {
+        let mut encoder = asn1::Encoder::new();
+        encoder.start_seq(0x30)?;
+        let pubkey = ca_private.public_key().to_sec1_bytes();
+        encoder.write_octet_string_with_tag(0x80, &cryptoutil::sha1_enc(&pubkey))?;
+        encoder.encode()
+    };
 
     encoder.start_seq(0xa3)?;
     encoder.start_seq(0x30)?;
@@ -154,8 +149,9 @@ pub fn encode_x509(
     }
     //subject key id
     add_ext(&mut encoder, OID_CE_SUBJECT_KEY_IDENTIFIER, false, &subjectkeyidasn)?;
+
     //authority key id
-    add_ext(&mut encoder, "2.5.29.35", false, &authoritykey_sha1_asn)?;
+    add_ext(&mut encoder, OID_CE_AUTHORITY_KEY_IDENTIFIER, false, &authoritykey_sha1_asn)?;
 
     encoder.end_seq();
     encoder.end_seq();

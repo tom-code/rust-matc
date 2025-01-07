@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     cert_matter, cert_x509, certmanager, fabric,
     messages::{self, Message},
-    session, sigma, spake2p, tlv, transport,
+    session, sigma, spake2p, tlv::{self, TlvItem, TlvItemValue}, transport,
     util::cryptoutil,
 };
 use anyhow::{Context, Result};
@@ -20,8 +20,8 @@ pub struct Connection {
     connection: Arc<transport::Connection>,
     session: session::Session,
 }
-trait IsSync: Sync {}
-impl IsSync for Controller {}
+//trait IsSync: Sync {}
+//impl IsSync for Controller {}
 
 impl Controller {
     pub fn new(
@@ -84,6 +84,30 @@ impl Connection {
     ) -> Result<Message> {
         read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
     }
+    pub async fn read_request2(
+        &mut self,
+        endpoint: u16,
+        cluster: u32,
+        attr: u32,
+    ) -> Result<TlvItemValue> {
+        let res = read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await?;
+        if (res.protocol_header.protocol_id != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION)
+            || (res.protocol_header.opcode != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA) {
+                Err(anyhow::anyhow!("response is not expected report_data {:?}", res.protocol_header))
+        } else {
+            match res.tlv.get(&[1,0,1,2]) {
+                Some(a) => Ok(a.clone()),
+                None => {
+                    let s = res.tlv.get(&[1,0,0,1,0]).context("report data format not recognized1")?;
+                    if let TlvItemValue::Int(status) = s {
+                        Err(anyhow::anyhow!("report data with status {}", status))
+                    } else {
+                        Err(anyhow::anyhow!("report data format not recognized2"))
+                    }
+                },
+            }
+        }
+    }
     pub async fn invoke_request(
         &mut self,
         endpoint: u16,
@@ -100,6 +124,25 @@ impl Connection {
             payload,
         )
         .await
+    }
+    pub async fn invoke_request2(
+        &mut self,
+        endpoint: u16,
+        cluster: u32,
+        command: u32,
+        payload: &[u8]
+    ) -> Result<TlvItemValue> {
+        let res = invoke_request(
+            &self.connection,
+            &mut self.session,
+            endpoint,
+            cluster,
+            command,
+            payload,
+        )
+        .await?;
+        let o = res.tlv.get(&[1,0,1,1]).context("result not found")?;
+        Ok(o.clone())
     }
 }
 

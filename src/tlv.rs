@@ -12,6 +12,7 @@ const TYPE_UINT_4: u8 = 6;
 const TYPE_UINT_8: u8 = 7;
 const TYPE_BOOL_FALSE: u8 = 8;
 const TYPE_BOOL_TRUE: u8 = 9;
+const TYPE_UTF8_L1: u8 = 0xC;
 
 const TYPE_OCTET_STRING_L1: u8 = 0x10;
 const TYPE_OCTET_STRING_L2: u8 = 0x11;
@@ -50,6 +51,16 @@ impl TlvBuffer {
     }
     pub fn write_struct_end(&mut self) -> Result<()> {
         self.data.write_u8(0x18)?;
+        Ok(())
+    }
+    pub fn write_string(&mut self, tag: u8, data: &str) -> Result<()> {
+        let mut ctrl: u8 = 1 << 5;
+        ctrl |= TYPE_UTF8_L1;
+        let bytes = data.as_bytes();
+        self.data.write_u8(ctrl)?;
+        self.data.write_u8(tag)?;
+        self.data.write_u8(bytes.len() as u8)?;
+        self.data.write_all(bytes)?;
         Ok(())
     }
     pub fn write_octetstring(&mut self, tag: u8, data: &[u8]) -> Result<()> {
@@ -113,7 +124,7 @@ impl Default for TlvBuffer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TlvItemValue {
     Int(u64),
     Bool(bool),
@@ -123,7 +134,7 @@ pub enum TlvItemValue {
     Invalid(),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TlvItem {
     pub tag: u8,
     pub value: TlvItemValue,
@@ -144,7 +155,61 @@ impl TlvItem {
             Some(&self.value)
         }
     }
+    pub fn get_item(&self, tag: &[u8]) -> Option<&TlvItem> {
+        if !tag.is_empty() {
+            if let TlvItemValue::List(lst) = &self.value {
+                for l in lst {
+                    if l.tag == tag[0] {
+                        return l.get_item(&tag[1..]);
+                    };
+                }
+            }
+            None
+        } else {
+            Some(self)
+        }
+    }
     pub fn get_int(&self, tag: &[u8]) -> Option<u64> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::Int(i)) = found {
+            Some(*i)
+        } else {
+            None
+        }
+    }
+    pub fn get_bool(&self, tag: &[u8]) -> Option<bool> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::Bool(i)) = found {
+            Some(*i)
+        } else {
+            None
+        }
+    }
+    pub fn get_u8(&self, tag: &[u8]) -> Option<u8> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::Int(i)) = found {
+            Some(*i as u8)
+        } else {
+            None
+        }
+    }
+    pub fn get_u16(&self, tag: &[u8]) -> Option<u16> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::Int(i)) = found {
+            Some(*i as u16)
+        } else {
+            None
+        }
+    }
+    pub fn get_u32(&self, tag: &[u8]) -> Option<u32> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::Int(i)) = found {
+            Some(*i as u32)
+        } else {
+            None
+        }
+    }
+    pub fn get_u64(&self, tag: &[u8]) -> Option<u64> {
         let found = self.get(tag);
         if let Some(TlvItemValue::Int(i)) = found {
             Some(*i)
@@ -156,6 +221,22 @@ impl TlvItem {
         let found = self.get(tag);
         if let Some(TlvItemValue::OctetString(o)) = found {
             Some(o)
+        } else {
+            None
+        }
+    }
+    pub fn get_octet_string_owned(&self, tag: &[u8]) -> Option<Vec<u8>> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::OctetString(o)) = found {
+            Some(o.to_owned())
+        } else {
+            None
+        }
+    }
+    pub fn get_string_owned(&self, tag: &[u8]) -> Option<String> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::String(o)) = found {
+            Some(o.clone())
         } else {
             None
         }
@@ -391,7 +472,9 @@ impl TlvItemEnc {
             TlvItemValueEnc::Bool(v) => {
                 buf.write_bool(self.tag, *v)?;
             }
-            TlvItemValueEnc::String(_) => {}
+            TlvItemValueEnc::String(s) => {
+                buf.write_string(self.tag, s)?;
+            }
             TlvItemValueEnc::OctetString(vec) => {
                 buf.write_octetstring(self.tag, vec)?;
             }

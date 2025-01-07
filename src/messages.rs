@@ -126,7 +126,9 @@ impl ProtocolMessageHeader {
     pub const OPCODE_CASE_SIGMA3: u8 = 0x32;
     pub const OPCODE_STATUS: u8 = 0x40;
 
+    pub const INTERACTION_OPCODE_STATUS_RESP: u8 = 0x1;
     pub const INTERACTION_OPCODE_READ_REQ: u8 = 0x2;
+    pub const INTERACTION_OPCODE_REPORT_DATA: u8 = 0x5;
     pub const INTERACTION_OPCODE_INVOKE_REQ: u8 = 0x8;
 
     pub const PROTOCOL_ID_SECURE_CHANNEL: u16 = 0;
