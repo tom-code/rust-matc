@@ -10,6 +10,7 @@ pub trait CertManager: Send + Sync {
     fn get_ca_public_key(&self) -> Result<Vec<u8>>;
     fn get_user_cert(&self, id: u64) -> Result<Vec<u8>>;
     fn get_user_key(&self, id: u64) -> Result<p256::SecretKey>;
+    fn get_fabric_id(&self) -> u64;
 }
 
 pub struct FileCertManager {
@@ -24,6 +25,14 @@ impl FileCertManager {
             path: path.to_owned(),
         })
     }
+    pub fn load(path: &str) -> Result<Arc<Self>> {
+        let fabric_str = std::fs::read_to_string(format!("{}/metadata.pem", path))?;
+        let fabric_id = fabric_str.parse::<u64>()?;
+        Ok(Arc::new(Self {
+            fabric_id,
+            path: path.to_owned(),
+        }))
+    }
     fn user_key_fname(&self, id: u64) -> String {
         format!("{}/{}-private.pem", self.path, id)
     }
@@ -36,9 +45,27 @@ impl FileCertManager {
     fn ca_cert_fname(&self) -> String {
         format!("{}/ca-cert.pem", self.path)
     }
+    fn metadata_fname(&self) -> String {
+        format!("{}/metadata.pem", self.path)
+    }
 }
 
 const CA_NODE_ID: u64 = 1;
+
+/*fn extract_fabric_id(fname: &str) -> Result<u64> {
+    let x509_raw = cryptoutil::read_data_from_pem(fname)?;
+    let x509 = x509_cert::Certificate::from_der(&x509_raw)?;
+    let subject = x509.tbs_certificate.subject;
+    for rdn in subject.0 {
+        for av in rdn.0.as_slice() {
+            if av.oid == const_oid::ObjectIdentifier::new_unwrap("1.3.6.1.4.1.37244.1.5") {
+                let valstr = av.value.decode_as::<String>()?;
+                return Ok(u64::from_str_radix(&valstr, 16)?)
+            }
+        }
+    };
+    Err(anyhow::anyhow!("can't extract fabric id"))
+}*/
 
 impl FileCertManager {
     pub fn bootstrap(&self) -> Result<()> {
@@ -59,6 +86,7 @@ impl FileCertManager {
             true,
         )?;
         cryptoutil::write_pem("CERTIFICATE", &x509, &self.ca_cert_fname())?;
+        std::fs::write(self.metadata_fname(), format!("{}", self.fabric_id))?;
         Ok(())
     }
 
@@ -102,5 +130,9 @@ impl CertManager for FileCertManager {
 
     fn get_ca_public_key(&self) -> Result<Vec<u8>> {
         Ok(self.get_ca_key()?.public_key().to_sec1_bytes().to_vec())
+    }
+
+    fn get_fabric_id(&self) -> u64 {
+        self.fabric_id
     }
 }

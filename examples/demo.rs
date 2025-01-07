@@ -23,9 +23,6 @@ struct Cli {
 enum Commands {
     /// Commission device
     Commission {
-        #[clap(long)]
-        #[arg(default_value_t = DEFAULT_FABRIC)]
-        fabric_id: u64,
 
         #[clap(long)]
         #[arg(default_value_t=DEFAULT_LOCAL_ADDRESS.to_string())]
@@ -37,9 +34,6 @@ enum Commands {
         pin: u32,
     },
     ListSupportedClusters {
-        #[clap(long)]
-        #[arg(default_value_t = DEFAULT_FABRIC)]
-        fabric_id: u64,
 
         #[clap(long)]
         #[arg(default_value_t=DEFAULT_LOCAL_ADDRESS.to_string())]
@@ -70,16 +64,9 @@ enum Commands {
     },
     /// Create key and certificate for controller
     CaCreateController {
-        #[clap(long)]
-        #[arg(default_value_t = DEFAULT_FABRIC)]
-        fabric_id: u64,
         controller_id: u64,
     },
     Command {
-        #[clap(long)]
-        #[arg(global = true, default_value_t = DEFAULT_FABRIC)]
-        fabric_id: u64,
-
         #[clap(long)]
         #[arg(global = true, default_value_t = DEFAULT_LOCAL_ADDRESS.to_string())]
         local_address: String,
@@ -119,16 +106,14 @@ enum CommandCommand {
 }
 
 async fn create_connection(
-    fabric_id: u64,
     local_address: &str,
     device_address: &str,
     device_id: u64,
     controller_id: u64,
 ) -> Result<controller::Connection> {
-    let cm: Arc<dyn certmanager::CertManager> =
-        certmanager::FileCertManager::new(fabric_id, CERT_PATH);
+    let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH)?;
     let transport = transport::Transport::new(local_address).await?;
-    let controller = controller::Controller::new(&cm, &transport, fabric_id);
+    let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
     let connection = transport.create_connection(device_address).await;
     let c = controller
         .auth_sigma(&connection, device_id, controller_id)
@@ -143,7 +128,6 @@ fn main() {
             controller_id,
             device_address,
             pin,
-            fabric_id,
             local_address,
             device_id,
         } => {
@@ -153,10 +137,9 @@ fn main() {
                 .unwrap();
 
             runtime.block_on(async {
-                let cm: Arc<dyn certmanager::CertManager> =
-                    certmanager::FileCertManager::new(fabric_id, CERT_PATH);
+                let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH).unwrap();
                 let transport = transport::Transport::new(&local_address).await.unwrap();
-                let controller = controller::Controller::new(&cm, &transport, fabric_id);
+                let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
                 let connection = transport.create_connection(&device_address).await;
                 controller
                     .commission(&connection, pin, device_id, controller_id)
@@ -169,14 +152,12 @@ fn main() {
             cm.bootstrap().unwrap();
         }
         Commands::CaCreateController {
-            fabric_id,
             controller_id,
         } => {
-            let cm = FileCertManager::new(fabric_id, CERT_PATH);
+            let cm = FileCertManager::load(CERT_PATH).unwrap();
             cm.create_user(controller_id).unwrap();
         }
         Commands::ListSupportedClusters {
-            fabric_id,
             local_address,
             device_address,
             controller_id,
@@ -189,7 +170,6 @@ fn main() {
 
             runtime.block_on(async {
                 let mut connection = create_connection(
-                    fabric_id,
                     &local_address,
                     &device_address,
                     device_id,
@@ -238,7 +218,6 @@ fn main() {
         },*/
         Commands::Command {
             command,
-            fabric_id,
             local_address,
             device_address,
             controller_id,
@@ -251,7 +230,6 @@ fn main() {
 
             runtime.block_on(async {
                 let mut connection = create_connection(
-                    fabric_id,
                     &local_address,
                     &device_address,
                     device_id,
