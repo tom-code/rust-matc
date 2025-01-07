@@ -1,5 +1,7 @@
 # simple rust controller library
 
+![build](https://github.com/tom-code/rust-matc/actions/workflows/rust.yml/badge.svg)
+
 This is prototype of matter controller library in rust.
 
 It supports controller side of:
