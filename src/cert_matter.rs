@@ -109,9 +109,12 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
     enc.write_list(10)?;
     enc.write_struct(1)?;
     let is_ca = {
-        let basicc = extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_BASIC_CONSTRAINTS);
+        let basicc = extract_extension(
+            &cert.tbs_certificate,
+            crate::cert_x509::OID_CE_BASIC_CONSTRAINTS,
+        );
         if let Ok(v) = basicc {
-            v[v.len()-1] == 0xff
+            v[v.len() - 1] == 0xff
         } else {
             false
         }
@@ -123,17 +126,29 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
 
     enc.write_uint8(2, kus.0.bits() as u8)?;
     ///////// ext key usage
-    let extu = extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_EXT_KEU_USAGE);
+    let extu = extract_extension(
+        &cert.tbs_certificate,
+        crate::cert_x509::OID_CE_EXT_KEU_USAGE,
+    );
     if extu.is_ok() {
         enc.write_array(0x3)?;
         let extu = x509_cert::ext::pkix::ExtendedKeyUsage::from_der(&extu?)?;
         for u in extu.0 {
             match u.to_string().as_str() {
-                "1.3.6.1.5.5.7.3.1" => { enc.write_uint8_notag(1)?; }  // server-auth
-                "1.3.6.1.5.5.7.3.2" => { enc.write_uint8_notag(2)?; }  // client-auth
-                _ => { return Err(anyhow::anyhow!("unsupported oid in extendedKeyUsage {:?}", u.to_string())) }
+                "1.3.6.1.5.5.7.3.1" => {
+                    enc.write_uint8_notag(1)?;
+                } // server-auth
+                "1.3.6.1.5.5.7.3.2" => {
+                    enc.write_uint8_notag(2)?;
+                } // client-auth
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "unsupported oid in extendedKeyUsage {:?}",
+                        u.to_string()
+                    ))
+                }
             };
-        };
+        }
         enc.write_struct_end()?;
     }
 
@@ -142,7 +157,10 @@ fn convert_x509_to_matter_int(cert: &CertificateInner, ca_pubkey: &[u8]) -> Resu
 
     enc.write_octetstring(
         4,
-        &extract_extension(&cert.tbs_certificate, crate::cert_x509::OID_CE_SUBJECT_KEY_IDENTIFIER)?[2..],
+        &extract_extension(
+            &cert.tbs_certificate,
+            crate::cert_x509::OID_CE_SUBJECT_KEY_IDENTIFIER,
+        )?[2..],
     )?;
     enc.write_octetstring(5, &cakey_sha1)?;
     enc.write_struct_end()?;

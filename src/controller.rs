@@ -3,7 +3,9 @@ use std::sync::Arc;
 use crate::{
     cert_matter, cert_x509, certmanager, fabric,
     messages::{self, Message},
-    session, sigma, spake2p, tlv::{self, TlvItem, TlvItemValue}, transport,
+    session, sigma, spake2p,
+    tlv::{self, TlvItem, TlvItemValue},
+    transport,
     util::cryptoutil,
 };
 use anyhow::{Context, Result};
@@ -90,21 +92,31 @@ impl Connection {
         cluster: u32,
         attr: u32,
     ) -> Result<TlvItemValue> {
-        let res = read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await?;
-        if (res.protocol_header.protocol_id != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION)
-            || (res.protocol_header.opcode != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA) {
-                Err(anyhow::anyhow!("response is not expected report_data {:?}", res.protocol_header))
+        let res =
+            read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await?;
+        if (res.protocol_header.protocol_id
+            != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION)
+            || (res.protocol_header.opcode
+                != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA)
+        {
+            Err(anyhow::anyhow!(
+                "response is not expected report_data {:?}",
+                res.protocol_header
+            ))
         } else {
-            match res.tlv.get(&[1,0,1,2]) {
+            match res.tlv.get(&[1, 0, 1, 2]) {
                 Some(a) => Ok(a.clone()),
                 None => {
-                    let s = res.tlv.get(&[1,0,0,1,0]).context("report data format not recognized1")?;
+                    let s = res
+                        .tlv
+                        .get(&[1, 0, 0, 1, 0])
+                        .context("report data format not recognized1")?;
                     if let TlvItemValue::Int(status) = s {
                         Err(anyhow::anyhow!("report data with status {}", status))
                     } else {
                         Err(anyhow::anyhow!("report data format not recognized2"))
                     }
-                },
+                }
             }
         }
     }
@@ -113,7 +125,7 @@ impl Connection {
         endpoint: u16,
         cluster: u32,
         command: u32,
-        payload: &[u8]
+        payload: &[u8],
     ) -> Result<Message> {
         invoke_request(
             &self.connection,
@@ -130,7 +142,7 @@ impl Connection {
         endpoint: u16,
         cluster: u32,
         command: u32,
-        payload: &[u8]
+        payload: &[u8],
     ) -> Result<TlvItemValue> {
         let res = invoke_request(
             &self.connection,
@@ -141,7 +153,7 @@ impl Connection {
             payload,
         )
         .await?;
-        let o = res.tlv.get(&[1,0,1,1]).context("result not found")?;
+        let o = res.tlv.get(&[1, 0, 1, 1]).context("result not found")?;
         Ok(o.clone())
     }
 }
@@ -302,10 +314,15 @@ async fn comission(
     // push ca cert response
     let resp = get_next_message(connection, session).await?;
     let noc_status = {
-        resp.tlv.get_int(&[1, 0, 1, 1, 0]).context("can't get status for AddTrustedRootCertificate")?
+        resp.tlv
+            .get_int(&[1, 0, 1, 1, 0])
+            .context("can't get status for AddTrustedRootCertificate")?
     };
     if noc_status != 0 {
-        return Err(anyhow::anyhow!("AddTrustedRootCertificate failed with status {}", noc_status))
+        return Err(anyhow::anyhow!(
+            "AddTrustedRootCertificate failed with status {}",
+            noc_status
+        ));
     }
 
     // step 4 push device cert (AddNOC)
@@ -337,10 +354,12 @@ async fn comission(
 
     let resp = get_next_message(connection, session).await?;
     let noc_status = {
-        resp.tlv.get_int(&[1, 0, 0, 1, 0]).context("can't get status for AddNOC")?
+        resp.tlv
+            .get_int(&[1, 0, 0, 1, 0])
+            .context("can't get status for AddNOC")?
     };
     if noc_status != 0 {
-        return Err(anyhow::anyhow!("AddNOC failed with status {}", noc_status))
+        return Err(anyhow::anyhow!("AddNOC failed with status {}", noc_status));
     }
 
     // send commissioning complete
@@ -350,10 +369,15 @@ async fn comission(
     connection.send(&out).await?;
     let resp = get_next_message(connection, &mut ses).await?;
     let comresp_status = {
-        resp.tlv.get_int(&[1, 0, 0, 1, 0]).context("can't get status from CommissioningCompleteResponse")?
+        resp.tlv
+            .get_int(&[1, 0, 0, 1, 0])
+            .context("can't get status from CommissioningCompleteResponse")?
     };
     if comresp_status != 0 {
-        return Err(anyhow::anyhow!("CommissioningComplete failed with status {}", noc_status))
+        return Err(anyhow::anyhow!(
+            "CommissioningComplete failed with status {}",
+            noc_status
+        ));
     }
     Ok(())
 }
@@ -404,8 +428,15 @@ async fn auth_sigma(
     connection.send(&out).await?;
 
     let status = get_next_message(connection, &mut session).await?;
-    if !status.status_report_info.context("sigma3 status resp not received")?.is_ok() {
-        return Err(anyhow::anyhow!(format!("response to sigma3 does not contain status ok {:?}", status)))
+    if !status
+        .status_report_info
+        .context("sigma3 status resp not received")?
+        .is_ok()
+    {
+        return Err(anyhow::anyhow!(format!(
+            "response to sigma3 does not contain status ok {:?}",
+            status
+        )));
     }
 
     //session keys

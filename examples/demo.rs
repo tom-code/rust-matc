@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
-use clap::{Parser, Subcommand};
-use matc::{certmanager::{self, FileCertManager}, controller, tlv, transport};
 use anyhow::Result;
+use clap::{Parser, Subcommand};
+use matc::{
+    certmanager::{self, FileCertManager},
+    controller, tlv, transport,
+};
 
 const DEFAULT_FABRIC: u64 = 0x110;
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
@@ -95,7 +98,7 @@ enum Commands {
 
         #[command(subcommand)]
         command: CommandCommand,
-    }
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -103,26 +106,33 @@ enum CommandCommand {
     Read {
         endpoint: u16,
         cluster: u32,
-        attr: u32
+        attr: u32,
     },
-    InvokeCommandOn {
-    },
-    InvokeCommandOff {
-    },
+    InvokeCommandOn {},
+    InvokeCommandOff {},
     InvokeCommandMoveToLevel {
-        level: u8
+        level: u8,
     },
     InvokeCommandUpdateFabricLabel {
-        label: String
-    }
+        label: String,
+    },
 }
 
-async fn create_connection(fabric_id: u64, local_address: &str, device_address: &str, device_id: u64, controller_id: u64) -> Result<controller::Connection> {
-    let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::new(fabric_id, CERT_PATH);
+async fn create_connection(
+    fabric_id: u64,
+    local_address: &str,
+    device_address: &str,
+    device_id: u64,
+    controller_id: u64,
+) -> Result<controller::Connection> {
+    let cm: Arc<dyn certmanager::CertManager> =
+        certmanager::FileCertManager::new(fabric_id, CERT_PATH);
     let transport = transport::Transport::new(local_address).await?;
     let controller = controller::Controller::new(&cm, &transport, fabric_id);
     let connection = transport.create_connection(device_address).await;
-    let c = controller.auth_sigma(&connection, device_id, controller_id).await?;
+    let c = controller
+        .auth_sigma(&connection, device_id, controller_id)
+        .await?;
     Ok(c)
 }
 
@@ -143,7 +153,8 @@ fn main() {
                 .unwrap();
 
             runtime.block_on(async {
-                let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::new(fabric_id, CERT_PATH);
+                let cm: Arc<dyn certmanager::CertManager> =
+                    certmanager::FileCertManager::new(fabric_id, CERT_PATH);
                 let transport = transport::Transport::new(&local_address).await.unwrap();
                 let controller = controller::Controller::new(&cm, &transport, fabric_id);
                 let connection = transport.create_connection(&device_address).await;
@@ -156,24 +167,36 @@ fn main() {
         Commands::CaBootstrap { fabric_id } => {
             let cm = FileCertManager::new(fabric_id, CERT_PATH);
             cm.bootstrap().unwrap();
-        },
-        Commands::CaCreateController { fabric_id, controller_id } => {
+        }
+        Commands::CaCreateController {
+            fabric_id,
+            controller_id,
+        } => {
             let cm = FileCertManager::new(fabric_id, CERT_PATH);
             cm.create_user(controller_id).unwrap();
-        },
+        }
         Commands::ListSupportedClusters {
             fabric_id,
             local_address,
             device_address,
             controller_id,
-            device_id } => {
-                let runtime = tokio::runtime::Builder::new_current_thread()
+            device_id,
+        } => {
+            let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .unwrap();
 
             runtime.block_on(async {
-                let mut connection = create_connection(fabric_id, &local_address, &device_address, device_id, controller_id).await.unwrap();
+                let mut connection = create_connection(
+                    fabric_id,
+                    &local_address,
+                    &device_address,
+                    device_id,
+                    controller_id,
+                )
+                .await
+                .unwrap();
                 let resptlv = connection.read_request2(0, 0x1d, 1).await.unwrap();
                 if let tlv::TlvItemValue::List(l) = resptlv {
                     for c in l {
@@ -183,7 +206,7 @@ fn main() {
                     }
                 }
             });
-        },
+        }
         /*Commands::ListFabrics {
             fabric_id,
             local_address,
@@ -219,7 +242,7 @@ fn main() {
             local_address,
             device_address,
             controller_id,
-            device_id
+            device_id,
         } => {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -227,48 +250,59 @@ fn main() {
                 .unwrap();
 
             runtime.block_on(async {
-                let mut connection = create_connection(fabric_id, &local_address, &device_address, device_id, controller_id).await.unwrap();
+                let mut connection = create_connection(
+                    fabric_id,
+                    &local_address,
+                    &device_address,
+                    device_id,
+                    controller_id,
+                )
+                .await
+                .unwrap();
                 match command {
                     CommandCommand::Read {
                         endpoint,
                         cluster,
-                        attr
+                        attr,
                     } => {
-                        let res = connection.read_request(endpoint, cluster, attr).await.unwrap();
+                        let res = connection
+                            .read_request(endpoint, cluster, attr)
+                            .await
+                            .unwrap();
                         res.tlv.dump(1);
-                    },
+                    }
 
-                    CommandCommand::InvokeCommandOn {
-                    } => {
+                    CommandCommand::InvokeCommandOn {} => {
                         let res = connection.invoke_request(1, 0x6, 1, &[]).await.unwrap();
                         res.tlv.dump(1);
-                    },
+                    }
 
-                    CommandCommand::InvokeCommandOff {
-                    } => {
+                    CommandCommand::InvokeCommandOff {} => {
                         let res = connection.invoke_request(1, 0x6, 0, &[]).await.unwrap();
                         res.tlv.dump(1);
-                    },
-                    CommandCommand::InvokeCommandMoveToLevel {
-                        level,
-                    } => {
+                    }
+                    CommandCommand::InvokeCommandMoveToLevel { level } => {
                         let tlv = tlv::TlvItemEnc {
-                            tag: 0, value: tlv::TlvItemValueEnc::UInt8(level)
-                        }.encode().unwrap();
+                            tag: 0,
+                            value: tlv::TlvItemValueEnc::UInt8(level),
+                        }
+                        .encode()
+                        .unwrap();
                         let res = connection.invoke_request(1, 0x8, 0, &tlv).await.unwrap();
                         res.tlv.dump(1);
-                    },
-                    CommandCommand::InvokeCommandUpdateFabricLabel {
-                        label
-                    } => {
+                    }
+                    CommandCommand::InvokeCommandUpdateFabricLabel { label } => {
                         let tlv = tlv::TlvItemEnc {
-                            tag: 0, value: tlv::TlvItemValueEnc::String(label)
-                        }.encode().unwrap();
+                            tag: 0,
+                            value: tlv::TlvItemValueEnc::String(label),
+                        }
+                        .encode()
+                        .unwrap();
                         let res = connection.invoke_request(0, 0x3e, 9, &tlv).await.unwrap();
                         res.tlv.dump(1);
-                    },
+                    }
                 }
             });
-        },
+        }
     }
 }

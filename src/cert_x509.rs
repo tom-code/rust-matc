@@ -39,7 +39,6 @@ pub(crate) const OID_CE_BASIC_CONSTRAINTS: &str = "2.5.29.19";
 pub(crate) const OID_CE_EXT_KEU_USAGE: &str = "2.5.29.37";
 pub(crate) const OID_CE_AUTHORITY_KEY_IDENTIFIER: &str = "2.5.29.35";
 
-
 fn add_rdn(encoder: &mut asn1::Encoder, oid: &str, id: u64) -> Result<()> {
     encoder.start_seq(0x31)?; //rdn
     encoder.start_seq(0x30)?; //atv
@@ -128,30 +127,55 @@ pub fn encode_x509(
     encoder.start_seq(0x30)?;
     // basic constraints
     if ca {
-        add_ext(&mut encoder, OID_CE_BASIC_CONSTRAINTS, true, &[0x30, 0x03, 0x01, 0x01, 0xFF])?
+        add_ext(
+            &mut encoder,
+            OID_CE_BASIC_CONSTRAINTS,
+            true,
+            &[0x30, 0x03, 0x01, 0x01, 0xFF],
+        )?
     } else {
         add_ext(&mut encoder, OID_CE_BASIC_CONSTRAINTS, true, &[0x30, 0x00])?
     }
     // key usage
     if ca {
-        add_ext(&mut encoder, OID_CE_KEY_USAGE, true, &[0x03, 0x02, 0x01, 0x06])?;
+        add_ext(
+            &mut encoder,
+            OID_CE_KEY_USAGE,
+            true,
+            &[0x03, 0x02, 0x01, 0x06],
+        )?;
     } else {
-        add_ext(&mut encoder, OID_CE_KEY_USAGE, true, &[0x03, 0x02, 0x07, 0x80])?;
+        add_ext(
+            &mut encoder,
+            OID_CE_KEY_USAGE,
+            true,
+            &[0x03, 0x02, 0x07, 0x80],
+        )?;
     }
     //ext key usage
     if !ca {
         let mut ext_ku_encoder = asn1::Encoder::new();
         ext_ku_encoder.start_seq(0x30)?;
-        ext_ku_encoder.write_oid("1.3.6.1.5.5.7.3.2")?;  // client-auth
-        ext_ku_encoder.write_oid("1.3.6.1.5.5.7.3.1")?;  // server-auth
+        ext_ku_encoder.write_oid("1.3.6.1.5.5.7.3.2")?; // client-auth
+        ext_ku_encoder.write_oid("1.3.6.1.5.5.7.3.1")?; // server-auth
         let ext_ku_bytes = ext_ku_encoder.encode();
         add_ext(&mut encoder, OID_CE_EXT_KEU_USAGE, true, &ext_ku_bytes)?;
     }
     //subject key id
-    add_ext(&mut encoder, OID_CE_SUBJECT_KEY_IDENTIFIER, false, &subjectkeyidasn)?;
+    add_ext(
+        &mut encoder,
+        OID_CE_SUBJECT_KEY_IDENTIFIER,
+        false,
+        &subjectkeyidasn,
+    )?;
 
     //authority key id
-    add_ext(&mut encoder, OID_CE_AUTHORITY_KEY_IDENTIFIER, false, &authoritykey_sha1_asn)?;
+    add_ext(
+        &mut encoder,
+        OID_CE_AUTHORITY_KEY_IDENTIFIER,
+        false,
+        &authoritykey_sha1_asn,
+    )?;
 
     encoder.end_seq();
     encoder.end_seq();

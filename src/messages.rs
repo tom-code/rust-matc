@@ -20,7 +20,7 @@ impl MessageHeader {
     const DSIZ_16: u8 = 2;
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut flags: u8 = 0;
-        if self.source_node_id.as_ref().is_some_and(|x|x.len() == 8) {
+        if self.source_node_id.as_ref().is_some_and(|x| x.len() == 8) {
             flags |= Self::FLAG_SRC_PRESENT;
         }
         if let Some(destination_node_id) = &self.destination_node_id {
