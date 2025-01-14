@@ -86,7 +86,7 @@ impl MessageHeader {
     }
 }
 
-#[derive(Debug)]
+/*#[derive(Debug)]
 enum SecChannelOpcode {
     None = 0x0,
     Ack = 0x10,
@@ -99,7 +99,7 @@ enum SecChannelOpcode {
     Sigma2 = 0x31,
     Sigma3 = 0x32,
     Status = 0x40,
-}
+}*/
 
 #[derive(Debug)]
 pub struct ProtocolMessageHeader {

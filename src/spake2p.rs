@@ -15,9 +15,9 @@ pub struct Context {
     x_random: p256::Scalar,
     pub x: p256::EncodedPoint,
     pub y: p256::EncodedPoint,
-    pub ca: Vec<u8>,
-    pub decrypt_key: Vec<u8>,
-    pub encrypt_key: Vec<u8>,
+    pub ca: Option<Vec<u8>>,
+    pub decrypt_key: Option<Vec<u8>>,
+    pub encrypt_key: Option<Vec<u8>>,
 }
 
 pub struct Engine {
@@ -75,9 +75,9 @@ impl Engine {
             x_random: x_random_scalar,
             x: px2enc,
             y: p256::EncodedPoint::identity(),
-            ca: Vec::new(),
-            decrypt_key: Vec::new(),
-            encrypt_key: Vec::new(),
+            ca: None,
+            decrypt_key: None,
+            encrypt_key: None,
         })
     }
 
@@ -114,12 +114,12 @@ impl Engine {
 
         let okm = cryptoutil::hkdf_sha256(&[], ka, "ConfirmationKeys".as_bytes(), 32)?;
 
-        ctx.ca = cryptoutil::hmac_sha256(ctx.y.as_bytes(), &okm[..16])?;
+        ctx.ca = Some(cryptoutil::hmac_sha256(ctx.y.as_bytes(), &okm[..16])?);
         let _cb = cryptoutil::hmac_sha256(ctx.x.as_bytes(), &okm[16..])?;
 
         let xcrypt = cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16 * 3)?;
-        ctx.decrypt_key = xcrypt[16..32].to_vec();
-        ctx.encrypt_key = xcrypt[..16].to_vec();
+        ctx.decrypt_key = Some(xcrypt[16..32].to_vec());
+        ctx.encrypt_key = Some(xcrypt[..16].to_vec());
 
         Ok(())
     }

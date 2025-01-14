@@ -4,7 +4,7 @@ use crate::{
     cert_matter, cert_x509, certmanager, fabric,
     messages::{self, Message},
     session, sigma, spake2p,
-    tlv::{self, TlvItem, TlvItemValue},
+    tlv::{self, TlvItemValue},
     transport,
     util::cryptoutil,
 };
@@ -244,7 +244,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     hash_seed.extend_from_slice(&pbkdf_req_protocol_message[6..]);
     hash_seed.extend_from_slice(&pbkdf_response.payload);
     engine.finish(&mut ctx, &hash_seed)?;
-    let pake3_protocol_message = messages::pake3(1, &ctx.ca, -1)?;
+    let pake3_protocol_message = messages::pake3(1, &ctx.ca.context("ca value not poresent in context")?, -1)?;
     let pake3 = session.encode_message(&pake3_protocol_message)?;
     connection.send(&pake3).await?;
 
@@ -263,8 +263,8 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
         }
     }
 
-    session.set_encrypt_key(&ctx.encrypt_key);
-    session.set_decrypt_key(&ctx.decrypt_key);
+    session.set_encrypt_key(&ctx.encrypt_key.context("encrypt key missing")?);
+    session.set_decrypt_key(&ctx.decrypt_key.context("decrypt key missing")?);
     session.session_id = p_session as u16;
     Ok(session)
 }

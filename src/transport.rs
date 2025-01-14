@@ -1,14 +1,17 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::Mutex};
 
+#[derive(Debug, Clone)]
 struct ConnectionInfo {
     sender: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 pub struct Transport {
-    socket: UdpSocket,
+    socket: Arc<UdpSocket>,
     connections: Mutex<HashMap<String, ConnectionInfo>>,
+    remove_channel_sender: tokio::sync::mpsc::UnboundedSender<String>,
+    stop_receive_token: tokio_util::sync::CancellationToken
 }
 
 pub struct Connection {
@@ -18,23 +21,66 @@ pub struct Connection {
 }
 
 impl Transport {
+
+    async fn read_from_socket_loop(socket: Arc<UdpSocket>,
+                                   stop_receive_token: tokio_util::sync::CancellationToken,
+                                   self_weak: std::sync::Weak<Transport>) -> Result<()> {
+        loop {
+            let mut buf = vec![0u8; 1024];
+            let (n, addr) = {
+                tokio::select! {
+                    recv_resp = socket.recv_from(&mut buf) => recv_resp,
+                    _ = stop_receive_token.cancelled() => break
+                }
+            }?;
+            buf.resize(n, 0);
+            let self_strong = self_weak.upgrade().context("weakpointer to self is gone - just stop")?;
+            let cons = self_strong.connections.lock().await;
+            if let Some(c) = cons.get(&addr.to_string()) {
+                _ = c.sender.send(buf).await;
+            }
+        };
+        Ok(())
+    }
+
+    async fn read_from_delete_queue_loop(mut remove_channel_receiver: tokio::sync::mpsc::UnboundedReceiver<String>,
+                                         self_weak: std::sync::Weak<Transport>) -> Result<()> {
+        loop {
+            let to_remove = remove_channel_receiver.recv().await;
+            match to_remove {
+                Some(to_remove) => {
+                    if to_remove.is_empty() {
+                        break
+                    }
+                    let self_strong = self_weak.upgrade().context("weak to self is gone - just stop")?;
+                    let mut cons = self_strong.connections.lock().await;
+                    _ = cons.remove(&to_remove);
+                },
+                None => break,
+            }
+        };
+        Ok(())
+    }
+
     pub async fn new(local: &str) -> Result<Arc<Self>> {
         let socket = UdpSocket::bind(local).await?;
+        let (remove_channel_sender, remove_channel_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let stop_receive_token = tokio_util::sync::CancellationToken::new();
+        let stop_receive_token_child = stop_receive_token.child_token();
         let o = Arc::new(Self {
-            socket,
+            socket: Arc::new(socket),
             connections: Mutex::new(HashMap::new()),
+            remove_channel_sender,
+            stop_receive_token
         });
-        let self_c = o.clone();
+        let self_weak = Arc::downgrade(&o.clone());
+        let socket = o.socket.clone();
         tokio::spawn(async move {
-            loop {
-                let mut buf = vec![0u8; 1024];
-                let (n, addr) = self_c.socket.recv_from(&mut buf).await.unwrap();
-                buf.resize(n, 0);
-                let cons = self_c.connections.lock().await;
-                if let Some(c) = cons.get(&addr.to_string()) {
-                    c.sender.send(buf).await.unwrap();
-                }
-            }
+            _ = Self::read_from_socket_loop(socket, stop_receive_token_child, self_weak).await;
+        });
+        let self_weak = Arc::downgrade(&o.clone());
+        tokio::spawn(async move {
+            _ = Self::read_from_delete_queue_loop(remove_channel_receiver, self_weak).await;
         });
         Ok(o)
     }
@@ -63,30 +109,19 @@ impl Connection {
         let mut ch = self.receiver.lock().await;
         let rec_future = ch.recv();
         let with_timeout = tokio::time::timeout(Duration::from_secs(3), rec_future);
-        let res = match with_timeout.await {
-            Ok(res) => res,
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "error waiting for data from transport err:{}",
-                    e
-                ))
-            }
-        };
-        match res {
-            Some(r) => Ok(r),
-            None => Err(anyhow::anyhow!("channel eof")),
-        }
+        with_timeout.await?.context("eof")
     }
 }
 
-/*impl Drop for Transport {
+impl Drop for Transport {
     fn drop(&mut self) {
-        println!("drop transport");
+        _ = self.remove_channel_sender.send("".to_owned());
+        self.stop_receive_token.cancel();
     }
 }
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        println!("drop connection");
+        _ = self.transport.remove_channel_sender.send(self.remote_address.clone());
     }
-}*/
+}
