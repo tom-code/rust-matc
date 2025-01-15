@@ -141,10 +141,19 @@ fn main() {
                 let transport = transport::Transport::new(&local_address).await.unwrap();
                 let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
                 let connection = transport.create_connection(&device_address).await;
-                controller
+                let mut con = controller
                     .commission(&connection, pin, device_id, controller_id)
                     .await
                     .unwrap();
+                println!("commissioning ok. now list supported clusters:");
+                let resptlv = con.read_request2(0, 0x1d, 1).await.unwrap();
+                if let tlv::TlvItemValue::List(l) = resptlv {
+                    for c in l {
+                        if let tlv::TlvItemValue::Int(v) = c.value {
+                            println!("{}", v)
+                        }
+                    }
+                }
             });
         }
         Commands::CaBootstrap { fabric_id } => {

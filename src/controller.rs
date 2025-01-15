@@ -38,15 +38,22 @@ impl Controller {
             fabric,
         })
     }
+
+    /// commission device
+    /// - authenticate using pin
+    /// - push CA certificate to device
+    /// - sign device's certificate
+    /// - set controller id - user which can control device
+    /// - return authenticated connection which can be used to send additional commands
     pub async fn commission(
         &self,
         connection: &Arc<transport::Connection>,
         pin: u32,
         node_id: u64,
         controller_id: u64,
-    ) -> Result<()> {
+    ) -> Result<Connection> {
         let mut session = auth_spake(connection, pin).await?;
-        comission(
+        let session = comission(
             connection,
             &mut session,
             &self.fabric,
@@ -54,8 +61,14 @@ impl Controller {
             node_id,
             controller_id,
         )
-        .await
+        .await?;
+        Ok(Connection {
+            connection: connection.clone(),
+            session,
+        })
     }
+
+    /// create authenticated connection to control device
     pub async fn auth_sigma(
         &self,
         connection: &Arc<transport::Connection>,
@@ -276,7 +289,7 @@ async fn comission(
     cm: &dyn certmanager::CertManager,
     node_id: u64,
     controller_id: u64,
-) -> Result<()> {
+) -> Result<session::Session> {
     // node operational credentials procedure
 
     // step 1 send csr request
@@ -379,7 +392,7 @@ async fn comission(
             noc_status
         ));
     }
-    Ok(())
+    Ok(ses)
 }
 
 async fn auth_sigma(

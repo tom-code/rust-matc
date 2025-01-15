@@ -49,6 +49,7 @@ fn add_rdn(encoder: &mut asn1::Encoder, oid: &str, id: u64) -> Result<()> {
     Ok(())
 }
 
+/// Create matter compatible certificate in x509 format.
 pub fn encode_x509(
     node_public_key: &[u8],
     node_id: u64,

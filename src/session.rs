@@ -5,7 +5,7 @@ use crate::{messages, util::cryptoutil};
 use anyhow::Result;
 use std::io::Write;
 
-pub struct Session {
+pub(crate) struct Session {
     pub session_id: u16,
     pub counter: u32,
     pub local_node: Option<Vec<u8>>,
