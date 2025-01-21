@@ -1,10 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager},
-    controller, tlv, transport,
+    certmanager::{self, FileCertManager}, controller, discover, tlv, transport
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -42,6 +41,8 @@ enum Commands {
         device_address: String,
         controller_id: u64,
         device_id: u64,
+    },
+    Discover {
     },
     /*ListFabrics {
         #[clap(long)]
@@ -291,5 +292,17 @@ fn main() {
                 }
             });
         }
+        Commands::Discover {  } => {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async {
+                let infos = discover::discover_commissionable(Duration::from_secs(5)).await.unwrap();
+                for info in infos {
+                    println!("{:?}", info);
+                }
+            });
+        },
     }
 }

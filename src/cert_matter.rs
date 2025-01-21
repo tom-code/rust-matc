@@ -1,3 +1,7 @@
+//! Handling of certificates in Matter format
+
+
+
 use anyhow::{Context, Result};
 use p256::NistP256;
 use x509_cert::{
@@ -59,11 +63,15 @@ pub fn get_subject_node_id_from_x509(fname: &str) -> Result<u64> {
     Err(anyhow::anyhow!("matter subject/node not found in x509"))
 }
 
+/// Convert certificate in PEM file to matter format
+/// PEM file must contain x509 certificate compatible with matter
 pub fn convert_x509_to_matter(fname: &str, ca_pubkey: &[u8]) -> Result<Vec<u8>> {
     let x509_raw = cryptoutil::read_data_from_pem(fname)?;
     convert_x509_bytes_to_matter(&x509_raw, ca_pubkey)
 }
 
+/// Convert certificate from X509/DER array of bytes to matter format
+/// x509 certificate must be compatible with matter
 pub fn convert_x509_bytes_to_matter(bytes: &[u8], ca_pubkey: &[u8]) -> Result<Vec<u8>> {
     let x509 = x509_cert::Certificate::from_der(bytes)?;
     convert_x509_to_matter_int(&x509, ca_pubkey)

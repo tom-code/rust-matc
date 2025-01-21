@@ -1,3 +1,5 @@
+//! Handling of x509 certificate compatible with matter
+
 use byteorder::WriteBytesExt;
 use std::time::{Duration, SystemTime};
 

@@ -1,3 +1,5 @@
+//! Utilities to decode/encode matter tlv
+
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Result, Write};
 

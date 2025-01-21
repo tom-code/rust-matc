@@ -437,6 +437,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a78a89907582615b19f6f0da1af18abf6ff08be259395669b834b057a7ee92d8"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "inout"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -472,12 +482,14 @@ dependencies = [
  "hex",
  "hkdf",
  "hmac",
+ "if-addrs",
  "p256",
  "pbkdf2",
  "pem",
  "rand",
  "sha1",
  "sha2",
+ "socket2",
  "tokio",
  "tokio-util",
  "x509-cert",

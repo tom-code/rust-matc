@@ -1,3 +1,5 @@
+//! Certificate manager trait and default file based implementation
+
 use std::sync::Arc;
 
 use anyhow::Result;
