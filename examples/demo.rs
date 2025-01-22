@@ -43,6 +43,8 @@ enum Commands {
         device_id: u64,
     },
     Discover {
+        #[command(subcommand)]
+        discover: DiscoverCommand
     },
     /*ListFabrics {
         #[clap(long)]
@@ -105,6 +107,12 @@ enum CommandCommand {
         label: String,
     },
 }
+#[derive(Subcommand, Debug)]
+enum DiscoverCommand {
+    Commissionable {},
+    Commissioned {}
+}
+
 
 async fn create_connection(
     local_address: &str,
@@ -122,6 +130,122 @@ async fn create_connection(
     Ok(c)
 }
 
+
+fn commission(controller_id: u64, device_address: &str, pin: u32, local_address: &str, device_id: u64) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
+    runtime.block_on(async {
+        let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH).unwrap();
+        let transport = transport::Transport::new(local_address).await.unwrap();
+        let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
+        let connection = transport.create_connection(device_address).await;
+        let mut con = controller
+            .commission(&connection, pin, device_id, controller_id)
+            .await
+            .unwrap();
+        println!("commissioning ok. now list supported clusters:");
+        let resptlv = con.read_request2(0, 0x1d, 1).await.unwrap();
+        if let tlv::TlvItemValue::List(l) = resptlv {
+            for c in l {
+                if let tlv::TlvItemValue::Int(v) = c.value {
+                    println!("{}", v)
+                }
+            }
+        }
+    });
+
+}
+
+fn discover_cmd(discover: DiscoverCommand) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+    match discover {
+        DiscoverCommand::Commissionable {  } => {
+            runtime.block_on(async {
+                let infos = discover::discover_commissionable(Duration::from_secs(5)).await.unwrap();
+                for info in infos {
+                    println!("{:?}", info);
+                }
+            })
+        },
+        DiscoverCommand::Commissioned {  } => {
+            runtime.block_on(async {
+                let infos = discover::discover_commissioned(Duration::from_secs(5)).await.unwrap();
+                for info in infos {
+                    println!("{:?}", info);
+                }
+            })
+
+        },
+    }
+}
+
+
+fn command_cmd(command: CommandCommand, local_address: &str, device_address: &str, controller_id: u64, device_id: u64) {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let mut connection = create_connection(
+            local_address,
+            device_address,
+            device_id,
+            controller_id,
+        )
+        .await
+        .unwrap();
+
+        match command {
+            CommandCommand::Read {
+                endpoint,
+                cluster,
+                attr,
+            } => {
+                let res = connection
+                    .read_request(endpoint, cluster, attr)
+                    .await
+                    .unwrap();
+                res.tlv.dump(1);
+            }
+            CommandCommand::InvokeCommandOn {} => {
+                let res = connection.invoke_request(1, 0x6, 1, &[]).await.unwrap();
+                res.tlv.dump(1);
+            }
+            CommandCommand::InvokeCommandOff {} => {
+                let res = connection.invoke_request(1, 0x6, 0, &[]).await.unwrap();
+                res.tlv.dump(1);
+            }
+            CommandCommand::InvokeCommandMoveToLevel { level } => {
+                let tlv = tlv::TlvItemEnc {
+                    tag: 0,
+                    value: tlv::TlvItemValueEnc::UInt8(level),
+                }
+                .encode()
+                .unwrap();
+                let res = connection.invoke_request(1, 0x8, 0, &tlv).await.unwrap();
+                res.tlv.dump(1);
+            }
+            CommandCommand::InvokeCommandUpdateFabricLabel { label } => {
+                let tlv = tlv::TlvItemEnc {
+                    tag: 0,
+                    value: tlv::TlvItemValueEnc::String(label),
+                }
+                .encode()
+                .unwrap();
+                let res = connection.invoke_request(0, 0x3e, 9, &tlv).await.unwrap();
+                res.tlv.dump(1);
+            }
+        }
+    });
+}
+
 fn main() {
     let cli = Cli::parse();
     match cli.command {
@@ -132,30 +256,7 @@ fn main() {
             local_address,
             device_id,
         } => {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            runtime.block_on(async {
-                let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH).unwrap();
-                let transport = transport::Transport::new(&local_address).await.unwrap();
-                let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
-                let connection = transport.create_connection(&device_address).await;
-                let mut con = controller
-                    .commission(&connection, pin, device_id, controller_id)
-                    .await
-                    .unwrap();
-                println!("commissioning ok. now list supported clusters:");
-                let resptlv = con.read_request2(0, 0x1d, 1).await.unwrap();
-                if let tlv::TlvItemValue::List(l) = resptlv {
-                    for c in l {
-                        if let tlv::TlvItemValue::Int(v) = c.value {
-                            println!("{}", v)
-                        }
-                    }
-                }
-            });
+            commission(controller_id, &device_address, pin, &local_address, device_id);
         }
         Commands::CaBootstrap { fabric_id } => {
             let cm = FileCertManager::new(fabric_id, CERT_PATH);
@@ -233,76 +334,10 @@ fn main() {
             controller_id,
             device_id,
         } => {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            runtime.block_on(async {
-                let mut connection = create_connection(
-                    &local_address,
-                    &device_address,
-                    device_id,
-                    controller_id,
-                )
-                .await
-                .unwrap();
-                match command {
-                    CommandCommand::Read {
-                        endpoint,
-                        cluster,
-                        attr,
-                    } => {
-                        let res = connection
-                            .read_request(endpoint, cluster, attr)
-                            .await
-                            .unwrap();
-                        res.tlv.dump(1);
-                    }
-
-                    CommandCommand::InvokeCommandOn {} => {
-                        let res = connection.invoke_request(1, 0x6, 1, &[]).await.unwrap();
-                        res.tlv.dump(1);
-                    }
-
-                    CommandCommand::InvokeCommandOff {} => {
-                        let res = connection.invoke_request(1, 0x6, 0, &[]).await.unwrap();
-                        res.tlv.dump(1);
-                    }
-                    CommandCommand::InvokeCommandMoveToLevel { level } => {
-                        let tlv = tlv::TlvItemEnc {
-                            tag: 0,
-                            value: tlv::TlvItemValueEnc::UInt8(level),
-                        }
-                        .encode()
-                        .unwrap();
-                        let res = connection.invoke_request(1, 0x8, 0, &tlv).await.unwrap();
-                        res.tlv.dump(1);
-                    }
-                    CommandCommand::InvokeCommandUpdateFabricLabel { label } => {
-                        let tlv = tlv::TlvItemEnc {
-                            tag: 0,
-                            value: tlv::TlvItemValueEnc::String(label),
-                        }
-                        .encode()
-                        .unwrap();
-                        let res = connection.invoke_request(0, 0x3e, 9, &tlv).await.unwrap();
-                        res.tlv.dump(1);
-                    }
-                }
-            });
+            command_cmd(command, &local_address, &device_address, controller_id, device_id);
         }
-        Commands::Discover {  } => {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            runtime.block_on(async {
-                let infos = discover::discover_commissionable(Duration::from_secs(5)).await.unwrap();
-                for info in infos {
-                    println!("{:?}", info);
-                }
-            });
+        Commands::Discover { discover } => {
+            discover_cmd(discover);
         },
     }
 }

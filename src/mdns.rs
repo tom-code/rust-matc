@@ -7,6 +7,7 @@ use socket2::{Domain, Protocol, Type};
 
 pub const TYPE_A: u16 = 1;
 pub const TYPE_PTR: u16 = 12;
+pub const TYPE_TXT: u16 = 16;
 pub const TYPE_AAAA: u16 = 28;
 pub const TYPE_SRV: u16 = 33;
 

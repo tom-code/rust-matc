@@ -1,4 +1,4 @@
-# simple rust controller library
+# simple rust matter controller library
 
 ![build](https://github.com/tom-code/rust-matc/actions/workflows/rust.yml/badge.svg)
 
