@@ -282,9 +282,7 @@ pub async fn discover(
                 let sender2 = sender.clone();
                 let label = label.to_owned();
                 tokio::spawn(async move {
-                    discoverv6(&label, index, sender2, stop_child)
-                        .await
-                        .unwrap();
+                    _ = discoverv6(&label, index, sender2, stop_child).await;
                 });
             }
         }
@@ -293,7 +291,7 @@ pub async fn discover(
     let stop_child = stop.child_token();
     let label = label.to_owned();
     tokio::spawn(async move {
-        discoverv4(&label, sender, stop_child).await.unwrap();
+        _ = discoverv4(&label, sender, stop_child).await;
     });
 
     Ok(())

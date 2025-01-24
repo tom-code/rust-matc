@@ -221,7 +221,7 @@ impl Message {
                 status_report_info: Some(status_report_info),
             });
         }
-        let tlv = tlv::decode_tlv(&rest).unwrap();
+        let tlv = tlv::decode_tlv(&rest)?;
         Ok(Self {
             message_header,
             protocol_header,

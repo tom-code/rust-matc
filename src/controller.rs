@@ -30,13 +30,13 @@ impl Controller {
         certmanager: &Arc<dyn certmanager::CertManager>,
         transport: &Arc<transport::Transport>,
         fabric_id: u64,
-    ) -> Arc<Self> {
-        let fabric = fabric::Fabric::new(fabric_id, 1, &certmanager.get_ca_public_key().unwrap());
-        Arc::new(Self {
+    ) -> Result<Arc<Self>> {
+        let fabric = fabric::Fabric::new(fabric_id, 1, &certmanager.get_ca_public_key()?);
+        Ok(Arc::new(Self {
             certmanager: certmanager.clone(),
             transport: transport.clone(),
             fabric,
-        })
+        }))
     }
 
     /// commission device

@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, time::{self, Duration}};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -42,6 +42,10 @@ enum Commands {
         device_id: u64,
     },
     Discover {
+        #[clap(long)]
+        #[arg(global = true, default_value_t = 5)]
+        timeout: u64,
+
         #[command(subcommand)]
         discover: DiscoverCommand,
     },
@@ -72,15 +76,15 @@ enum Commands {
         local_address: String,
 
         #[clap(long)]
-        #[arg(default_value_t = DEFAULT_DEVICE_ADDRESS.to_string())]
+        #[arg(global = true, default_value_t = DEFAULT_DEVICE_ADDRESS.to_string())]
         device_address: String,
 
         #[clap(long)]
-        #[arg(default_value_t = 100)]
+        #[arg(global = true, default_value_t = 100)]
         controller_id: u64,
 
         #[clap(long)]
-        #[arg(default_value_t = 300)]
+        #[arg(global = true, default_value_t = 300)]
         device_id: u64,
 
         #[command(subcommand)]
@@ -118,7 +122,7 @@ async fn create_connection(
 ) -> Result<controller::Connection> {
     let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH)?;
     let transport = transport::Transport::new(local_address).await?;
-    let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
+    let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id())?;
     let connection = transport.create_connection(device_address).await;
     let c = controller
         .auth_sigma(&connection, device_id, controller_id)
@@ -142,7 +146,7 @@ fn commission(
         let cm: Arc<dyn certmanager::CertManager> =
             certmanager::FileCertManager::load(CERT_PATH).unwrap();
         let transport = transport::Transport::new(local_address).await.unwrap();
-        let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
+        let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id()).unwrap();
         let connection = transport.create_connection(device_address).await;
         let mut con = controller
             .commission(&connection, pin, device_id, controller_id)
@@ -160,26 +164,39 @@ fn commission(
     });
 }
 
-fn discover_cmd(discover: DiscoverCommand) {
+async fn progress(duration: Duration) {
+    tokio::spawn(async move {
+        let start_time = time::SystemTime::now();
+        while start_time.elapsed().unwrap() < duration {
+            println!("remaining time: {:.2}sec", (duration - start_time.elapsed().unwrap()).as_secs_f32());
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    });
+}
+
+fn discover_cmd(discover: DiscoverCommand, timeout: u64) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
+    let time = Duration::from_secs(timeout);
     match discover {
         DiscoverCommand::Commissionable {} => runtime.block_on(async {
-            let infos = discover::discover_commissionable(Duration::from_secs(5))
+            progress(time).await;
+            let infos = discover::discover_commissionable(time)
                 .await
                 .unwrap();
             for info in infos {
-                println!("{:?}", info);
+                println!("{:#?}", info);
             }
         }),
         DiscoverCommand::Commissioned {} => runtime.block_on(async {
-            let infos = discover::discover_commissioned(Duration::from_secs(5))
+            progress(time).await;
+            let infos = discover::discover_commissioned(time)
                 .await
                 .unwrap();
             for info in infos {
-                println!("{:?}", info);
+                println!("{:#?}", info);
             }
         }),
     }
@@ -343,8 +360,8 @@ fn main() {
                 device_id,
             );
         }
-        Commands::Discover { discover } => {
-            discover_cmd(discover);
+        Commands::Discover { discover, timeout } => {
+            discover_cmd(discover, timeout);
         }
     }
 }

@@ -43,7 +43,7 @@
 //! let pin = 123456;
 //! let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load("./pem")?;
 //! let transport = transport::Transport::new("0.0.0.0:5555").await?;
-//! let controller = controller::Controller::new(&cm, &transport, fabric_id);
+//! let controller = controller::Controller::new(&cm, &transport, fabric_id)?;
 //! let connection = transport.create_connection("1.2.3.4:5540").await;
 //! let mut connection = controller.commission(&connection, pin, device_id, controller_id).await?;
 //! // commission method returns authenticated connection which can be used to send commands
@@ -67,7 +67,7 @@
 //! let controller_id = 100;
 //! let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load("./pem")?;
 //! let transport = transport::Transport::new("0.0.0.0:5555").await?;
-//! let controller = controller::Controller::new(&cm, &transport, fabric_id);
+//! let controller = controller::Controller::new(&cm, &transport, fabric_id)?;
 //! let connection = transport.create_connection("1.2.3.4:5540").await;
 //! let mut c = controller.auth_sigma(&connection, device_id, controller_id).await?;
 //! c.invoke_request(1, 0x6, 1, &[]).await?;

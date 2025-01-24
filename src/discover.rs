@@ -27,22 +27,6 @@ pub struct MatterDeviceInfo {
     pub pairing_hint: Option<String>,
 }
 
-impl MatterDeviceInfo {
-    fn dump(&self) {
-        if let Some(name) = &self.name {
-            println!("name: {}", name);
-        }
-        println!("service name: {}", self.service);
-        println!("device name: {}", self.device);
-        println!("ip addresses: {:?}", self.ips);
-        if let Some(d) = &self.discriminator {
-            println!("discriminator: {}", d);
-        }
-        if let Some(c) = &self.commissioning_mode {
-            println!("commissioning mode: {:?}", c);
-        }
-    }
-}
 
 fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
     let mut cursor = Cursor::new(data);
@@ -158,18 +142,18 @@ async fn discover_common(timeout: Duration, svc_type: &str) -> Result<Vec<Matter
             Ok(info) => info,
             Err(_) => continue,
         };
-        println!("----------------------------");
-        info.dump();
         out.push(info);
         cache.insert(dns, true);
     }
     Ok(out)
 }
 
+/// Discover commissionable devices using mdns
 pub async fn discover_commissionable(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
     discover_common(timeout, "_matterc._udp.local").await
 }
 
+/// Discover commissioned devices using mdns
 pub async fn discover_commissioned(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
     discover_common(timeout, "_matter._tcp.local").await
 }
