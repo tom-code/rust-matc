@@ -1,7 +1,5 @@
 //! Handling of certificates in Matter format
 
-
-
 use anyhow::{Context, Result};
 use p256::NistP256;
 use x509_cert::{

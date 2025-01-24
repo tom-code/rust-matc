@@ -257,7 +257,8 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     hash_seed.extend_from_slice(&pbkdf_req_protocol_message[6..]);
     hash_seed.extend_from_slice(&pbkdf_response.payload);
     engine.finish(&mut ctx, &hash_seed)?;
-    let pake3_protocol_message = messages::pake3(1, &ctx.ca.context("ca value not poresent in context")?, -1)?;
+    let pake3_protocol_message =
+        messages::pake3(1, &ctx.ca.context("ca value not poresent in context")?, -1)?;
     let pake3 = session.encode_message(&pake3_protocol_message)?;
     connection.send(&pake3).await?;
 

@@ -1,15 +1,19 @@
-use std::{collections::{BTreeMap, HashMap}, io::{Cursor, Read}, net::{IpAddr, Ipv4Addr, Ipv6Addr}, time::Duration};
+use crate::mdns::{self, DnsMessage};
 use anyhow::{Context, Result};
 use byteorder::ReadBytesExt;
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::{Cursor, Read},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
 use tokio_util::bytes::Buf;
-use crate::mdns::{self, DnsMessage};
-
 
 #[derive(Debug)]
 pub enum CommissioningMode {
     No,
     Yes,
-    WithPasscode
+    WithPasscode,
 }
 
 #[derive(Debug)]
@@ -20,7 +24,7 @@ pub struct MatterDeviceInfo {
     pub name: Option<String>,
     pub discriminator: Option<String>,
     pub commissioning_mode: Option<CommissioningMode>,
-    pub pairing_hint: Option<String>
+    pub pairing_hint: Option<String>,
 }
 
 impl MatterDeviceInfo {
@@ -48,7 +52,7 @@ fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
         let mut buf = vec![0; len as usize];
         cursor.read_exact(buf.as_mut_slice())?;
         let splitstr = std::str::from_utf8(&buf)?.split("=");
-        let x:Vec<&str> = splitstr.collect();
+        let x: Vec<&str> = splitstr.collect();
         if x.len() == 2 {
             out.insert(x[0].to_owned(), x[1].to_owned());
         }
@@ -82,7 +86,7 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     }
     for additional in &msg.additional {
         if additional.typ == mdns::TYPE_A {
-            let arr : [u8; 4] = match additional.rdata.clone().try_into() {
+            let arr: [u8; 4] = match additional.rdata.clone().try_into() {
                 Ok(v) => v,
                 Err(_e) => return Err(anyhow::anyhow!("A record is not correct")),
             };
@@ -91,7 +95,7 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
             device = Some(remove_string_suffix(&additional.name, ".local."));
         }
         if additional.typ == mdns::TYPE_AAAA {
-            let arr : [u8; 16] = match additional.rdata.clone().try_into() {
+            let arr: [u8; 16] = match additional.rdata.clone().try_into() {
                 Ok(v) => v,
                 Err(_e) => return Err(anyhow::anyhow!("AAAA record is not correct")),
             };
@@ -112,7 +116,7 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
                     "0" => Some(CommissioningMode::No),
                     "1" => Some(CommissioningMode::Yes),
                     "2" => Some(CommissioningMode::WithPasscode),
-                    _ => None
+                    _ => None,
                 },
                 None => None,
             };
@@ -130,17 +134,15 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         name,
         discriminator,
         commissioning_mode: cm,
-        pairing_hint
+        pairing_hint,
     })
 }
-
 
 async fn discover_common(timeout: Duration, svc_type: &str) -> Result<Vec<MatterDeviceInfo>> {
     let stop = tokio_util::sync::CancellationToken::new();
     let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<DnsMessage>();
 
     mdns::discover(svc_type, sender, stop.child_token()).await?;
-
 
     tokio::spawn(async move {
         tokio::time::sleep(timeout).await;
@@ -150,7 +152,7 @@ async fn discover_common(timeout: Duration, svc_type: &str) -> Result<Vec<Matter
     let mut out = Vec::new();
     while let Some(dns) = receiver.recv().await {
         if cache.contains_key(&dns) {
-            continue
+            continue;
         }
         let info = match to_matter_info(&dns, svc_type) {
             Ok(info) => info,
@@ -163,7 +165,6 @@ async fn discover_common(timeout: Duration, svc_type: &str) -> Result<Vec<Matter
     }
     Ok(out)
 }
-
 
 pub async fn discover_commissionable(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
     discover_common(timeout, "_matterc._udp.local").await

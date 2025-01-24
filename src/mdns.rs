@@ -11,7 +11,6 @@ pub const TYPE_TXT: u16 = 16;
 pub const TYPE_AAAA: u16 = 28;
 pub const TYPE_SRV: u16 = 33;
 
-
 fn encode_label(label: &str, out: &mut Vec<u8>) -> Result<()> {
     for seg in label.split(".") {
         let bytes = seg.as_bytes();
@@ -39,18 +38,16 @@ fn create_query(label: &str) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-
-
-fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String>{
+fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
     let mut out = Vec::new();
     loop {
         let n = cursor.read_u8()?;
         if n == 0 {
-            break
+            break;
         } else if n & 0xc0 == 0xc0 {
             let off = {
-                let off = n &0x3f;
-                ((off as usize)<<8) | (cursor.read_u8()? as u16) as usize
+                let off = n & 0x3f;
+                ((off as usize) << 8) | (cursor.read_u8()? as u16) as usize
             };
             let frag = read_label(data, &mut Cursor::new(&data[off..]))?;
             out.extend_from_slice(frag.as_bytes());
@@ -65,21 +62,19 @@ fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String>{
     Ok(std::str::from_utf8(&out)?.to_owned())
 }
 
-
-
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct RR {
     pub name: String,
-    pub typ:  u16,
+    pub typ: u16,
     class: u16,
     ttl: u32,
-    pub rdata: Vec<u8>
+    pub rdata: Vec<u8>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 struct Query {
     name: String,
-    typ:  u16,
+    typ: u16,
     class: u16,
 }
 
@@ -91,18 +86,28 @@ pub struct DnsMessage {
     queries: Vec<Query>,
     pub answers: Vec<RR>,
     authority: Vec<RR>,
-    pub additional: Vec<RR>
+    pub additional: Vec<RR>,
 }
 
 impl RR {
     pub fn dump(&self, indent: usize) {
-        println!("{} {} {}", " ".to_owned().repeat(indent), self.name, self.typ)
+        println!(
+            "{} {} {}",
+            " ".to_owned().repeat(indent),
+            self.name,
+            self.typ
+        )
     }
 }
 
 impl Query {
     pub fn dump(&self, indent: usize) {
-        println!("{} {} {}", " ".to_owned().repeat(indent), self.name, self.typ)
+        println!(
+            "{} {} {}",
+            " ".to_owned().repeat(indent),
+            self.name,
+            self.typ
+        )
     }
 }
 
@@ -128,7 +133,7 @@ impl DnsMessage {
     }
 }
 
-fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR>{
+fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR> {
     let name = read_label(data, cursor)?;
     let typ = cursor.read_u16::<BigEndian>()?;
     let class = cursor.read_u16::<BigEndian>()?;
@@ -137,29 +142,21 @@ fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR>{
     let mut rdata = vec![0; dlen as usize];
     cursor.read_exact(&mut rdata)?;
 
-    Ok(
-        RR {
-            name,
-            typ,
-            class,
-            ttl,
-            rdata
-        }
-    )
+    Ok(RR {
+        name,
+        typ,
+        class,
+        ttl,
+        rdata,
+    })
 }
 
-fn parse_q(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<Query>{
+fn parse_q(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<Query> {
     let name = read_label(data, cursor)?;
     let typ = cursor.read_u16::<BigEndian>()?;
     let class = cursor.read_u16::<BigEndian>()?;
 
-    Ok(
-        Query {
-            name,
-            typ,
-            class,
-        }
-    )
+    Ok(Query { name, typ, class })
 }
 
 fn parse_dns(data: &[u8], source: std::net::SocketAddr) -> Result<DnsMessage> {
@@ -200,20 +197,24 @@ fn parse_dns(data: &[u8], source: std::net::SocketAddr) -> Result<DnsMessage> {
     })
 }
 
-async fn discoverv4(label: &str, sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>, cancel: tokio_util::sync::CancellationToken) -> Result<()> {
+async fn discoverv4(
+    label: &str,
+    sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>,
+    cancel: tokio_util::sync::CancellationToken,
+) -> Result<()> {
     let stdsocket = socket2::Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     stdsocket.set_reuse_address(true)?;
     stdsocket.set_reuse_port(true)?;
-    let addr : std::net::SocketAddrV4 = "0.0.0.0:5353".parse()?;
+    let addr: std::net::SocketAddrV4 = "0.0.0.0:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
-    let maddr : std::net::Ipv4Addr = "224.0.0.251".parse()?;
+    let maddr: std::net::Ipv4Addr = "224.0.0.251".parse()?;
     stdsocket.join_multicast_v4(&maddr, &std::net::Ipv4Addr::UNSPECIFIED)?;
     stdsocket.set_nonblocking(true)?;
     let socket = tokio::net::UdpSocket::from_std(stdsocket.into())?;
     let query = create_query(label)?;
     socket.send_to(&query, "224.0.0.251:5353").await?;
     loop {
-        let mut buf = vec![0;1024];
+        let mut buf = vec![0; 1024];
         //let (n, addr) = socket.recv_from(&mut buf).await?;
         let (n, addr) = tokio::select! {
             v = socket.recv_from(&mut buf) => v?,
@@ -222,21 +223,26 @@ async fn discoverv4(label: &str, sender: tokio::sync::mpsc::UnboundedSender<DnsM
 
         buf.resize(n, 0);
         let dns = parse_dns(&buf, addr)?;
-        if dns.flags == 0 { // ignore requests
-            continue
+        if dns.flags == 0 {
+            // ignore requests
+            continue;
         }
         sender.send(dns)?;
     }
 }
 
-
-async fn discoverv6(label: &str, interface: u32, sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>, cancel: tokio_util::sync::CancellationToken) -> Result<()> {
+async fn discoverv6(
+    label: &str,
+    interface: u32,
+    sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>,
+    cancel: tokio_util::sync::CancellationToken,
+) -> Result<()> {
     let stdsocket = socket2::Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
     stdsocket.set_reuse_address(true)?;
     stdsocket.set_reuse_port(true)?;
-    let addr : std::net::SocketAddrV6 = "[::]:5353".parse()?;
+    let addr: std::net::SocketAddrV6 = "[::]:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
-    let maddr : std::net::Ipv6Addr = "ff02::fb".parse()?;
+    let maddr: std::net::Ipv6Addr = "ff02::fb".parse()?;
     stdsocket.join_multicast_v6(&maddr, interface)?;
     stdsocket.set_multicast_if_v6(interface)?;
     stdsocket.set_nonblocking(true)?;
@@ -244,7 +250,7 @@ async fn discoverv6(label: &str, interface: u32, sender: tokio::sync::mpsc::Unbo
     let query = create_query(label)?;
     socket.send_to(&query, "[ff02::fb]:5353").await?;
     loop {
-        let mut buf = vec![0;1024];
+        let mut buf = vec![0; 1024];
         //let (n, addr) = socket.recv_from(&mut buf).await?;
         let (n, addr) = tokio::select! {
             v = socket.recv_from(&mut buf) => v?,
@@ -252,27 +258,33 @@ async fn discoverv6(label: &str, interface: u32, sender: tokio::sync::mpsc::Unbo
         };
         buf.resize(n, 0);
         let dns = parse_dns(&buf, addr)?;
-        if dns.flags == 0 { // ignore requests
-            continue
+        if dns.flags == 0 {
+            // ignore requests
+            continue;
         }
         sender.send(dns)?;
     }
 }
 
-pub async fn discover(label: &str, sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>, stop: tokio_util::sync::CancellationToken) -> Result<()> {
-
+pub async fn discover(
+    label: &str,
+    sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>,
+    stop: tokio_util::sync::CancellationToken,
+) -> Result<()> {
     let ifaces = if_addrs::get_if_addrs();
     if let Ok(ifaces) = ifaces {
         for iface in ifaces {
             let stop_child = stop.child_token();
             if !iface.ip().is_ipv6() {
-                continue
+                continue;
             }
             if let Some(index) = iface.index {
                 let sender2 = sender.clone();
                 let label = label.to_owned();
                 tokio::spawn(async move {
-                    discoverv6(&label, index, sender2, stop_child).await.unwrap();
+                    discoverv6(&label, index, sender2, stop_child)
+                        .await
+                        .unwrap();
                 });
             }
         }
@@ -283,7 +295,6 @@ pub async fn discover(label: &str, sender: tokio::sync::mpsc::UnboundedSender<Dn
     tokio::spawn(async move {
         discoverv4(&label, sender, stop_child).await.unwrap();
     });
-
 
     Ok(())
 }

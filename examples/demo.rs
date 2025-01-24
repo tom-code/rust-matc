@@ -3,7 +3,8 @@ use std::{sync::Arc, time::Duration};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager}, controller, discover, tlv, transport
+    certmanager::{self, FileCertManager},
+    controller, discover, tlv, transport,
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -22,7 +23,6 @@ struct Cli {
 enum Commands {
     /// Commission device
     Commission {
-
         #[clap(long)]
         #[arg(default_value_t=DEFAULT_LOCAL_ADDRESS.to_string())]
         local_address: String,
@@ -33,7 +33,6 @@ enum Commands {
         pin: u32,
     },
     ListSupportedClusters {
-
         #[clap(long)]
         #[arg(default_value_t=DEFAULT_LOCAL_ADDRESS.to_string())]
         local_address: String,
@@ -44,7 +43,7 @@ enum Commands {
     },
     Discover {
         #[command(subcommand)]
-        discover: DiscoverCommand
+        discover: DiscoverCommand,
     },
     /*ListFabrics {
         #[clap(long)]
@@ -66,9 +65,7 @@ enum Commands {
         fabric_id: u64,
     },
     /// Create key and certificate for controller
-    CaCreateController {
-        controller_id: u64,
-    },
+    CaCreateController { controller_id: u64 },
     Command {
         #[clap(long)]
         #[arg(global = true, default_value_t = DEFAULT_LOCAL_ADDRESS.to_string())]
@@ -110,9 +107,8 @@ enum CommandCommand {
 #[derive(Subcommand, Debug)]
 enum DiscoverCommand {
     Commissionable {},
-    Commissioned {}
+    Commissioned {},
 }
-
 
 async fn create_connection(
     local_address: &str,
@@ -130,15 +126,21 @@ async fn create_connection(
     Ok(c)
 }
 
-
-fn commission(controller_id: u64, device_address: &str, pin: u32, local_address: &str, device_id: u64) {
+fn commission(
+    controller_id: u64,
+    device_address: &str,
+    pin: u32,
+    local_address: &str,
+    device_id: u64,
+) {
     let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
+        .enable_all()
+        .build()
+        .unwrap();
 
     runtime.block_on(async {
-        let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH).unwrap();
+        let cm: Arc<dyn certmanager::CertManager> =
+            certmanager::FileCertManager::load(CERT_PATH).unwrap();
         let transport = transport::Transport::new(local_address).await.unwrap();
         let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id());
         let connection = transport.create_connection(device_address).await;
@@ -156,51 +158,50 @@ fn commission(controller_id: u64, device_address: &str, pin: u32, local_address:
             }
         }
     });
-
 }
 
 fn discover_cmd(discover: DiscoverCommand) {
     let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
+        .enable_all()
+        .build()
+        .unwrap();
     match discover {
-        DiscoverCommand::Commissionable {  } => {
-            runtime.block_on(async {
-                let infos = discover::discover_commissionable(Duration::from_secs(5)).await.unwrap();
-                for info in infos {
-                    println!("{:?}", info);
-                }
-            })
-        },
-        DiscoverCommand::Commissioned {  } => {
-            runtime.block_on(async {
-                let infos = discover::discover_commissioned(Duration::from_secs(5)).await.unwrap();
-                for info in infos {
-                    println!("{:?}", info);
-                }
-            })
-
-        },
+        DiscoverCommand::Commissionable {} => runtime.block_on(async {
+            let infos = discover::discover_commissionable(Duration::from_secs(5))
+                .await
+                .unwrap();
+            for info in infos {
+                println!("{:?}", info);
+            }
+        }),
+        DiscoverCommand::Commissioned {} => runtime.block_on(async {
+            let infos = discover::discover_commissioned(Duration::from_secs(5))
+                .await
+                .unwrap();
+            for info in infos {
+                println!("{:?}", info);
+            }
+        }),
     }
 }
 
-
-fn command_cmd(command: CommandCommand, local_address: &str, device_address: &str, controller_id: u64, device_id: u64) {
+fn command_cmd(
+    command: CommandCommand,
+    local_address: &str,
+    device_address: &str,
+    controller_id: u64,
+    device_id: u64,
+) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
     runtime.block_on(async {
-        let mut connection = create_connection(
-            local_address,
-            device_address,
-            device_id,
-            controller_id,
-        )
-        .await
-        .unwrap();
+        let mut connection =
+            create_connection(local_address, device_address, device_id, controller_id)
+                .await
+                .unwrap();
 
         match command {
             CommandCommand::Read {
@@ -256,15 +257,19 @@ fn main() {
             local_address,
             device_id,
         } => {
-            commission(controller_id, &device_address, pin, &local_address, device_id);
+            commission(
+                controller_id,
+                &device_address,
+                pin,
+                &local_address,
+                device_id,
+            );
         }
         Commands::CaBootstrap { fabric_id } => {
             let cm = FileCertManager::new(fabric_id, CERT_PATH);
             cm.bootstrap().unwrap();
         }
-        Commands::CaCreateController {
-            controller_id,
-        } => {
+        Commands::CaCreateController { controller_id } => {
             let cm = FileCertManager::load(CERT_PATH).unwrap();
             cm.create_user(controller_id).unwrap();
         }
@@ -280,14 +285,10 @@ fn main() {
                 .unwrap();
 
             runtime.block_on(async {
-                let mut connection = create_connection(
-                    &local_address,
-                    &device_address,
-                    device_id,
-                    controller_id,
-                )
-                .await
-                .unwrap();
+                let mut connection =
+                    create_connection(&local_address, &device_address, device_id, controller_id)
+                        .await
+                        .unwrap();
                 let resptlv = connection.read_request2(0, 0x1d, 1).await.unwrap();
                 if let tlv::TlvItemValue::List(l) = resptlv {
                     for c in l {
@@ -334,10 +335,16 @@ fn main() {
             controller_id,
             device_id,
         } => {
-            command_cmd(command, &local_address, &device_address, controller_id, device_id);
+            command_cmd(
+                command,
+                &local_address,
+                &device_address,
+                controller_id,
+                device_id,
+            );
         }
         Commands::Discover { discover } => {
             discover_cmd(discover);
-        },
+        }
     }
 }
