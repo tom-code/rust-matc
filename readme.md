@@ -1,9 +1,10 @@
 # simple rust matter protocol library
 
 ![build](https://github.com/tom-code/rust-matc/actions/workflows/rust.yml/badge.svg)
-![doc](https://github.com/tom-code/rust-matc/actions/workflows/doc.yml/badge.svg)
+[![doc](https://github.com/tom-code/rust-matc/actions/workflows/doc.yml/badge.svg)](https://tom-code.github.io/rust-matc/matc/)
 
 This is prototype of matter protocol library in rust (controller side).
+
 [API doc](https://tom-code.github.io/rust-matc/matc/)
 
 It supports controller side of:
