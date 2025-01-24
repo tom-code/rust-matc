@@ -18,7 +18,7 @@ It supports controller side of:
 
 
 Use of demo application:
-* Compile demo application using cargo. Binary will be found usually in target/debug/examples/demo.
+* Compile demo application using cargo. Binary will be found usually in target/debug/examples/demo.\
   `cargo build --example demo`
 * demo application uses clap. use --help to learn all supported parameters
 * create CA certificates in directory pem:\
