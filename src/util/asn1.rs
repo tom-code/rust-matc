@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Result;

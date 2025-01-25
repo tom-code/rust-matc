@@ -73,7 +73,10 @@
 //! let connection = transport.create_connection("1.2.3.4:5540").await;
 //! let mut c = controller.auth_sigma(&connection, device_id, controller_id).await?;
 //! // send ON command
-//! c.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+//! c.invoke_request(1, // endpoint
+//!                  clusters::defs::CLUSTER_ID_ON_OFF,
+//!                  clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON,
+//!                  &[]).await?;
 //! //
 //! // invoke SetLevel command to show how to supply command parameters
 //! let tlv = tlv::TlvItemEnc {
@@ -85,7 +88,10 @@
 //!     tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0)    }, // options override
 //!   ])
 //! }.encode()?;
-//! c.invoke_request(1, clusters::defs::CLUSTER_ID_LEVEL_CONTROL, clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL, &tlv).await?;
+//! c.invoke_request(1, // endpoint
+//!                  clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
+//!                  clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
+//!                  &tlv).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -93,6 +99,7 @@
 pub mod cert_matter;
 pub mod cert_x509;
 pub mod certmanager;
+pub mod clusters;
 pub mod controller;
 pub mod discover;
 mod fabric;
@@ -104,4 +111,3 @@ mod spake2p;
 pub mod tlv;
 pub mod transport;
 mod util;
-pub mod clusters;

@@ -1,9 +1,13 @@
-use std::{sync::Arc, time::{self, Duration}};
+use std::{
+    sync::Arc,
+    time::{self, Duration},
+};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager}, clusters, controller, discover, tlv, transport
+    certmanager::{self, FileCertManager},
+    clusters, controller, discover, tlv, transport,
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -168,7 +172,10 @@ async fn progress(duration: Duration) {
     tokio::spawn(async move {
         let start_time = time::SystemTime::now();
         while start_time.elapsed().unwrap() < duration {
-            println!("remaining time: {:.2}sec", (duration - start_time.elapsed().unwrap()).as_secs_f32());
+            println!(
+                "remaining time: {:.2}sec",
+                (duration - start_time.elapsed().unwrap()).as_secs_f32()
+            );
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
     });
@@ -183,18 +190,14 @@ fn discover_cmd(discover: DiscoverCommand, timeout: u64) {
     match discover {
         DiscoverCommand::Commissionable {} => runtime.block_on(async {
             progress(time).await;
-            let infos = discover::discover_commissionable(time)
-                .await
-                .unwrap();
+            let infos = discover::discover_commissionable(time).await.unwrap();
             for info in infos {
                 println!("{:#?}", info);
             }
         }),
         DiscoverCommand::Commissioned {} => runtime.block_on(async {
             progress(time).await;
-            let infos = discover::discover_commissioned(time)
-                .await
-                .unwrap();
+            let infos = discover::discover_commissioned(time).await.unwrap();
             for info in infos {
                 println!("{:#?}", info);
             }

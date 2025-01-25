@@ -27,7 +27,6 @@ pub struct MatterDeviceInfo {
     pub pairing_hint: Option<String>,
 }
 
-
 fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
     let mut cursor = Cursor::new(data);
     let mut out = HashMap::new();
