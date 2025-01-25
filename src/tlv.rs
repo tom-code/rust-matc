@@ -15,9 +15,15 @@ const TYPE_UINT_8: u8 = 7;
 const TYPE_BOOL_FALSE: u8 = 8;
 const TYPE_BOOL_TRUE: u8 = 9;
 const TYPE_UTF8_L1: u8 = 0xC;
-
 const TYPE_OCTET_STRING_L1: u8 = 0x10;
 const TYPE_OCTET_STRING_L2: u8 = 0x11;
+
+const TYPE_STRUCT: u8 = 0x15;
+const TYPE_ARRAY: u8 = 0x16;
+const TYPE_LIST: u8 = 0x17;
+const TYPE_END_CONTAINER: u8 = 0x18;
+
+const CTRL_CTX_L1: u8 = 1 << 5;
 
 impl TlvBuffer {
     pub fn new() -> Self {
@@ -29,35 +35,34 @@ impl TlvBuffer {
         self.data.write_all(data)
     }
     pub fn write_anon_struct(&mut self) -> Result<()> {
-        self.data.write_u8(0x15)?;
+        self.data.write_u8(TYPE_STRUCT)?;
         Ok(())
     }
     pub fn write_anon_list(&mut self) -> Result<()> {
-        self.data.write_u8(0x17)?;
+        self.data.write_u8(TYPE_LIST)?;
         Ok(())
     }
     pub fn write_struct(&mut self, tag: u8) -> Result<()> {
-        self.data.write_u8(0x35)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_STRUCT)?;
         self.data.write_u8(tag)?;
         Ok(())
     }
     pub fn write_array(&mut self, tag: u8) -> Result<()> {
-        self.data.write_u8(0x36)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_ARRAY)?;
         self.data.write_u8(tag)?;
         Ok(())
     }
     pub fn write_list(&mut self, tag: u8) -> Result<()> {
-        self.data.write_u8(0x37)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_LIST)?;
         self.data.write_u8(tag)?;
         Ok(())
     }
     pub fn write_struct_end(&mut self) -> Result<()> {
-        self.data.write_u8(0x18)?;
+        self.data.write_u8(TYPE_END_CONTAINER)?;
         Ok(())
     }
     pub fn write_string(&mut self, tag: u8, data: &str) -> Result<()> {
-        let mut ctrl: u8 = 1 << 5;
-        ctrl |= TYPE_UTF8_L1;
+        let ctrl = CTRL_CTX_L1 | TYPE_UTF8_L1;
         let bytes = data.as_bytes();
         self.data.write_u8(ctrl)?;
         self.data.write_u8(tag)?;
@@ -66,15 +71,12 @@ impl TlvBuffer {
         Ok(())
     }
     pub fn write_octetstring(&mut self, tag: u8, data: &[u8]) -> Result<()> {
-        let mut ctrl: u8 = 1 << 5;
         if data.len() > 0xff {
-            ctrl |= TYPE_OCTET_STRING_L2;
-            self.data.write_u8(ctrl)?;
+            self.data.write_u8(CTRL_CTX_L1 | TYPE_OCTET_STRING_L2)?;
             self.data.write_u8(tag)?;
             self.data.write_u16::<LittleEndian>(data.len() as u16)?;
         } else {
-            ctrl |= TYPE_OCTET_STRING_L1;
-            self.data.write_u8(ctrl)?;
+            self.data.write_u8(CTRL_CTX_L1 | TYPE_OCTET_STRING_L1)?;
             self.data.write_u8(tag)?;
             self.data.write_u8(data.len() as u8)?;
         }
@@ -82,12 +84,12 @@ impl TlvBuffer {
         Ok(())
     }
     pub fn write_int8(&mut self, tag: u8, value: i8) -> Result<()> {
-        self.data.write_u8((1 << 5) | TYPE_INT_1)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_INT_1)?;
         self.data.write_u8(tag)?;
         self.data.write_i8(value)
     }
     pub fn write_uint8(&mut self, tag: u8, value: u8) -> Result<()> {
-        self.data.write_u8((1 << 5) | TYPE_UINT_1)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_1)?;
         self.data.write_u8(tag)?;
         self.data.write_u8(value)
     }
@@ -96,25 +98,25 @@ impl TlvBuffer {
         self.data.write_u8(value)
     }
     pub fn write_uint16(&mut self, tag: u8, value: u16) -> Result<()> {
-        self.data.write_u8((1 << 5) | TYPE_UINT_2)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_2)?;
         self.data.write_u8(tag)?;
         self.data.write_u16::<LittleEndian>(value)
     }
     pub fn write_uint32(&mut self, tag: u8, value: u32) -> Result<()> {
-        self.data.write_u8((1 << 5) | TYPE_UINT_4)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_4)?;
         self.data.write_u8(tag)?;
         self.data.write_u32::<LittleEndian>(value)
     }
     pub fn write_uint64(&mut self, tag: u8, value: u64) -> Result<()> {
-        self.data.write_u8((1 << 5) | TYPE_UINT_8)?;
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_8)?;
         self.data.write_u8(tag)?;
         self.data.write_u64::<LittleEndian>(value)
     }
     pub fn write_bool(&mut self, tag: u8, value: bool) -> Result<()> {
         if value {
-            self.data.write_u8((1 << 5) | TYPE_BOOL_TRUE)?;
+            self.data.write_u8(CTRL_CTX_L1 | TYPE_BOOL_TRUE)?;
         } else {
-            self.data.write_u8((1 << 5) | TYPE_BOOL_FALSE)?;
+            self.data.write_u8(CTRL_CTX_L1 | TYPE_BOOL_FALSE)?;
         }
         self.data.write_u8(tag)
     }
@@ -126,7 +128,7 @@ impl Default for TlvBuffer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TlvItemValue {
     Int(u64),
     Bool(bool),
@@ -136,7 +138,7 @@ pub enum TlvItemValue {
     Invalid(),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TlvItem {
     pub tag: u8,
     pub value: TlvItemValue,
@@ -329,7 +331,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            0xc => {
+            TYPE_UTF8_L1 => {
                 // utf8 string
                 let tag = read_tag(tagctrl, cursor)?;
                 let size = cursor.read_u8()?;
@@ -367,7 +369,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            0x15 => {
+            TYPE_STRUCT => {
                 //list
                 let tag = read_tag(tagctrl, cursor)?;
                 let mut c2 = Vec::new();
@@ -378,7 +380,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            0x16 => {
+            TYPE_ARRAY => {
                 //list
                 let tag = read_tag(tagctrl, cursor)?;
                 let mut c2 = Vec::new();
@@ -389,7 +391,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            0x17 => {
+            TYPE_LIST => {
                 //list
                 let tag = read_tag(tagctrl, cursor)?;
                 let mut c2 = Vec::new();
@@ -400,7 +402,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
-            0x18 => return Ok(()),
+            TYPE_END_CONTAINER => return Ok(()),
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -444,6 +446,7 @@ pub enum TlvItemValueEnc {
     String(String),
     OctetString(Vec<u8>),
     StructAnon(Vec<TlvItemEnc>),
+    StructInvisible(Vec<TlvItemEnc>),
     Invalid(),
 }
 
@@ -486,6 +489,11 @@ impl TlvItemEnc {
                     i.encode_internal(buf)?;
                 }
                 buf.write_struct_end()?;
+            }
+            TlvItemValueEnc::StructInvisible(vec) => {
+                for i in vec {
+                    i.encode_internal(buf)?;
+                }
             }
             TlvItemValueEnc::Invalid() => todo!(),
         }

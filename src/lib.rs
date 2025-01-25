@@ -4,7 +4,7 @@
 //! Following are main parts of api:
 //! - [Transport](transport::Transport) - Representation of IP/UDP transport. Binds to specified IP/port,
 //!                             allows to define virtual connections for remote destinations
-//!                             and demultiplexes incomming messages based on these connections.
+//!                             and demultiplexes incoming messages based on these connections.
 //! - [CertManager](certmanager::CertManager) - Trait allowing to supply external certificate storage.
 //!                                Default implementation [certmanager::FileCertManager] stores certificates to specified directory in PEM format.
 //! - [Controller](controller::Controller) - Matter controller - uses [Transport](transport::Transport) to send/receive messages,
@@ -74,7 +74,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//!
+//! See examples directory for full code example.
 pub mod cert_matter;
 pub mod cert_x509;
 pub mod certmanager;
@@ -88,4 +88,4 @@ mod sigma;
 mod spake2p;
 pub mod tlv;
 pub mod transport;
-pub mod util;
+mod util;
