@@ -3,8 +3,7 @@ use std::{sync::Arc, time::{self, Duration}};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager},
-    controller, discover, tlv, transport,
+    certmanager::{self, FileCertManager}, clusters, controller, discover, tlv, transport
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -40,6 +39,7 @@ enum Commands {
         device_address: String,
         controller_id: u64,
         device_id: u64,
+        endpoint: u16,
     },
     Discover {
         #[clap(long)]
@@ -152,12 +152,12 @@ fn commission(
             .commission(&connection, pin, device_id, controller_id)
             .await
             .unwrap();
-        println!("commissioning ok. now list supported clusters:");
+        println!("commissioning ok. now list supported clusters (endpoint 0):");
         let resptlv = con.read_request2(0, 0x1d, 1).await.unwrap();
         if let tlv::TlvItemValue::List(l) = resptlv {
             for c in l {
                 if let tlv::TlvItemValue::Int(v) = c.value {
-                    println!("{}", v)
+                    println!("{:?}", clusters::names::get_cluster_name(v as u32));
                 }
             }
         }
@@ -295,6 +295,7 @@ fn main() {
             device_address,
             controller_id,
             device_id,
+            endpoint,
         } => {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -306,11 +307,14 @@ fn main() {
                     create_connection(&local_address, &device_address, device_id, controller_id)
                         .await
                         .unwrap();
-                let resptlv = connection.read_request2(0, 0x1d, 1).await.unwrap();
+                let resptlv = connection.read_request2(endpoint, 0x1d, 1).await.unwrap();
                 if let tlv::TlvItemValue::List(l) = resptlv {
                     for c in l {
                         if let tlv::TlvItemValue::Int(v) = c.value {
-                            println!("{}", v)
+                            match clusters::names::get_cluster_name(v as u32) {
+                                Some(v) => println!("{}", v),
+                                None => println!("unknown cluster - id 0x{:x}", v),
+                            }
                         }
                     }
                 }

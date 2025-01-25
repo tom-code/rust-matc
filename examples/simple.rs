@@ -7,7 +7,7 @@
 
     use std::sync::Arc;
 
-    use matc::{certmanager, controller, tlv::TlvItemValue, transport};
+    use matc::{certmanager, controller, tlv::TlvItemValue, transport, clusters};
     use anyhow::Result;
 
     #[tokio::main]
@@ -33,17 +33,17 @@
         let mut connection = controller.commission(&connection, pin, device_id, controller_id).await?;
 
         // send ON command to device
-        connection.invoke_request(1, 0x6, 1, &[]).await?;
+        connection.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
 
         // read ON/OFF state
-        let res = connection.read_request2(1, 6, 0).await?;
+        let res = connection.read_request2(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF).await?;
         assert!(res == TlvItemValue::Bool(true));
 
         // send OFF command to device
-        connection.invoke_request(1, 0x6, 0, &[]).await?;
+        connection.invoke_request(1, 0x6, clusters::defs::CLUSTER_ON_OFF_CMD_ID_OFF, &[]).await?;
 
         // read ON/OFF state
-        let res = connection.read_request2(1, 6, 0).await?;
+        let res = connection.read_request2(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF).await?;
         assert!(res == TlvItemValue::Bool(false));
 
         Ok(())

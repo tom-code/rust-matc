@@ -60,6 +60,8 @@
 //! # use std::sync::Arc;
 //! # use matc::transport;
 //! # use matc::controller;
+//! # use matc::tlv;
+//! # use matc::clusters;
 //! # #[tokio::main]
 //! # async fn main() -> Result<()> {
 //! let fabric_id = 1000;
@@ -70,7 +72,20 @@
 //! let controller = controller::Controller::new(&cm, &transport, fabric_id)?;
 //! let connection = transport.create_connection("1.2.3.4:5540").await;
 //! let mut c = controller.auth_sigma(&connection, device_id, controller_id).await?;
-//! c.invoke_request(1, 0x6, 1, &[]).await?;
+//! // send ON command
+//! c.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+//! //
+//! // invoke SetLevel command to show how to supply command parameters
+//! let tlv = tlv::TlvItemEnc {
+//!   tag: 0,
+//!   value: tlv::TlvItemValueEnc::StructInvisible(vec![
+//!     tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(50)   }, // level
+//!     tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt16(1000)}, // transition time
+//!     tlv::TlvItemEnc { tag: 2, value: tlv::TlvItemValueEnc::UInt8(0)    }, // options mask
+//!     tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0)    }, // options override
+//!   ])
+//! }.encode()?;
+//! c.invoke_request(1, clusters::defs::CLUSTER_ID_LEVEL_CONTROL, clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL, &tlv).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -89,3 +104,4 @@ mod spake2p;
 pub mod tlv;
 pub mod transport;
 mod util;
+pub mod clusters;
