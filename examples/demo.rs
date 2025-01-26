@@ -6,7 +6,7 @@ use std::{
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager}, clusters, controller, discover, onboarding, tlv, transport
+    certmanager::{self, FileCertManager}, clusters::{self, defs::{CLUSTER_ID_LEVEL_CONTROL, CLUSTER_LEVEL_CONTROL_CMD_ID_MOVE, CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL}}, controller, discover, onboarding, tlv, transport
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -109,6 +109,9 @@ enum CommandCommand {
     InvokeCommandOff {},
     InvokeCommandMoveToLevel {
         level: u8,
+    },
+    InvokeCommandMoveToHue {
+        hue: u8,
     },
     InvokeCommandUpdateFabricLabel {
         label: String,
@@ -257,11 +260,37 @@ fn command_cmd(
             CommandCommand::InvokeCommandMoveToLevel { level } => {
                 let tlv = tlv::TlvItemEnc {
                     tag: 0,
-                    value: tlv::TlvItemValueEnc::UInt8(level),
-                }
-                .encode()
-                .unwrap();
-                let res = connection.invoke_request(1, 0x8, 0, &tlv).await.unwrap();
+                    value: tlv::TlvItemValueEnc::StructInvisible(vec![
+                        tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(level) }, // level
+                        tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt16(10) },   // transition time
+                        tlv::TlvItemEnc { tag: 2, value: tlv::TlvItemValueEnc::UInt8(0) },     // options mask
+                        tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0) },     // options override
+                    ]),
+                }.encode().unwrap();
+                let res = connection.invoke_request(
+                    1,
+                    CLUSTER_ID_LEVEL_CONTROL,
+                    CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
+                    &tlv
+                ).await.unwrap();
+                res.tlv.dump(1);
+            }
+            CommandCommand::InvokeCommandMoveToHue { hue } => {
+                let tlv = tlv::TlvItemEnc {
+                    tag: 0,
+                    value: tlv::TlvItemValueEnc::StructInvisible(vec![
+                        tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(hue) },
+                        tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt8(0) },    // direction
+                        tlv::TlvItemEnc { tag: 2, value: tlv::TlvItemValueEnc::UInt16(10) },  // time
+                        tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0) },    // options mask
+                        tlv::TlvItemEnc { tag: 4, value: tlv::TlvItemValueEnc::UInt8(0) },    // options override
+                    ]),
+                }.encode().unwrap();
+                let res = connection.invoke_request(1,
+                    clusters::defs::CLUSTER_ID_COLOR_CONTROL,
+                    clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUE,
+                    &tlv)
+                    .await.unwrap();
                 res.tlv.dump(1);
             }
             CommandCommand::InvokeCommandUpdateFabricLabel { label } => {
