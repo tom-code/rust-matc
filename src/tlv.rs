@@ -8,6 +8,7 @@ pub struct TlvBuffer {
 }
 
 const TYPE_INT_1: u8 = 0;
+const TYPE_INT_4: u8 = 2;
 const TYPE_UINT_1: u8 = 4;
 const TYPE_UINT_2: u8 = 5;
 const TYPE_UINT_4: u8 = 6;
@@ -135,6 +136,7 @@ pub enum TlvItemValue {
     String(String),
     OctetString(Vec<u8>),
     List(Vec<TlvItem>),
+    Nil(),
     Invalid(),
 }
 
@@ -288,6 +290,15 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
+            TYPE_INT_4 => {
+                let tag = read_tag(tagctrl, cursor)?;
+                let value = cursor.read_i32::<LittleEndian>()?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Int(value as u64),
+                };
+                container.push(item);
+            }
             TYPE_UINT_1 => {
                 let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u8()?;
@@ -403,6 +414,14 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 container.push(item);
             }
             TYPE_END_CONTAINER => return Ok(()),
+            0x14 => {
+                let tag = read_tag(tagctrl, cursor)?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Nil(),
+                };
+                container.push(item);
+            },
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,

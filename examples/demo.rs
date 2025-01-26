@@ -6,8 +6,7 @@ use std::{
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager},
-    clusters, controller, discover, tlv, transport,
+    certmanager::{self, FileCertManager}, clusters, controller, discover, onboarding, tlv, transport
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -72,6 +71,9 @@ enum Commands {
         #[arg(default_value_t = DEFAULT_FABRIC)]
         fabric_id: u64,
     },
+    DecodeManualPairingCode {
+        code: String,
+    },
     /// Create key and certificate for controller
     CaCreateController { controller_id: u64 },
     Command {
@@ -110,6 +112,15 @@ enum CommandCommand {
     },
     InvokeCommandUpdateFabricLabel {
         label: String,
+    },
+    InvokeCommandRemoveFabric {
+        index: u8
+    },
+    ListSupportedClusters {
+        endpoint: u16
+    },
+    ListSupportedClusters2 {
+        endpoint: u16
     },
 }
 #[derive(Subcommand, Debug)]
@@ -263,6 +274,44 @@ fn command_cmd(
                 let res = connection.invoke_request(0, 0x3e, 9, &tlv).await.unwrap();
                 res.tlv.dump(1);
             }
+            CommandCommand::InvokeCommandRemoveFabric { index } => {
+                let tlv = tlv::TlvItemEnc {
+                    tag: 0,
+                    value: tlv::TlvItemValueEnc::UInt8(index),
+                }
+                .encode()
+                .unwrap();
+                let res = connection.invoke_request(0, 0x3e, 0xa, &tlv).await.unwrap();
+                res.tlv.dump(1);
+            },
+            CommandCommand::ListSupportedClusters { endpoint } => {
+                let resptlv = connection.read_request2(endpoint, 0x1d, 1).await.unwrap();
+                if let tlv::TlvItemValue::List(l) = resptlv {
+                    for c in l {
+                        if let tlv::TlvItemValue::Int(v) = c.value {
+                            match clusters::names::get_cluster_name(v as u32) {
+                                Some(v) => println!("{}", v),
+                                None => println!("unknown cluster - id 0x{:x}", v),
+                            }
+                        }
+                    }
+                }
+            },
+            CommandCommand::ListSupportedClusters2 { endpoint } => {
+                let resptlv = connection.read_request(endpoint, 0x1d, 1).await.unwrap();
+                let r = resptlv.tlv.get(&[1]).unwrap();
+                if let tlv::TlvItemValue::List(l) = r {
+                    for r in l {
+                        let v = r.get(&[1,2]);
+                        if let Some(tlv::TlvItemValue::Int(v)) = v {
+                            match clusters::names::get_cluster_name(*v as u32) {
+                                Some(v) => println!("{}", v),
+                                None => println!("unknown cluster - id 0x{:x}", v),
+                            }
+                        }
+                    }
+                }
+            },
         }
     });
 }
@@ -370,5 +419,9 @@ fn main() {
         Commands::Discover { discover, timeout } => {
             discover_cmd(discover, timeout);
         }
+        Commands::DecodeManualPairingCode { code } => {
+            let res = onboarding::decode_manual_pairing_code(&code).unwrap();
+            println!("discriminator: {}\npasscode: {}", res.discriminator, res.passcode)
+        },
     }
 }

@@ -410,3 +410,22 @@ pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32) -> Result<Vec<u8>
     b.write_all(&tlv.data)?;
     Ok(b)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::Message;
+
+    #[test]
+    pub fn test_1() {
+        let msg = "04000000a5a0b90d3320764c7d52ef86052060d5000015300120cabe444262d4e5dd568c755ed77e0829b9983c4d62b480b579811ec383eb69c625020837240300280418";
+        let msg = hex::decode(msg).unwrap();
+        let m = Message::decode(&msg).unwrap();
+        println!("{:?}", m);
+
+        let msg = "04000000000000000000000000000000012001000000153001203052998af1897150086e6c84003c074df93a796b4f68a9221ee4e40325014aaf25020100240300280418";
+        let msg = hex::decode(msg).unwrap();
+        let m = Message::decode(&msg).unwrap();
+        println!("{:?}", m);
+    }
+}

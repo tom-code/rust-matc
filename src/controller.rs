@@ -202,9 +202,10 @@ fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
 }
 
 async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::Session> {
+    let exchange = rand::random();
     let mut session = session::Session::new();
     // send pbkdf
-    let pbkdf_req_protocol_message = messages::pbkdf_req(1)?;
+    let pbkdf_req_protocol_message = messages::pbkdf_req(exchange)?;
     let pbkdf_req = session.encode_message(&pbkdf_req_protocol_message)?;
     connection.send(&pbkdf_req).await?;
 
@@ -234,7 +235,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     // send pake1
     let engine = spake2p::Engine::new()?;
     let mut ctx = engine.start(&pin_to_passcode(pin)?, salt, iterations as u32)?;
-    let pake1_protocol_message = messages::pake1(1, ctx.x.as_bytes(), -1)?;
+    let pake1_protocol_message = messages::pake1(exchange, ctx.x.as_bytes(), -1)?;
     let pake1 = session.encode_message(&pake1_protocol_message)?;
     connection.send(&pake1).await?;
 
@@ -258,7 +259,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     hash_seed.extend_from_slice(&pbkdf_response.payload);
     engine.finish(&mut ctx, &hash_seed)?;
     let pake3_protocol_message =
-        messages::pake3(1, &ctx.ca.context("ca value not poresent in context")?, -1)?;
+        messages::pake3(exchange, &ctx.ca.context("ca value not poresent in context")?, -1)?;
     let pake3 = session.encode_message(&pake3_protocol_message)?;
     connection.send(&pake3).await?;
 

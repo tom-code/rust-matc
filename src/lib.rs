@@ -111,3 +111,4 @@ mod spake2p;
 pub mod tlv;
 pub mod transport;
 mod util;
+pub mod onboarding;
