@@ -69,25 +69,42 @@ async fn main() -> Result<()> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-            tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(50) }, // level
-            tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt16(1000) }, // transition time
-            tlv::TlvItemEnc { tag: 2, value: tlv::TlvItemValueEnc::UInt8(0) }, // options mask
-            tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0) }, // options override
+            tlv::TlvItemEnc {
+                tag: 0,
+                value: tlv::TlvItemValueEnc::UInt8(50),
+            }, // level
+            tlv::TlvItemEnc {
+                tag: 1,
+                value: tlv::TlvItemValueEnc::UInt16(1000),
+            }, // transition time
+            tlv::TlvItemEnc {
+                tag: 2,
+                value: tlv::TlvItemValueEnc::UInt8(0),
+            }, // options mask
+            tlv::TlvItemEnc {
+                tag: 3,
+                value: tlv::TlvItemValueEnc::UInt8(0),
+            }, // options override
         ]),
     }
     .encode()?;
-    connection.invoke_request(
-        1,
-        clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
-        clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL, &tlv
-    ).await?;
+    connection
+        .invoke_request(
+            1,
+            clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
+            clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
+            &tlv,
+        )
+        .await?;
 
     // read level
-    let res = connection.read_request2(
-        1,
-        clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
-        clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTLEVEL
-    ).await?;
+    let res = connection
+        .read_request2(
+            1,
+            clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
+            clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTLEVEL,
+        )
+        .await?;
     println!("{:?}", res);
 
     Ok(())

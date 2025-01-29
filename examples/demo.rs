@@ -6,7 +6,8 @@ use std::{
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
-    certmanager::{self, FileCertManager}, clusters::{self, defs::{CLUSTER_ID_LEVEL_CONTROL, CLUSTER_LEVEL_CONTROL_CMD_ID_MOVE, CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL}}, controller, discover, onboarding, tlv, transport
+    certmanager::{self, FileCertManager},
+    clusters, controller, discover, onboarding, tlv, transport,
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -75,7 +76,9 @@ enum Commands {
         code: String,
     },
     /// Create key and certificate for controller
-    CaCreateController { controller_id: u64 },
+    CaCreateController {
+        controller_id: u64,
+    },
     Command {
         #[clap(long)]
         #[arg(global = true, default_value_t = DEFAULT_LOCAL_ADDRESS.to_string())]
@@ -117,14 +120,15 @@ enum CommandCommand {
         label: String,
     },
     InvokeCommandRemoveFabric {
-        index: u8
+        index: u8,
     },
     ListSupportedClusters {
-        endpoint: u16
+        endpoint: u16,
     },
     ListSupportedClusters2 {
-        endpoint: u16
+        endpoint: u16,
     },
+    ListParts {},
 }
 #[derive(Subcommand, Debug)]
 enum DiscoverCommand {
@@ -261,36 +265,74 @@ fn command_cmd(
                 let tlv = tlv::TlvItemEnc {
                     tag: 0,
                     value: tlv::TlvItemValueEnc::StructInvisible(vec![
-                        tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(level) }, // level
-                        tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt16(10) },   // transition time
-                        tlv::TlvItemEnc { tag: 2, value: tlv::TlvItemValueEnc::UInt8(0) },     // options mask
-                        tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0) },     // options override
+                        tlv::TlvItemEnc {
+                            tag: 0,
+                            value: tlv::TlvItemValueEnc::UInt8(level),
+                        }, // level
+                        tlv::TlvItemEnc {
+                            tag: 1,
+                            value: tlv::TlvItemValueEnc::UInt16(10),
+                        }, // transition time
+                        tlv::TlvItemEnc {
+                            tag: 2,
+                            value: tlv::TlvItemValueEnc::UInt8(0),
+                        }, // options mask
+                        tlv::TlvItemEnc {
+                            tag: 3,
+                            value: tlv::TlvItemValueEnc::UInt8(0),
+                        }, // options override
                     ]),
-                }.encode().unwrap();
-                let res = connection.invoke_request(
-                    1,
-                    CLUSTER_ID_LEVEL_CONTROL,
-                    CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
-                    &tlv
-                ).await.unwrap();
+                }
+                .encode()
+                .unwrap();
+                let res = connection
+                    .invoke_request(
+                        1,
+                        clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
+                        clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
+                        &tlv,
+                    )
+                    .await
+                    .unwrap();
                 res.tlv.dump(1);
             }
             CommandCommand::InvokeCommandMoveToHue { hue } => {
                 let tlv = tlv::TlvItemEnc {
                     tag: 0,
                     value: tlv::TlvItemValueEnc::StructInvisible(vec![
-                        tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(hue) },
-                        tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt8(0) },    // direction
-                        tlv::TlvItemEnc { tag: 2, value: tlv::TlvItemValueEnc::UInt16(10) },  // time
-                        tlv::TlvItemEnc { tag: 3, value: tlv::TlvItemValueEnc::UInt8(0) },    // options mask
-                        tlv::TlvItemEnc { tag: 4, value: tlv::TlvItemValueEnc::UInt8(0) },    // options override
+                        tlv::TlvItemEnc {
+                            tag: 0,
+                            value: tlv::TlvItemValueEnc::UInt8(hue),
+                        },
+                        tlv::TlvItemEnc {
+                            tag: 1,
+                            value: tlv::TlvItemValueEnc::UInt8(0),
+                        }, // direction
+                        tlv::TlvItemEnc {
+                            tag: 2,
+                            value: tlv::TlvItemValueEnc::UInt16(10),
+                        }, // time
+                        tlv::TlvItemEnc {
+                            tag: 3,
+                            value: tlv::TlvItemValueEnc::UInt8(0),
+                        }, // options mask
+                        tlv::TlvItemEnc {
+                            tag: 4,
+                            value: tlv::TlvItemValueEnc::UInt8(0),
+                        }, // options override
                     ]),
-                }.encode().unwrap();
-                let res = connection.invoke_request(1,
-                    clusters::defs::CLUSTER_ID_COLOR_CONTROL,
-                    clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUE,
-                    &tlv)
-                    .await.unwrap();
+                }
+                .encode()
+                .unwrap();
+                let res = connection
+                    .invoke_request(
+                        1,
+                        clusters::defs::CLUSTER_ID_COLOR_CONTROL,
+                        clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUE,
+                        &tlv,
+                    )
+                    .await
+                    .unwrap();
                 res.tlv.dump(1);
             }
             CommandCommand::InvokeCommandUpdateFabricLabel { label } => {
@@ -312,7 +354,7 @@ fn command_cmd(
                 .unwrap();
                 let res = connection.invoke_request(0, 0x3e, 0xa, &tlv).await.unwrap();
                 res.tlv.dump(1);
-            },
+            }
             CommandCommand::ListSupportedClusters { endpoint } => {
                 let resptlv = connection.read_request2(endpoint, 0x1d, 1).await.unwrap();
                 if let tlv::TlvItemValue::List(l) = resptlv {
@@ -325,13 +367,13 @@ fn command_cmd(
                         }
                     }
                 }
-            },
+            }
             CommandCommand::ListSupportedClusters2 { endpoint } => {
                 let resptlv = connection.read_request(endpoint, 0x1d, 1).await.unwrap();
                 let r = resptlv.tlv.get(&[1]).unwrap();
                 if let tlv::TlvItemValue::List(l) = r {
                     for r in l {
-                        let v = r.get(&[1,2]);
+                        let v = r.get(&[1, 2]);
                         if let Some(tlv::TlvItemValue::Int(v)) = v {
                             match clusters::names::get_cluster_name(*v as u32) {
                                 Some(v) => println!("{}", v),
@@ -340,7 +382,25 @@ fn command_cmd(
                         }
                     }
                 }
-            },
+            }
+            CommandCommand::ListParts {} => {
+                let resptlv = connection
+                    .read_request2(
+                        0,
+                        clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                        clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+                    )
+                    .await
+                    .unwrap();
+                println!("{:?}", resptlv);
+                if let tlv::TlvItemValue::List(l) = resptlv {
+                    for c in l {
+                        if let tlv::TlvItemValue::Int(v) = c.value {
+                            println!("{}", v);
+                        }
+                    }
+                }
+            }
         }
     });
 }
@@ -450,7 +510,10 @@ fn main() {
         }
         Commands::DecodeManualPairingCode { code } => {
             let res = onboarding::decode_manual_pairing_code(&code).unwrap();
-            println!("discriminator: {}\npasscode: {}", res.discriminator, res.passcode)
-        },
+            println!(
+                "discriminator: {}\npasscode: {}",
+                res.discriminator, res.passcode
+            )
+        }
     }
 }

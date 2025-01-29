@@ -1,3 +1,8 @@
+//! Module with very simple mdns based discovery of matter devices.
+//! Usually application shall discover devices using these methods and filter according discriminator.
+//! This module tries to send mdns using ipv4 and ipv6 multicast at same time.
+//! If more control over discovery mechanism is required, it may be better to use some external mdns library.
+
 use crate::mdns::{self, DnsMessage};
 use anyhow::{Context, Result};
 use byteorder::ReadBytesExt;
@@ -22,9 +27,12 @@ pub struct MatterDeviceInfo {
     pub device: String,
     pub ips: Vec<IpAddr>,
     pub name: Option<String>,
+    pub vendor_id: Option<String>,
+    pub product_id: Option<String>,
     pub discriminator: Option<String>,
     pub commissioning_mode: Option<CommissioningMode>,
     pub pairing_hint: Option<String>,
+    pub source_ip: String,
 }
 
 fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
@@ -59,6 +67,8 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     let mut discriminator = None;
     let mut cm = None;
     let mut pairing_hint = None;
+    let mut vendor_id = None;
+    let mut product_id = None;
 
     let mut matter_service = false;
     let svcname = ".".to_owned() + svc + ".";
@@ -94,6 +104,11 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
             name = rec.get("DN").cloned();
             discriminator = rec.get("D").cloned();
             pairing_hint = rec.get("PH").cloned();
+            if let Some(vp) = rec.get("VP") {
+                let mut split = vp.split("+");
+                vendor_id = split.next().map(str::to_owned);
+                product_id = split.next().map(str::to_owned);
+            }
             cm = match rec.get("CM") {
                 Some(v) => match v.as_str() {
                     "0" => Some(CommissioningMode::No),
@@ -118,6 +133,9 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         discriminator,
         commissioning_mode: cm,
         pairing_hint,
+        source_ip: msg.source.to_string(),
+        vendor_id,
+        product_id,
     })
 }
 

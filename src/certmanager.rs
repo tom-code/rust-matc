@@ -15,6 +15,8 @@ pub trait CertManager: Send + Sync {
     fn get_fabric_id(&self) -> u64;
 }
 
+/// Example implementation of [CertManager] trait.
+/// It stores keys and certificates in PEM files in specified directory.
 pub struct FileCertManager {
     fabric_id: u64,
     path: String,
@@ -70,6 +72,8 @@ const CA_NODE_ID: u64 = 1;
 }*/
 
 impl FileCertManager {
+    /// Initialize CA. Create directory, generate CA key and certificate and store them in specified directory.
+    /// Directory must not exist before calling this function. If it exists function will fail.
     pub fn bootstrap(&self) -> Result<()> {
         std::fs::create_dir(&self.path)?;
 
@@ -92,6 +96,8 @@ impl FileCertManager {
         Ok(())
     }
 
+    /// Create key and certificate for specified node identifier.
+    /// This can be used as credentials for admin(and any additional) user controlling devices.
     pub fn create_user(&self, id: u64) -> Result<()> {
         let ca_private = self.get_ca_key()?;
         let secret_key = p256::SecretKey::random(&mut rand::thread_rng());

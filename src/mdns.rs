@@ -1,3 +1,5 @@
+//! Very simple mdns client library
+
 use std::io::{Cursor, Read, Write};
 
 use anyhow::Result;
@@ -31,7 +33,6 @@ fn create_query(label: &str) -> Result<Vec<u8>> {
     out.write_u16::<BigEndian>(0)?; // additional
 
     encode_label(label, &mut out)?;
-    //encode_label("_matterc._udp.local", &mut out)?;
 
     out.write_u16::<BigEndian>(0xff)?; // any
     out.write_u16::<BigEndian>(0x0001)?; // class
@@ -66,26 +67,26 @@ fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
 pub struct RR {
     pub name: String,
     pub typ: u16,
-    class: u16,
-    ttl: u32,
+    pub class: u16,
+    pub ttl: u32,
     pub rdata: Vec<u8>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
-struct Query {
-    name: String,
-    typ: u16,
-    class: u16,
+pub struct Query {
+    pub name: String,
+    pub typ: u16,
+    pub class: u16,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct DnsMessage {
-    source: std::net::SocketAddr,
-    transaction: u16,
-    flags: u16,
-    queries: Vec<Query>,
+    pub source: std::net::SocketAddr,
+    pub transaction: u16,
+    pub flags: u16,
+    pub queries: Vec<Query>,
     pub answers: Vec<RR>,
-    authority: Vec<RR>,
+    pub authority: Vec<RR>,
     pub additional: Vec<RR>,
 }
 

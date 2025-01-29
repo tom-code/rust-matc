@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use crate::{
-    cert_matter, cert_x509, certmanager, fabric,
+    cert_matter, cert_x509, certmanager,
+    fabric::{self, Fabric},
     messages::{self, Message},
-    session, sigma, spake2p,
+    retransmit, session, sigma, spake2p,
     tlv::{self, TlvItemValue},
     transport,
     util::cryptoutil,
@@ -25,13 +26,15 @@ pub struct Connection {
 //trait IsSync: Sync {}
 //impl IsSync for Controller {}
 
+const CA_ID: u64 = 1;
+
 impl Controller {
     pub fn new(
         certmanager: &Arc<dyn certmanager::CertManager>,
         transport: &Arc<transport::Transport>,
         fabric_id: u64,
     ) -> Result<Arc<Self>> {
-        let fabric = fabric::Fabric::new(fabric_id, 1, &certmanager.get_ca_public_key()?);
+        let fabric = fabric::Fabric::new(fabric_id, CA_ID, &certmanager.get_ca_public_key()?);
         Ok(Arc::new(Self {
             certmanager: certmanager.clone(),
             transport: transport.clone(),
@@ -53,7 +56,7 @@ impl Controller {
         controller_id: u64,
     ) -> Result<Connection> {
         let mut session = auth_spake(connection, pin).await?;
-        let session = comission(
+        let session = commission(
             connection,
             &mut session,
             &self.fabric,
@@ -90,7 +93,10 @@ impl Controller {
     }
 }
 
+/// Authenticated virtual connection can bse used to send commands to device.
 impl Connection {
+
+    /// Read attribute from device and return parsed matter protocol response.
     pub async fn read_request(
         &mut self,
         endpoint: u16,
@@ -99,6 +105,8 @@ impl Connection {
     ) -> Result<Message> {
         read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
     }
+
+    /// Read attribute from device and return tlv with attribute value.
     pub async fn read_request2(
         &mut self,
         endpoint: u16,
@@ -133,6 +141,8 @@ impl Connection {
             }
         }
     }
+
+    /// Invoke command
     pub async fn invoke_request(
         &mut self,
         endpoint: u16,
@@ -150,6 +160,8 @@ impl Connection {
         )
         .await
     }
+
+    /// Invoke command
     pub async fn invoke_request2(
         &mut self,
         endpoint: u16,
@@ -176,7 +188,7 @@ async fn get_next_message(
     session: &mut session::Session,
 ) -> Result<messages::Message> {
     loop {
-        let resp = connection.receive().await?;
+        let resp = connection.receive(Duration::from_secs(3)).await?;
         let resp = session.decode_message(&resp)?;
         let decoded = messages::Message::decode(&resp)?;
         if decoded.protocol_header.protocol_id
@@ -204,13 +216,13 @@ fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
 async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::Session> {
     let exchange = rand::random();
     let mut session = session::Session::new();
+    let mut retrctx = retransmit::RetrContext::new(connection, &mut session);
     // send pbkdf
     let pbkdf_req_protocol_message = messages::pbkdf_req(exchange)?;
-    let pbkdf_req = session.encode_message(&pbkdf_req_protocol_message)?;
-    connection.send(&pbkdf_req).await?;
+    retrctx.send(&pbkdf_req_protocol_message).await?;
 
     // get pbkdf response
-    let pbkdf_response = get_next_message(connection, &mut session).await?;
+    let pbkdf_response = retrctx.get_next_message().await?;
     if pbkdf_response.protocol_header.protocol_id
         != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         || pbkdf_response.protocol_header.opcode
@@ -236,11 +248,10 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     let engine = spake2p::Engine::new()?;
     let mut ctx = engine.start(&pin_to_passcode(pin)?, salt, iterations as u32)?;
     let pake1_protocol_message = messages::pake1(exchange, ctx.x.as_bytes(), -1)?;
-    let pake1 = session.encode_message(&pake1_protocol_message)?;
-    connection.send(&pake1).await?;
+    retrctx.send(&pake1_protocol_message).await?;
 
     // receive pake2
-    let pake2 = get_next_message(connection, &mut session).await?;
+    let pake2 = retrctx.get_next_message().await?;
     if pake2.protocol_header.protocol_id
         != messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         || pake2.protocol_header.opcode != messages::ProtocolMessageHeader::OPCODE_PASE_PAKE2
@@ -258,12 +269,14 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     hash_seed.extend_from_slice(&pbkdf_req_protocol_message[6..]);
     hash_seed.extend_from_slice(&pbkdf_response.payload);
     engine.finish(&mut ctx, &hash_seed)?;
-    let pake3_protocol_message =
-        messages::pake3(exchange, &ctx.ca.context("ca value not poresent in context")?, -1)?;
-    let pake3 = session.encode_message(&pake3_protocol_message)?;
-    connection.send(&pake3).await?;
+    let pake3_protocol_message = messages::pake3(
+        exchange,
+        &ctx.ca.context("ca value not poresent in context")?,
+        -1,
+    )?;
+    retrctx.send(&pake3_protocol_message).await?;
 
-    let pake3_resp = get_next_message(connection, &mut session).await?;
+    let pake3_resp = retrctx.get_next_message().await?;
     match &pake3_resp.status_report_info {
         Some(s) => {
             if !s.is_ok() {
@@ -284,50 +297,20 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     Ok(session)
 }
 
-async fn comission(
-    connection: &transport::Connection,
-    session: &mut session::Session,
-    fabric: &fabric::Fabric,
+async fn push_ca_cert(
+    retrcrx: &mut retransmit::RetrContext<'_>,
     cm: &dyn certmanager::CertManager,
-    node_id: u64,
-    controller_id: u64,
-) -> Result<session::Session> {
-    // node operational credentials procedure
-
-    // step 1 send csr request
-    let mut tlv = tlv::TlvBuffer::new();
-    let mut random_csr_nonce = vec![0; 32];
-    rand::thread_rng().fill_bytes(&mut random_csr_nonce);
-    tlv.write_octetstring(0, &random_csr_nonce)?;
-    let csr_request = messages::im_invoke_request(0, 0x3e, 4, 1, &tlv.data, false)?;
-    let csr_request = session.encode_message(&csr_request)?;
-    connection.send(&csr_request).await?;
-
-    // step 2 receive csr request response
-    let csr_msg = get_next_message(connection, session).await?;
-
-    let csr_tlve = csr_msg
-        .tlv
-        .get_octet_string(&[1, 0, 0, 1, 0])
-        .context("csr tlv missing")?;
-    let csr_t = tlv::decode_tlv(csr_tlve).context("csr tlv can't decode")?;
-    let csr = csr_t
-        .get_octet_string(&[1])
-        .context("csr tlv in tlv missing")?;
-    let csrd = x509_cert::request::CertReq::try_from(csr)?;
-
-    // step 3 push ca cert (AddTrustedRootCertificate)
+) -> Result<()> {
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     let ca_cert = cm.get_ca_cert()?;
     let mcert = cert_matter::convert_x509_bytes_to_matter(&ca_cert, &ca_pubkey)?;
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_octetstring(0, &mcert)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0xb, 1, &tlv.data, false)?;
-    let out = session.encode_message(&t1)?;
-    connection.send(&out).await?;
+    retrcrx.send(&t1).await?;
 
     // push ca cert response
-    let resp = get_next_message(connection, session).await?;
+    let resp = retrcrx.get_next_message().await?;
     let noc_status = {
         resp.tlv
             .get_int(&[1, 0, 1, 1, 0])
@@ -339,9 +322,19 @@ async fn comission(
             noc_status
         ));
     }
+    Ok(())
+}
 
-    // step 4 push device cert (AddNOC)
+async fn push_device_cert(
+    retrcrx: &mut retransmit::RetrContext<'_>,
+    cm: &dyn certmanager::CertManager,
+    csrd: x509_cert::request::CertReq,
+    node_id: u64,
+    controller_id: u64,
+    fabric: &Fabric,
+) -> Result<()> {
     let ca_id = fabric.ca_id;
+    let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     let node_public_key = csrd
         .info
         .public_key
@@ -352,7 +345,7 @@ async fn comission(
     let noc_x509 = cert_x509::encode_x509(
         node_public_key,
         node_id,
-        fabric.id,
+        cm.get_fabric_id(),
         ca_id,
         &ca_private,
         false,
@@ -364,10 +357,9 @@ async fn comission(
     tlv.write_uint64(3, controller_id)?;
     tlv.write_uint64(4, 101)?;
     let t1 = messages::im_invoke_request(0, 0x3e, 0x6, 1, &tlv.data, false)?;
-    let out = session.encode_message(&t1)?;
-    connection.send(&out).await?;
+    retrcrx.send(&t1).await?;
 
-    let resp = get_next_message(connection, session).await?;
+    let resp = retrcrx.get_next_message().await?;
     let noc_status = {
         resp.tlv
             .get_int(&[1, 0, 0, 1, 0])
@@ -376,8 +368,40 @@ async fn comission(
     if noc_status != 0 {
         return Err(anyhow::anyhow!("AddNOC failed with status {}", noc_status));
     }
+    Ok(())
+}
 
-    // send commissioning complete
+async fn send_csr(
+    retrcrx: &mut retransmit::RetrContext<'_>,
+) -> Result<x509_cert::request::CertReq> {
+    let mut tlv = tlv::TlvBuffer::new();
+    let mut random_csr_nonce = vec![0; 32];
+    rand::thread_rng().fill_bytes(&mut random_csr_nonce);
+    tlv.write_octetstring(0, &random_csr_nonce)?;
+    let csr_request = messages::im_invoke_request(0, 0x3e, 4, 1, &tlv.data, false)?;
+    retrcrx.send(&csr_request).await?;
+
+    let csr_msg = retrcrx.get_next_message().await?;
+
+    let csr_tlve = csr_msg
+        .tlv
+        .get_octet_string(&[1, 0, 0, 1, 0])
+        .context("csr tlv missing")?;
+    let csr_t = tlv::decode_tlv(csr_tlve).context("csr tlv can't decode")?;
+    let csr = csr_t
+        .get_octet_string(&[1])
+        .context("csr tlv in tlv missing")?;
+    let csrd = x509_cert::request::CertReq::try_from(csr)?;
+    Ok(csrd)
+}
+
+async fn commissioning_complete(
+    connection: &transport::Connection,
+    cm: &dyn certmanager::CertManager,
+    node_id: u64,
+    controller_id: u64,
+    fabric: &Fabric,
+) -> Result<session::Session> {
     let mut ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
     let t1 = messages::im_invoke_request(0, 0x30, 0x4, 30, &[], false)?;
     let out = ses.encode_message(&t1)?;
@@ -391,9 +415,31 @@ async fn comission(
     if comresp_status != 0 {
         return Err(anyhow::anyhow!(
             "CommissioningComplete failed with status {}",
-            noc_status
+            comresp_status
         ));
     }
+    Ok(ses)
+}
+
+async fn commission(
+    connection: &transport::Connection,
+    session: &mut session::Session,
+    fabric: &fabric::Fabric,
+    cm: &dyn certmanager::CertManager,
+    node_id: u64,
+    controller_id: u64,
+) -> Result<session::Session> {
+    // node operational credentials procedure
+    let mut retrctx = retransmit::RetrContext::new(connection, session);
+
+    let csrd = send_csr(&mut retrctx).await?;
+
+    push_ca_cert(&mut retrctx, cm).await?;
+
+    push_device_cert(&mut retrctx, cm, csrd, node_id, controller_id, fabric).await?;
+
+    let ses = commissioning_complete(connection, cm, node_id, controller_id, fabric).await?;
+
     Ok(ses)
 }
 
@@ -404,17 +450,19 @@ async fn auth_sigma(
     node_id: u64,
     controller_id: u64,
 ) -> Result<session::Session> {
+    let exchange = rand::random();
     let mut session = session::Session::new();
-    session.counter = rand::random();
+    let mut retrctx = retransmit::RetrContext::new(connection, &mut session);
+    retrctx.subscribe_exchange(exchange);
     let mut ctx = sigma::SigmaContext::new(node_id);
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
     sigma::sigma1(fabric, &mut ctx, &ca_pubkey)?;
-    let s1 = messages::sigma1(11, &ctx.sigma1_payload)?;
-    let out = session.encode_message(&s1)?;
-    connection.send(&out).await?;
+    let s1 = messages::sigma1(exchange, &ctx.sigma1_payload)?;
+
+    retrctx.send(&s1).await?;
 
     // receive sigma2
-    let sigma2 = get_next_message(connection, &mut session).await?;
+    let sigma2 = retrctx.get_next_message().await?;
     ctx.sigma2_payload = sigma2.payload;
     ctx.responder_session = sigma2
         .tlv
@@ -438,11 +486,10 @@ async fn auth_sigma(
         &controller_private.to_sec1_der()?,
         &controller_matter_cert,
     )?;
-    let sigma3 = messages::sigma3(11, &ctx.sigma3_payload)?;
-    let out = session.encode_message(&sigma3)?;
-    connection.send(&out).await?;
+    let sigma3 = messages::sigma3(exchange, &ctx.sigma3_payload)?;
+    retrctx.send(&sigma3).await?;
 
-    let status = get_next_message(connection, &mut session).await?;
+    let status = retrctx.get_next_message().await?;
     if !status
         .status_report_info
         .context("sigma3 status resp not received")?
@@ -482,8 +529,6 @@ async fn auth_sigma(
     let mut remote_node = Vec::new();
     remote_node.write_u64::<LittleEndian>(node_id)?;
     ses.remote_node = Some(remote_node);
-
-    ses.counter = rand::random();
 
     Ok(ses)
 }

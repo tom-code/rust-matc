@@ -113,10 +113,10 @@ impl Connection {
             .await?;
         Ok(())
     }
-    pub async fn receive(&self) -> Result<Vec<u8>> {
+    pub async fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
         let mut ch = self.receiver.lock().await;
         let rec_future = ch.recv();
-        let with_timeout = tokio::time::timeout(Duration::from_secs(3), rec_future);
+        let with_timeout = tokio::time::timeout(timeout, rec_future);
         with_timeout.await?.context("eof")
     }
 }

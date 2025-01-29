@@ -3,6 +3,21 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Result, Write};
 
+/// Buffer to encode matter tlv. Create buffer, write elements then use data member which contains encoded tlv.
+/// Example how to commission device using certificates pre-created in pem directory:
+/// ```
+/// # use matc::tlv;
+/// # use anyhow::Result;
+/// # fn main() -> Result<()> {
+/// let mut tlv = tlv::TlvBuffer::new();
+/// tlv.write_struct(1)?;
+/// tlv.write_uint8(0, 100)?;
+/// tlv.write_string(0, "test")?;
+/// tlv.write_struct_end()?;
+/// // now tlv.data contains encoded tlv buffer
+/// # Ok(())
+/// # }
+/// ```
 pub struct TlvBuffer {
     pub data: Vec<u8>,
 }
@@ -31,6 +46,9 @@ impl TlvBuffer {
         Self {
             data: Vec::with_capacity(1024),
         }
+    }
+    pub fn from_vec(v: Vec<u8>) -> Self {
+        Self { data: v }
     }
     pub fn write_raw(&mut self, data: &[u8]) -> Result<()> {
         self.data.write_all(data)
@@ -129,6 +147,7 @@ impl Default for TlvBuffer {
     }
 }
 
+/// Enum containing data of decoded tlv element
 #[derive(Debug, Clone, PartialEq)]
 pub enum TlvItemValue {
     Int(u64),
@@ -140,6 +159,7 @@ pub enum TlvItemValue {
     Invalid(),
 }
 
+/// Decoded tlv element returned by [decode_tlv]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TlvItem {
     pub tag: u8,
@@ -421,7 +441,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                     value: TlvItemValue::Nil(),
                 };
                 container.push(item);
-            },
+            }
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -433,6 +453,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
     Ok(())
 }
 
+/// decode raw buffer with tlv data
 pub fn decode_tlv(data: &[u8]) -> Result<TlvItem> {
     let mut container = Vec::new();
     let mut cursor = std::io::Cursor::new(data);
@@ -469,6 +490,19 @@ pub enum TlvItemValueEnc {
     Invalid(),
 }
 
+/// Structure used for document style encoding.
+///
+/// ```
+/// # use matc::tlv;
+/// let t1 = tlv::TlvItemEnc {
+///   tag: 0,
+///   value: tlv::TlvItemValueEnc::StructAnon(vec![
+///     tlv::TlvItemEnc { tag: 0, value: tlv::TlvItemValueEnc::UInt8(6) },
+///     tlv::TlvItemEnc { tag: 1, value: tlv::TlvItemValueEnc::UInt8(7) }
+///   ]),
+/// };
+/// let o = t1.encode().unwrap();
+/// ```
 #[derive(Debug)]
 pub struct TlvItemEnc {
     pub tag: u8,

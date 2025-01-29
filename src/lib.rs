@@ -12,9 +12,14 @@
 //!                              Allows to [commission](controller::Controller::commission) device, [authenticate](controller::Controller::auth_sigma)
 //!                              commissioned device. Authenticated device is represented by [Connection](controller::Connection) which allows to
 //!                              [read attributes](controller::Connection::read_request) and [invoke commands](controller::Connection::invoke_request).
+//! - [tlv](tlv) - Module with simple matter tlv encoders and decoders which can be used to encode command parameters
+//!                and decode complex responses.
+//! - [discover](discover) - simple mdns based discovery of matter devices on local network
 //!
 //!
-//! Example how to initialize certificate authority and create controller user - stores certificates in pem directory
+//! Examples directory contains simple demo application and simple standalone examples on how to use APIs.
+//!
+//! Example how to initialize certificate authority and create controller user - stores certificates in pem directory:
 //! ```no_run
 //! # use matc::certmanager::FileCertManager;
 //! # use anyhow::Result;
@@ -35,6 +40,7 @@
 //! # use std::sync::Arc;
 //! # use matc::transport;
 //! # use matc::controller;
+//! # use matc::clusters;
 //! # #[tokio::main]
 //! # async fn main() -> Result<()> {
 //! let fabric_id = 1000;
@@ -48,7 +54,10 @@
 //! let mut connection = controller.commission(&connection, pin, device_id, controller_id).await?;
 //! // commission method returns authenticated connection which can be used to send commands
 //! // now we can send ON command:
-//! connection.invoke_request(1, 0x6, 1, &[]).await?;
+//! connection.invoke_request(1,  // endpoint
+//!                           clusters::defs::CLUSTER_ID_ON_OFF,
+//!                           clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON,
+//!                           &[]).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -92,10 +101,21 @@
 //!                  clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
 //!                  clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
 //!                  &tlv).await?;
+//! //
+//! // read level
+//! let result = c.read_request2(1,
+//!                              clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
+//!                              clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTLEVEL,
+//!                              ).await?;
+//! println!("{:?}", result);
 //! # Ok(())
 //! # }
 //! ```
-//! See examples directory for full code example.
+//!
+//!
+#![doc = include_str!("../readme.md")]
+
+
 pub mod cert_matter;
 pub mod cert_x509;
 pub mod certmanager;
@@ -104,11 +124,12 @@ pub mod controller;
 pub mod discover;
 mod fabric;
 pub mod mdns;
-mod messages;
+pub mod messages;
+pub mod onboarding;
+mod retransmit;
 mod session;
 mod sigma;
 mod spake2p;
 pub mod tlv;
 pub mod transport;
 mod util;
-pub mod onboarding;
