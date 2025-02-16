@@ -115,11 +115,11 @@
 //!
 #![doc = include_str!("../readme.md")]
 
-
 pub mod cert_matter;
 pub mod cert_x509;
 pub mod certmanager;
 pub mod clusters;
+mod commission;
 pub mod controller;
 pub mod discover;
 mod fabric;

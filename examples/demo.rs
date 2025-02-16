@@ -18,6 +18,10 @@ const DEFAULT_DEVICE_ADDRESS: &str = "192.168.5.108:5540";
 #[derive(Parser, Debug)]
 #[command()]
 struct Cli {
+    #[clap(long)]
+    #[arg(global = true, default_value_t = false)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -407,6 +411,24 @@ fn command_cmd(
 
 fn main() {
     let cli = Cli::parse();
+
+    let log_level = {
+        if cli.verbose {
+            log::LevelFilter::Debug
+        } else {
+            log::LevelFilter::Error
+        }
+    };
+    env_logger::Builder::new()
+            .parse_default_env()
+            .target(env_logger::Target::Stdout)
+            .filter_level(log_level)
+            .format_line_number(true)
+            .format_file(true)
+            .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
+            .init();
+
+
     match cli.command {
         Commands::Commission {
             controller_id,

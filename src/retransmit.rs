@@ -29,9 +29,11 @@ impl<'b> RetrContext<'b> {
     }
     fn send_internal(&mut self, d: &[u8]) {
         let h = messages::MessageHeader::decode(d).unwrap();
+        log::debug!("send msg counter:{}", h.0.message_counter);
         self.sent.insert(h.0.message_counter, d.to_owned());
     }
     fn received_ack(&mut self, c: u32) {
+        log::debug!("received ack counter:{}", c);
         self.sent.remove(&c);
     }
     fn received(&mut self, c: u32) -> bool {
@@ -43,7 +45,13 @@ impl<'b> RetrContext<'b> {
         }
     }
     fn to_resend(&self) -> Option<Vec<u8>> {
-        self.sent.iter().next().map(|v| v.1.clone())
+        //self.sent.iter().next().map(|v| v.1.clone())
+        if let Some((cnt, msg)) = self.sent.iter().next() {
+            log::debug!("retransmit counter = {}", cnt);
+            Some(msg.clone())
+        } else {
+            None
+        }
     }
 
     pub fn subscribe_exchange(&mut self, e: u16) {
@@ -65,6 +73,7 @@ impl<'b> RetrContext<'b> {
             };
             let resp = self.session.decode_message(&resp)?;
             let decoded = messages::Message::decode(&resp)?;
+            log::debug!("received message {:?}", decoded);
 
             // apply ack - remove from retransmit buffer
             self.received_ack(decoded.protocol_header.ack_counter);
@@ -78,12 +87,27 @@ impl<'b> RetrContext<'b> {
                 )?;
                 let out = self.session.encode_message(&ack)?;
                 self.connection.send(&out).await?;
+                log::debug!(
+                    "sending ack for exchange:{} counter:{}",
+                    decoded.protocol_header.exchange_id,
+                    decoded.message_header.message_counter
+                );
+                log::debug!(
+                    "dropping duplicit message exchange:{} counter:{}",
+                    decoded.protocol_header.exchange_id,
+                    decoded.message_header.message_counter
+                );
                 continue;
             }
             if decoded.protocol_header.protocol_id
                 == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
                 && decoded.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_ACK
             {
+                log::debug!(
+                    "standalone ack exchange:{} ack_counter:{}",
+                    decoded.protocol_header.exchange_id,
+                    decoded.protocol_header.ack_counter
+                );
                 continue;
             }
 
@@ -93,6 +117,11 @@ impl<'b> RetrContext<'b> {
             )?;
             let out = self.session.encode_message(&ack)?;
             self.connection.send(&out).await?;
+            log::debug!(
+                "sending ack for exchange:{} counter:{}",
+                decoded.protocol_header.exchange_id,
+                decoded.message_header.message_counter
+            );
 
             if !self.subscribed_exchanges.is_empty()
                 && !self

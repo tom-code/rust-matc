@@ -1,12 +1,13 @@
 [package]
 name = "matc"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "BSD-2-Clause"
 description = "Matter protocol library (controller side)"
 repository = "https://github.com/tom-code/rust-matc"
 homepage = "https://github.com/tom-code/rust-matc"
 exclude = [".github"]
+keywords = ["matter", "protocol", "controller"]
 
 
 [dependencies]
@@ -30,6 +31,8 @@ hex = "0.4.*"
 byteorder = "1.5.0"
 tokio = {version="1.42.*", features=["sync", "net", "rt", "rt-multi-thread", "time", "macros"]}
 tokio-util = {version="0.7.*"}
+log = "0.4"
+env_logger = "0.11"
 
 socket2 = "0.5.8"
 if-addrs = { version = "0.13", features = ["link-local"] }
