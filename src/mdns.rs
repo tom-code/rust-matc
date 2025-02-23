@@ -12,6 +12,7 @@ pub const TYPE_PTR: u16 = 12;
 pub const TYPE_TXT: u16 = 16;
 pub const TYPE_AAAA: u16 = 28;
 pub const TYPE_SRV: u16 = 33;
+pub const QTYPE_ANY: u16 = 0xff;
 
 fn encode_label(label: &str, out: &mut Vec<u8>) -> Result<()> {
     for seg in label.split(".") {
@@ -23,7 +24,7 @@ fn encode_label(label: &str, out: &mut Vec<u8>) -> Result<()> {
     Ok(())
 }
 
-fn create_query(label: &str) -> Result<Vec<u8>> {
+fn create_query(label: &str, qtype: u16) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(512);
     out.write_u16::<BigEndian>(0)?; // transaction id
     out.write_u16::<BigEndian>(0)?; // flags
@@ -34,7 +35,7 @@ fn create_query(label: &str) -> Result<Vec<u8>> {
 
     encode_label(label, &mut out)?;
 
-    out.write_u16::<BigEndian>(0xff)?; // any
+    out.write_u16::<BigEndian>(qtype)?;
     out.write_u16::<BigEndian>(0x0001)?; // class
     Ok(out)
 }
@@ -200,6 +201,7 @@ fn parse_dns(data: &[u8], source: std::net::SocketAddr) -> Result<DnsMessage> {
 
 async fn discoverv4(
     label: &str,
+    qtype: u16,
     sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>,
     cancel: tokio_util::sync::CancellationToken,
 ) -> Result<()> {
@@ -212,7 +214,7 @@ async fn discoverv4(
     stdsocket.join_multicast_v4(&maddr, &std::net::Ipv4Addr::UNSPECIFIED)?;
     stdsocket.set_nonblocking(true)?;
     let socket = tokio::net::UdpSocket::from_std(stdsocket.into())?;
-    let query = create_query(label)?;
+    let query = create_query(label, qtype)?;
     socket.send_to(&query, "224.0.0.251:5353").await?;
     loop {
         let mut buf = vec![0; 1024];
@@ -234,6 +236,7 @@ async fn discoverv4(
 
 async fn discoverv6(
     label: &str,
+    qtype: u16,
     interface: u32,
     sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>,
     cancel: tokio_util::sync::CancellationToken,
@@ -248,7 +251,7 @@ async fn discoverv6(
     stdsocket.set_multicast_if_v6(interface)?;
     stdsocket.set_nonblocking(true)?;
     let socket = tokio::net::UdpSocket::from_std(stdsocket.into())?;
-    let query = create_query(label)?;
+    let query = create_query(label, qtype)?;
     socket.send_to(&query, "[ff02::fb]:5353").await?;
     loop {
         let mut buf = vec![0; 1024];
@@ -269,6 +272,7 @@ async fn discoverv6(
 
 pub async fn discover(
     label: &str,
+    qtype: u16,
     sender: tokio::sync::mpsc::UnboundedSender<DnsMessage>,
     stop: tokio_util::sync::CancellationToken,
 ) -> Result<()> {
@@ -283,7 +287,7 @@ pub async fn discover(
                 let sender2 = sender.clone();
                 let label = label.to_owned();
                 tokio::spawn(async move {
-                    _ = discoverv6(&label, index, sender2, stop_child).await;
+                    _ = discoverv6(&label, qtype, index, sender2, stop_child).await;
                 });
             }
         }
@@ -292,7 +296,7 @@ pub async fn discover(
     let stop_child = stop.child_token();
     let label = label.to_owned();
     tokio::spawn(async move {
-        _ = discoverv4(&label, sender, stop_child).await;
+        _ = discoverv4(&label, qtype, sender, stop_child).await;
     });
 
     Ok(())

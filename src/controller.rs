@@ -310,9 +310,11 @@ pub(crate) async fn auth_sigma(
     sigma::sigma1(fabric, &mut ctx, &ca_pubkey)?;
     let s1 = messages::sigma1(exchange, &ctx.sigma1_payload)?;
 
+    log::debug!("send sigma1 {}", exchange);
     retrctx.send(&s1).await?;
 
     // receive sigma2
+    log::debug!("receive sigma2 {}", exchange);
     let sigma2 = retrctx.get_next_message().await?;
     ctx.sigma2_payload = sigma2.payload;
     ctx.responder_session = sigma2
@@ -331,6 +333,7 @@ pub(crate) async fn auth_sigma(
         cert_matter::convert_x509_bytes_to_matter(&controller_x509, &ca_pubkey)?;
 
     // send sigma3
+    log::debug!("send sigma3 {}", exchange);
     sigma::sigma3(
         fabric,
         &mut ctx,
@@ -340,6 +343,7 @@ pub(crate) async fn auth_sigma(
     let sigma3 = messages::sigma3(exchange, &ctx.sigma3_payload)?;
     retrctx.send(&sigma3).await?;
 
+    log::debug!("receive result {}", exchange);
     let status = retrctx.get_next_message().await?;
     if !status
         .status_report_info
@@ -391,11 +395,11 @@ async fn read_request(
     cluster: u32,
     attr: u32,
 ) -> Result<Message> {
-    let testm = messages::im_read_request(endpoint, cluster, attr)?;
-    let out = session.encode_message(&testm)?;
-    connection.send(&out).await?;
-
-    let result = get_next_message(connection, session).await?;
+    let exchange = rand::random();
+    let mut retrctx = retransmit::RetrContext::new(connection, session);
+    let testm = messages::im_read_request(endpoint, cluster, attr, exchange)?;
+    retrctx.send(&testm).await?;
+    let result = retrctx.get_next_message().await?;
     Ok(result)
 }
 
@@ -408,10 +412,10 @@ async fn invoke_request(
     payload: &[u8],
 ) -> Result<Message> {
     let exchange = rand::random();
+    let mut retrctx = retransmit::RetrContext::new(connection, session);
+    retrctx.subscribe_exchange(exchange);
     let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
-    let out = session.encode_message(&testm)?;
-    connection.send(&out).await?;
-
-    let result = get_next_message(connection, session).await?;
+    retrctx.send(&testm).await?;
+    let result = retrctx.get_next_message().await?;
     Ok(result)
 }

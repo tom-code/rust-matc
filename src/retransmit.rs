@@ -71,7 +71,13 @@ impl<'b> RetrContext<'b> {
                     continue;
                 }
             };
-            let resp = self.session.decode_message(&resp)?;
+            let resp = match self.session.decode_message(&resp) {
+                Ok(resp) => resp,
+                Err(e) => {
+                    log::debug!("can't decode incoming message {:?}", e);
+                    continue
+                }
+            };
             let decoded = messages::Message::decode(&resp)?;
             log::debug!("received message {:?}", decoded);
 

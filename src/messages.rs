@@ -385,11 +385,11 @@ pub fn im_invoke_request(
     Ok(tlv.data)
 }
 
-pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32) -> Result<Vec<u8>> {
+pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: 5,
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_READ_REQ,
-        exchange_id: 0,
+        exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
         ack_counter: 0,
     }

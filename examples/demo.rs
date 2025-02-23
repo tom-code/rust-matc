@@ -12,7 +12,7 @@ use matc::{
 
 const DEFAULT_FABRIC: u64 = 0x110;
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
-const CERT_PATH: &str = "./pem";
+const DEFAULT_CERT_PATH: &str = "./pem";
 
 const DEFAULT_DEVICE_ADDRESS: &str = "192.168.5.108:5540";
 #[derive(Parser, Debug)]
@@ -21,6 +21,10 @@ struct Cli {
     #[clap(long)]
     #[arg(global = true, default_value_t = false)]
     verbose: bool,
+
+    #[clap(long)]
+    #[arg(global = true, default_value_t = DEFAULT_CERT_PATH.to_string())]
+    cert_path: String,
 
     #[command(subcommand)]
     command: Commands,
@@ -145,8 +149,9 @@ async fn create_connection(
     device_address: &str,
     device_id: u64,
     controller_id: u64,
+    cert_path: &str
 ) -> Result<controller::Connection> {
-    let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(CERT_PATH)?;
+    let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(cert_path)?;
     let transport = transport::Transport::new(local_address).await?;
     let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id())?;
     let connection = transport.create_connection(device_address).await;
@@ -162,6 +167,7 @@ fn commission(
     pin: u32,
     local_address: &str,
     device_id: u64,
+    cert_path: &str
 ) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -170,7 +176,7 @@ fn commission(
 
     runtime.block_on(async {
         let cm: Arc<dyn certmanager::CertManager> =
-            certmanager::FileCertManager::load(CERT_PATH).unwrap();
+            certmanager::FileCertManager::load(cert_path).unwrap();
         let transport = transport::Transport::new(local_address).await.unwrap();
         let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id()).unwrap();
         let connection = transport.create_connection(device_address).await;
@@ -233,6 +239,7 @@ fn command_cmd(
     device_address: &str,
     controller_id: u64,
     device_id: u64,
+    cert_path: &str
 ) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -241,7 +248,7 @@ fn command_cmd(
 
     runtime.block_on(async {
         let mut connection =
-            create_connection(local_address, device_address, device_id, controller_id)
+            create_connection(local_address, device_address, device_id, controller_id, cert_path)
                 .await
                 .unwrap();
 
@@ -428,6 +435,7 @@ fn main() {
             .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
             .init();
 
+    let cert_path = cli.cert_path;
 
     match cli.command {
         Commands::Commission {
@@ -443,14 +451,15 @@ fn main() {
                 pin,
                 &local_address,
                 device_id,
+                &cert_path
             );
         }
         Commands::CaBootstrap { fabric_id } => {
-            let cm = FileCertManager::new(fabric_id, CERT_PATH);
+            let cm = FileCertManager::new(fabric_id, &cert_path);
             cm.bootstrap().unwrap();
         }
         Commands::CaCreateController { controller_id } => {
-            let cm = FileCertManager::load(CERT_PATH).unwrap();
+            let cm = FileCertManager::load(&cert_path).unwrap();
             cm.create_user(controller_id).unwrap();
         }
         Commands::ListSupportedClusters {
@@ -467,7 +476,7 @@ fn main() {
 
             runtime.block_on(async {
                 let mut connection =
-                    create_connection(&local_address, &device_address, device_id, controller_id)
+                    create_connection(&local_address, &device_address, device_id, controller_id, &cert_path)
                         .await
                         .unwrap();
                 let resptlv = connection.read_request2(endpoint, 0x1d, 1).await.unwrap();
@@ -525,6 +534,7 @@ fn main() {
                 &device_address,
                 controller_id,
                 device_id,
+                &cert_path
             );
         }
         Commands::Discover { discover, timeout } => {

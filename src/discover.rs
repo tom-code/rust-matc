@@ -143,7 +143,7 @@ async fn discover_common(timeout: Duration, svc_type: &str) -> Result<Vec<Matter
     let stop = tokio_util::sync::CancellationToken::new();
     let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<DnsMessage>();
 
-    mdns::discover(svc_type, sender, stop.child_token()).await?;
+    mdns::discover(svc_type, mdns::QTYPE_ANY, sender, stop.child_token()).await?;
 
     tokio::spawn(async move {
         tokio::time::sleep(timeout).await;
