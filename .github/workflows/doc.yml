@@ -1,0 +1,42 @@
+name: Doc
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+
+env:
+  CARGO_TERM_COLOR: always
+
+
+jobs:
+  build:
+    name: build-doc
+    environment:
+      name: github-pages
+      url: https://tom-code.github.io/rust-matc
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build
+      run: cargo doc --no-deps
+    - name: redirect
+      run: echo '<meta http-equiv="refresh" content="0;url=matc">' > target/doc/index.html
+    - name: Remove lock file
+      run: rm target/doc/.lock
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: target/doc
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
