@@ -207,6 +207,7 @@ async fn discoverv4(
 ) -> Result<()> {
     let stdsocket = socket2::Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     stdsocket.set_reuse_address(true)?;
+    #[cfg(not(target_os = "windows"))]
     stdsocket.set_reuse_port(true)?;
     let addr: std::net::SocketAddrV4 = "0.0.0.0:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
@@ -243,6 +244,7 @@ async fn discoverv6(
 ) -> Result<()> {
     let stdsocket = socket2::Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
     stdsocket.set_reuse_address(true)?;
+    #[cfg(not(target_os = "windows"))]
     stdsocket.set_reuse_port(true)?;
     let addr: std::net::SocketAddrV6 = "[::]:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
