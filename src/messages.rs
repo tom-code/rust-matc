@@ -1,5 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use rand::RngCore;
+use core::fmt;
 use std::io::{Read, Result, Write};
 
 use crate::tlv::{self, TlvItem, TlvItemEnc, TlvItemValueEnc};
@@ -197,13 +198,24 @@ impl StatusReportInfo {
     }
 }
 
-#[derive(Debug)]
 pub struct Message {
     pub message_header: MessageHeader,
     pub protocol_header: ProtocolMessageHeader,
     pub payload: Vec<u8>,
     pub tlv: TlvItem,
     pub status_report_info: Option<StatusReportInfo>,
+}
+
+impl fmt::Debug for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Message")
+            .field("message_header", &self.message_header)
+            .field("protocol_header", &self.protocol_header)
+            .field("payload", &hex::encode(&self.payload))
+            .field("tlv", &self.tlv)
+            .field("status_report_info", &self.status_report_info)
+            .finish()
+    }
 }
 
 impl Message {

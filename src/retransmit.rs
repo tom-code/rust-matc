@@ -29,11 +29,11 @@ impl<'b> RetrContext<'b> {
     }
     fn send_internal(&mut self, d: &[u8]) {
         let h = messages::MessageHeader::decode(d).unwrap();
-        log::debug!("send msg counter:{}", h.0.message_counter);
+        log::trace!("send msg counter:{}", h.0.message_counter);
         self.sent.insert(h.0.message_counter, d.to_owned());
     }
     fn received_ack(&mut self, c: u32) {
-        log::debug!("received ack counter:{}", c);
+        log::trace!("received ack counter:{}", c);
         self.sent.remove(&c);
     }
     fn received(&mut self, c: u32) -> bool {
@@ -47,7 +47,7 @@ impl<'b> RetrContext<'b> {
     fn to_resend(&self) -> Option<Vec<u8>> {
         //self.sent.iter().next().map(|v| v.1.clone())
         if let Some((cnt, msg)) = self.sent.iter().next() {
-            log::debug!("retransmit counter = {}", cnt);
+            log::trace!("retransmit counter = {}", cnt);
             Some(msg.clone())
         } else {
             None
@@ -79,7 +79,7 @@ impl<'b> RetrContext<'b> {
                 }
             };
             let decoded = messages::Message::decode(&resp)?;
-            log::debug!("received message {:?}", decoded);
+            log::trace!("received message {:?}", decoded);
 
             // apply ack - remove from retransmit buffer
             self.received_ack(decoded.protocol_header.ack_counter);
@@ -93,12 +93,12 @@ impl<'b> RetrContext<'b> {
                 )?;
                 let out = self.session.encode_message(&ack)?;
                 self.connection.send(&out).await?;
-                log::debug!(
+                log::trace!(
                     "sending ack for exchange:{} counter:{}",
                     decoded.protocol_header.exchange_id,
                     decoded.message_header.message_counter
                 );
-                log::debug!(
+                log::trace!(
                     "dropping duplicit message exchange:{} counter:{}",
                     decoded.protocol_header.exchange_id,
                     decoded.message_header.message_counter
@@ -109,7 +109,7 @@ impl<'b> RetrContext<'b> {
                 == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
                 && decoded.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_ACK
             {
-                log::debug!(
+                log::trace!(
                     "standalone ack exchange:{} ack_counter:{}",
                     decoded.protocol_header.exchange_id,
                     decoded.protocol_header.ack_counter
@@ -123,7 +123,7 @@ impl<'b> RetrContext<'b> {
             )?;
             let out = self.session.encode_message(&ack)?;
             self.connection.send(&out).await?;
-            log::debug!(
+            log::trace!(
                 "sending ack for exchange:{} counter:{}",
                 decoded.protocol_header.exchange_id,
                 decoded.message_header.message_counter

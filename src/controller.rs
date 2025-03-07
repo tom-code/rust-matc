@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use crate::{
     cert_matter, certmanager, commission, fabric,
@@ -180,7 +180,7 @@ impl Connection {
     }
 }
 
-async fn get_next_message(
+/*async fn get_next_message(
     connection: &transport::Connection,
     session: &mut session::Session,
 ) -> Result<messages::Message> {
@@ -202,7 +202,7 @@ async fn get_next_message(
         connection.send(&out).await?;
         return Ok(decoded);
     }
-}
+}*/
 
 fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
     let mut out = Vec::new();
@@ -212,9 +212,11 @@ fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
 
 async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::Session> {
     let exchange = rand::random();
+    log::debug!("start auth_spake");
     let mut session = session::Session::new();
     let mut retrctx = retransmit::RetrContext::new(connection, &mut session);
     // send pbkdf
+    log::debug!("send pbkdf request");
     let pbkdf_req_protocol_message = messages::pbkdf_req(exchange)?;
     retrctx.send(&pbkdf_req_protocol_message).await?;
 
@@ -244,6 +246,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     // send pake1
     let engine = spake2p::Engine::new()?;
     let mut ctx = engine.start(&pin_to_passcode(pin)?, salt, iterations as u32)?;
+    log::debug!("send pake1 request");
     let pake1_protocol_message = messages::pake1(exchange, ctx.x.as_bytes(), -1)?;
     retrctx.send(&pake1_protocol_message).await?;
 
@@ -268,9 +271,10 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     engine.finish(&mut ctx, &hash_seed)?;
     let pake3_protocol_message = messages::pake3(
         exchange,
-        &ctx.ca.context("ca value not poresent in context")?,
+        &ctx.ca.context("ca value not present in context")?,
         -1,
     )?;
+    log::debug!("send pake3 request");
     retrctx.send(&pake3_protocol_message).await?;
 
     let pake3_resp = retrctx.get_next_message().await?;
@@ -291,6 +295,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     session.set_encrypt_key(&ctx.encrypt_key.context("encrypt key missing")?);
     session.set_decrypt_key(&ctx.decrypt_key.context("decrypt key missing")?);
     session.session_id = p_session as u16;
+    log::debug!("auth_spake ok; session: {}", session.session_id);
     Ok(session)
 }
 
@@ -301,6 +306,7 @@ pub(crate) async fn auth_sigma(
     node_id: u64,
     controller_id: u64,
 ) -> Result<session::Session> {
+    log::debug!("auth_sigma");
     let exchange = rand::random();
     let mut session = session::Session::new();
     let mut retrctx = retransmit::RetrContext::new(connection, &mut session);
@@ -414,6 +420,7 @@ async fn invoke_request(
     let exchange = rand::random();
     let mut retrctx = retransmit::RetrContext::new(connection, session);
     retrctx.subscribe_exchange(exchange);
+    log::debug!("invoke_request exch:{} endpoint:{} cluster:{} command:{}", exchange, endpoint, cluster, command);
     let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
     retrctx.send(&testm).await?;
     let result = retrctx.get_next_message().await?;

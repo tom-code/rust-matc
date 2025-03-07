@@ -33,6 +33,7 @@ pub struct MatterDeviceInfo {
     pub commissioning_mode: Option<CommissioningMode>,
     pub pairing_hint: Option<String>,
     pub source_ip: String,
+    pub port: Option<u16>
 }
 
 fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
@@ -69,6 +70,7 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     let mut pairing_hint = None;
     let mut vendor_id = None;
     let mut product_id = None;
+    let mut port: Option<u16> = None;
 
     let mut matter_service = false;
     let svcname = ".".to_owned() + svc + ".";
@@ -98,6 +100,9 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         }
         if additional.typ == mdns::TYPE_SRV {
             service = Some(remove_string_suffix(&additional.name, &svcname));
+            if additional.rdata.len() >= 6 {
+                port = Some((additional.rdata[4] as u16)<<8 | (additional.rdata[5] as u16))
+            }
         }
         if additional.typ == mdns::TYPE_TXT {
             let rec = parse_txt_records(&additional.rdata)?;
@@ -136,6 +141,7 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         source_ip: msg.source.to_string(),
         vendor_id,
         product_id,
+        port
     })
 }
 

@@ -21,6 +21,15 @@ It supports controller side of:
   * Read attribute
   * Invoke command
 
+This library expects that device is already reachable using IPV4 or IPV6.
+Bluetooth/BLE related communication is not yet supported.
+To control device which first requires commissioning using BLE,
+you must first commission using different controller (such as phone),
+then using that controller enable commissioning.
+For example in iphone/ios this is available under "enable pairing mode"
+in device settings in Home app.
+It will show "manual pairing code" which can be decoded
+to obtain commissioning pass code (see decode-manual-pairing-code bellow).
 
 Use of demo application:
 * Compile demo application using cargo. Binary will be found usually in target/debug/examples/demo.\
@@ -34,7 +43,7 @@ Use of demo application:
   `./demo discover commissionable --timeout 3`
 * discover all commissioned devices using mdns:\
   `./demo discover commissioned --timeout 3`
-* if you have manual pairing code you need to extract passcode from it using following command:\
+* if you have manual pairing code you can extract passcode from it using following command:\
   `demo decode-manual-pairing-code 1577-384-0075`
 * commission device (device ip address is 192.168.5.70, commissioning passcode is 123456, device id will be 300, device admin has id 100):\
   `./demo commission 192.168.5.70:5540 100 300 123456`
@@ -49,3 +58,8 @@ Use of demo application:
   `demo command invoke-command-off --device-address 192.168.5.70:5540 --controller-id 100 --device-id 300`
 * if you want to start from scratch remove directory pem
 
+Other demo application flags:
+* --verbose - enable verbose logs
+* --local-address - specify local bind address for matter protocol. Format is ip:port. This is
+  ip/port which is used as source address for matter UDP requests.
+  Default is 0.0.0.0:5555. When IPV6 is used this must be changed for example to --local-address "[\:\:]:5555"

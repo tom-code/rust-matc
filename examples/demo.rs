@@ -421,7 +421,7 @@ fn main() {
 
     let log_level = {
         if cli.verbose {
-            log::LevelFilter::Debug
+            log::LevelFilter::Trace
         } else {
             log::LevelFilter::Error
         }

@@ -1,6 +1,7 @@
 //! Utilities to decode/encode matter tlv
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use core::fmt;
 use std::io::{Cursor, Read, Result, Write};
 
 /// Buffer to encode matter tlv. Create buffer, write elements then use data member which contains encoded tlv.
@@ -148,7 +149,7 @@ impl Default for TlvBuffer {
 }
 
 /// Enum containing data of decoded tlv element
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum TlvItemValue {
     Int(u64),
     Bool(bool),
@@ -165,6 +166,21 @@ pub struct TlvItem {
     pub tag: u8,
     pub value: TlvItemValue,
 }
+
+impl fmt::Debug for TlvItemValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Int(arg0) => f.debug_tuple("Int").field(arg0).finish(),
+            Self::Bool(arg0) => f.debug_tuple("Bool").field(arg0).finish(),
+            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
+            Self::OctetString(arg0) => f.debug_tuple("OctetString").field(&hex::encode(arg0)).finish(),
+            Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
+            Self::Nil() => f.debug_tuple("Nil").finish(),
+            Self::Invalid() => f.debug_tuple("Invalid").finish(),
+        }
+    }
+}
+
 
 impl TlvItem {
     pub fn get(&self, tag: &[u8]) -> Option<&TlvItemValue> {
