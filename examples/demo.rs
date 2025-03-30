@@ -104,6 +104,10 @@ enum Commands {
         #[arg(global = true, default_value_t = 300)]
         device_id: u64,
 
+        #[clap(long)]
+        #[arg(global = true, default_value_t = 1)]
+        endpoint: u16,
+
         #[command(subcommand)]
         command: CommandCommand,
     },
@@ -239,7 +243,8 @@ fn command_cmd(
     device_address: &str,
     controller_id: u64,
     device_id: u64,
-    cert_path: &str
+    cert_path: &str,
+    endpoint: u16
 ) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -265,11 +270,11 @@ fn command_cmd(
                 res.tlv.dump(1);
             }
             CommandCommand::InvokeCommandOn {} => {
-                let res = connection.invoke_request(1, 0x6, 1, &[]).await.unwrap();
+                let res = connection.invoke_request(endpoint, 0x6, 1, &[]).await.unwrap();
                 res.tlv.dump(1);
             }
             CommandCommand::InvokeCommandOff {} => {
-                let res = connection.invoke_request(1, 0x6, 0, &[]).await.unwrap();
+                let res = connection.invoke_request(endpoint, 0x6, 0, &[]).await.unwrap();
                 res.tlv.dump(1);
             }
             CommandCommand::InvokeCommandMoveToLevel { level } => {
@@ -298,7 +303,7 @@ fn command_cmd(
                 .unwrap();
                 let res = connection
                     .invoke_request(
-                        1,
+                        endpoint,
                         clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
                         clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
                         &tlv,
@@ -337,7 +342,7 @@ fn command_cmd(
                 .unwrap();
                 let res = connection
                     .invoke_request(
-                        1,
+                        endpoint,
                         clusters::defs::CLUSTER_ID_COLOR_CONTROL,
                         clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUE,
                         &tlv,
@@ -527,6 +532,7 @@ fn main() {
             device_address,
             controller_id,
             device_id,
+            endpoint,
         } => {
             command_cmd(
                 command,
@@ -534,7 +540,8 @@ fn main() {
                 &device_address,
                 controller_id,
                 device_id,
-                &cert_path
+                &cert_path,
+                endpoint
             );
         }
         Commands::Discover { discover, timeout } => {

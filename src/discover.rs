@@ -101,7 +101,7 @@ fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         if additional.typ == mdns::TYPE_SRV {
             service = Some(remove_string_suffix(&additional.name, &svcname));
             if additional.rdata.len() >= 6 {
-                port = Some((additional.rdata[4] as u16)<<8 | (additional.rdata[5] as u16))
+                port = Some(((additional.rdata[4] as u16)<<8) | (additional.rdata[5] as u16))
             }
         }
         if additional.typ == mdns::TYPE_TXT {

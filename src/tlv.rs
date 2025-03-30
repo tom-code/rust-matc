@@ -596,13 +596,13 @@ mod tests {
             ]),
         };
         let o = t1.encode().unwrap();
-        println!("{}", hex::encode(o));
+        assert_eq!(hex::encode(o), "1524000624010718");
 
         let mut tlv = TlvBuffer::new();
         tlv.write_anon_struct().unwrap();
         tlv.write_octetstring(0x1, &[1, 2, 3]).unwrap();
         tlv.write_struct_end().unwrap();
-        println!("{}", hex::encode(tlv.data));
+        assert_eq!(hex::encode(tlv.data), "1530010301020318");
 
         let t1 = TlvItemEnc {
             tag: 0,
@@ -613,6 +613,6 @@ mod tests {
         }
         .encode()
         .unwrap();
-        println!("{}", hex::encode(t1));
+        assert_eq!(hex::encode(t1), "1530010301020318");
     }
 }

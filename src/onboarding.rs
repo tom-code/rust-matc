@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+#[derive(Debug)]
 pub struct OnboardingInfo {
     pub discriminator: u16,
     pub passcode: u32,
@@ -27,6 +28,8 @@ mod tests {
 
     #[test]
     pub fn test_1() {
-        decode_manual_pairing_code("2585-103-3238").unwrap();
+        let res = decode_manual_pairing_code("2585-103-3238").unwrap();
+        assert_eq!(res.discriminator, 2816);
+        assert_eq!(res.passcode, 54453390);
     }
 }
