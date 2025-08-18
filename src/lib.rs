@@ -129,7 +129,7 @@ pub mod onboarding;
 mod retransmit;
 mod session;
 mod sigma;
-mod spake2p;
+pub mod spake2p;
 pub mod tlv;
 pub mod transport;
 mod util;

@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
     certmanager::{self, FileCertManager},
-    clusters, controller, discover, onboarding, tlv, transport,
+    clusters, controller, discover, messages, onboarding, tlv, transport,
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -141,6 +141,18 @@ enum CommandCommand {
         endpoint: u16,
     },
     ListParts {},
+    StartCommissioning {
+        pin: u32,
+
+        #[arg(default_value_t = 1000)]
+        iterations: u32,
+
+        #[arg(default_value_t = 1000)]
+        discriminator: u16,
+
+        #[arg(default_value_t = 200)]
+        timeout: u16,
+    },
 }
 #[derive(Subcommand, Debug)]
 enum DiscoverCommand {
@@ -153,7 +165,7 @@ async fn create_connection(
     device_address: &str,
     device_id: u64,
     controller_id: u64,
-    cert_path: &str
+    cert_path: &str,
 ) -> Result<controller::Connection> {
     let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(cert_path)?;
     let transport = transport::Transport::new(local_address).await?;
@@ -171,7 +183,7 @@ fn commission(
     pin: u32,
     local_address: &str,
     device_id: u64,
-    cert_path: &str
+    cert_path: &str,
 ) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -244,7 +256,7 @@ fn command_cmd(
     controller_id: u64,
     device_id: u64,
     cert_path: &str,
-    endpoint: u16
+    endpoint: u16,
 ) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -281,22 +293,10 @@ fn command_cmd(
                 let tlv = tlv::TlvItemEnc {
                     tag: 0,
                     value: tlv::TlvItemValueEnc::StructInvisible(vec![
-                        tlv::TlvItemEnc {
-                            tag: 0,
-                            value: tlv::TlvItemValueEnc::UInt8(level),
-                        }, // level
-                        tlv::TlvItemEnc {
-                            tag: 1,
-                            value: tlv::TlvItemValueEnc::UInt16(10),
-                        }, // transition time
-                        tlv::TlvItemEnc {
-                            tag: 2,
-                            value: tlv::TlvItemValueEnc::UInt8(0),
-                        }, // options mask
-                        tlv::TlvItemEnc {
-                            tag: 3,
-                            value: tlv::TlvItemValueEnc::UInt8(0),
-                        }, // options override
+                        (0, tlv::TlvItemValueEnc::UInt8(level)).into(),
+                        (1, tlv::TlvItemValueEnc::UInt16(10)).into(), // transition time
+                        (2, tlv::TlvItemValueEnc::UInt8(0)).into(), // options mask
+                        (3, tlv::TlvItemValueEnc::UInt8(0)).into(), // options override
                     ]),
                 }
                 .encode()
@@ -316,26 +316,11 @@ fn command_cmd(
                 let tlv = tlv::TlvItemEnc {
                     tag: 0,
                     value: tlv::TlvItemValueEnc::StructInvisible(vec![
-                        tlv::TlvItemEnc {
-                            tag: 0,
-                            value: tlv::TlvItemValueEnc::UInt8(hue),
-                        },
-                        tlv::TlvItemEnc {
-                            tag: 1,
-                            value: tlv::TlvItemValueEnc::UInt8(0),
-                        }, // direction
-                        tlv::TlvItemEnc {
-                            tag: 2,
-                            value: tlv::TlvItemValueEnc::UInt16(10),
-                        }, // time
-                        tlv::TlvItemEnc {
-                            tag: 3,
-                            value: tlv::TlvItemValueEnc::UInt8(0),
-                        }, // options mask
-                        tlv::TlvItemEnc {
-                            tag: 4,
-                            value: tlv::TlvItemValueEnc::UInt8(0),
-                        }, // options override
+                        (0, tlv::TlvItemValueEnc::UInt8(hue)).into(),
+                        (1, tlv::TlvItemValueEnc::UInt8(0)).into(), // direction
+                        (2, tlv::TlvItemValueEnc::UInt16(10)).into(), // time
+                        (3, tlv::TlvItemValueEnc::UInt8(0)).into(), // options mask
+                        (4, tlv::TlvItemValueEnc::UInt8(0)).into(), // options override
                     ]),
                 }
                 .encode()
@@ -417,6 +402,39 @@ fn command_cmd(
                     }
                 }
             }
+            CommandCommand::StartCommissioning { pin, iterations, discriminator, timeout } => {
+                let mut salt = [0; 32];
+                rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut salt);
+                let key = &matc::controller::pin_to_passcode(pin).unwrap();
+                let data = matc::spake2p::Engine::create_passcode_verifier(key, &salt, iterations);
+                let tlv = tlv::TlvItemEnc {
+                            tag: 0,
+                            value: tlv::TlvItemValueEnc::StructInvisible(vec![
+                                    (0, tlv::TlvItemValueEnc::UInt16(timeout)).into(),
+                                    (1, tlv::TlvItemValueEnc::OctetString(data)).into(),
+                                    (2, tlv::TlvItemValueEnc::UInt16(discriminator)).into(),
+                                    (3, tlv::TlvItemValueEnc::UInt32(iterations)).into(),
+                                    (4, tlv::TlvItemValueEnc::OctetString(salt.to_vec())).into(),
+                            ]),
+                        }
+                        .encode()
+                        .unwrap();
+                let res = connection.invoke_request_timed(0, clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_CMD_ID_OPENCOMMISSIONINGWINDOW, &tlv, 6000).await.unwrap();
+                log::debug!("start commissioning response: {:?}", res);
+                if res.protocol_header.protocol_id != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+                    || res.protocol_header.opcode != messages::ProtocolMessageHeader::INTERACTION_OPCODE_INVOKE_RESP
+                {
+                    panic!("unexpected response {:?}", res);
+                }
+                let (_common_status, status) = messages::parse_im_invoke_resp(&res.tlv).unwrap();
+                match status {
+                    0 => log::info!("start commissioning status: success"),
+                    2 => log::info!("start commissioning status: busy(2)"),
+                    3 => log::info!("start commissioning status: pake error(3)"),
+                    4 => log::info!("start commissioning status: window not open(4)"),
+                    _ => log::info!("start commissioning status: {}", status),
+                }
+            },
         }
     });
 }
@@ -432,13 +450,13 @@ fn main() {
         }
     };
     env_logger::Builder::new()
-            .parse_default_env()
-            .target(env_logger::Target::Stdout)
-            .filter_level(log_level)
-            .format_line_number(true)
-            .format_file(true)
-            .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
-            .init();
+        .parse_default_env()
+        .target(env_logger::Target::Stdout)
+        .filter_level(log_level)
+        .format_line_number(true)
+        .format_file(true)
+        .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
+        .init();
 
     let cert_path = cli.cert_path;
 
@@ -456,7 +474,7 @@ fn main() {
                 pin,
                 &local_address,
                 device_id,
-                &cert_path
+                &cert_path,
             );
         }
         Commands::CaBootstrap { fabric_id } => {
@@ -480,10 +498,15 @@ fn main() {
                 .unwrap();
 
             runtime.block_on(async {
-                let mut connection =
-                    create_connection(&local_address, &device_address, device_id, controller_id, &cert_path)
-                        .await
-                        .unwrap();
+                let mut connection = create_connection(
+                    &local_address,
+                    &device_address,
+                    device_id,
+                    controller_id,
+                    &cert_path,
+                )
+                .await
+                .unwrap();
                 let resptlv = connection.read_request2(endpoint, 0x1d, 1).await.unwrap();
                 if let tlv::TlvItemValue::List(l) = resptlv {
                     for c in l {
@@ -541,7 +564,7 @@ fn main() {
                 controller_id,
                 device_id,
                 &cert_path,
-                endpoint
+                endpoint,
             );
         }
         Commands::Discover { discover, timeout } => {

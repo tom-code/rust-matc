@@ -31,8 +31,8 @@ impl FileCertManager {
     }
     pub fn load(path: &str) -> Result<Arc<Self>> {
         let fname = format!("{}/metadata.pem", path);
-        let fabric_str = std::fs::read_to_string(&fname)
-            .context(format!("can't read from {}", fname))?;
+        let fabric_str =
+            std::fs::read_to_string(&fname).context(format!("can't read from {}", fname))?;
         let fabric_id = fabric_str.parse::<u64>()?;
         Ok(Arc::new(Self {
             fabric_id,

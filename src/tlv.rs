@@ -160,6 +160,58 @@ pub enum TlvItemValue {
     Invalid(),
 }
 
+impl From<TlvItemValue> for bool {
+    fn from(value: TlvItemValue) -> Self {
+        match value {
+            TlvItemValue::Bool(b) => b,
+            _ => false,
+        }
+    }
+}
+impl From<TlvItemValue> for String {
+    fn from(value: TlvItemValue) -> Self {
+        match value {
+            TlvItemValue::String(s) => s,
+            _ => String::new(),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a TlvItemValue> for &'a [u8] {
+    type Error = &'static str;
+    fn try_from(value: &'a TlvItemValue) -> std::result::Result<Self, Self::Error> {
+        if let TlvItemValue::OctetString(ref s) = value {
+            Ok(s.as_slice())
+        } else {
+            Err("Not an octet string")
+        }
+    }
+}
+impl From<TlvItemValue> for Vec<u8> {
+    fn from(value: TlvItemValue) -> Self {
+        match value {
+            TlvItemValue::OctetString(s) => s,
+            _ => Vec::new(),
+        }
+    }
+}
+impl From<TlvItemValue> for u64 {
+    fn from(value: TlvItemValue) -> Self {
+        match value {
+            TlvItemValue::Int(i) => i,
+            _ => 0,
+        }
+    }
+}
+impl From<TlvItemValue> for Vec<TlvItem> {
+    fn from(value: TlvItemValue) -> Self {
+        match value {
+            TlvItemValue::List(lst) => lst,
+            _ => panic!("Cannot convert to Vec<TlvItem>"),
+        }
+    }
+}
+
 /// Decoded tlv element returned by [decode_tlv]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TlvItem {
@@ -173,14 +225,16 @@ impl fmt::Debug for TlvItemValue {
             Self::Int(arg0) => f.debug_tuple("Int").field(arg0).finish(),
             Self::Bool(arg0) => f.debug_tuple("Bool").field(arg0).finish(),
             Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
-            Self::OctetString(arg0) => f.debug_tuple("OctetString").field(&hex::encode(arg0)).finish(),
+            Self::OctetString(arg0) => f
+                .debug_tuple("OctetString")
+                .field(&hex::encode(arg0))
+                .finish(),
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Nil() => f.debug_tuple("Nil").finish(),
             Self::Invalid() => f.debug_tuple("Invalid").finish(),
         }
     }
 }
-
 
 impl TlvItem {
     pub fn get(&self, tag: &[u8]) -> Option<&TlvItemValue> {
@@ -219,13 +273,21 @@ impl TlvItem {
             None
         }
     }
+    pub fn get_t<T>(&self, tag: &[u8]) -> Option<T>
+    where
+        T: From<TlvItemValue>,
+    {
+        self.get(tag).map(|f| f.clone().into())
+    }
+
     pub fn get_bool(&self, tag: &[u8]) -> Option<bool> {
-        let found = self.get(tag);
+        self.get(tag).map(|f| f.clone().into())
+        /*let found = self.get(tag);
         if let Some(TlvItemValue::Bool(i)) = found {
             Some(*i)
         } else {
             None
-        }
+        }*/
     }
     pub fn get_u8(&self, tag: &[u8]) -> Option<u8> {
         let found = self.get(tag);
@@ -316,9 +378,9 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
         let fb = cursor.read_u8()?;
         let tp = fb & 0x1f;
         let tagctrl = fb >> 5;
+        let tag = read_tag(tagctrl, cursor)?;
         match tp {
             TYPE_INT_1 => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u8()?;
                 let item = TlvItem {
                     tag,
@@ -327,7 +389,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 container.push(item);
             }
             TYPE_INT_4 => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_i32::<LittleEndian>()?;
                 let item = TlvItem {
                     tag,
@@ -336,7 +397,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 container.push(item);
             }
             TYPE_UINT_1 => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u8()?;
                 let item = TlvItem {
                     tag,
@@ -345,7 +405,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 container.push(item);
             }
             TYPE_UINT_2 => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u16::<LittleEndian>()?;
                 let item = TlvItem {
                     tag,
@@ -354,7 +413,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 container.push(item);
             }
             TYPE_UINT_4 => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let value = cursor.read_u32::<LittleEndian>()?;
                 let item = TlvItem {
                     tag,
@@ -362,8 +420,15 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
+            TYPE_UINT_8 => {
+                let value = cursor.read_u64::<LittleEndian>()?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Int(value),
+                };
+                container.push(item);
+            }
             TYPE_BOOL_FALSE => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::Bool(false),
@@ -371,7 +436,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 container.push(item);
             }
             TYPE_BOOL_TRUE => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::Bool(true),
@@ -380,7 +444,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_UTF8_L1 => {
                 // utf8 string
-                let tag = read_tag(tagctrl, cursor)?;
                 let size = cursor.read_u8()?;
                 let mut value = vec![0; size as usize];
                 cursor.read_exact(&mut value)?;
@@ -394,7 +457,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_OCTET_STRING_L1 => {
                 // octet string
-                let tag = read_tag(tagctrl, cursor)?;
                 let size = cursor.read_u8()?;
                 let mut value = vec![0; size as usize];
                 cursor.read_exact(&mut value)?;
@@ -406,7 +468,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_OCTET_STRING_L2 => {
                 // octet string large
-                let tag = read_tag(tagctrl, cursor)?;
                 let size = cursor.read_u16::<LittleEndian>()?;
                 let mut value = vec![0; size as usize];
                 cursor.read_exact(&mut value)?;
@@ -418,7 +479,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_STRUCT => {
                 //list
-                let tag = read_tag(tagctrl, cursor)?;
                 let mut c2 = Vec::new();
                 decode(cursor, &mut c2)?;
                 let item = TlvItem {
@@ -429,7 +489,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_ARRAY => {
                 //list
-                let tag = read_tag(tagctrl, cursor)?;
                 let mut c2 = Vec::new();
                 decode(cursor, &mut c2)?;
                 let item = TlvItem {
@@ -440,7 +499,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_LIST => {
                 //list
-                let tag = read_tag(tagctrl, cursor)?;
                 let mut c2 = Vec::new();
                 decode(cursor, &mut c2)?;
                 let item = TlvItem {
@@ -451,7 +509,6 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             }
             TYPE_END_CONTAINER => return Ok(()),
             0x14 => {
-                let tag = read_tag(tagctrl, cursor)?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::Nil(),
@@ -525,6 +582,15 @@ pub struct TlvItemEnc {
     pub value: TlvItemValueEnc,
 }
 
+impl From<(u8, TlvItemValueEnc)> for TlvItemEnc {
+    fn from(item: (u8, TlvItemValueEnc)) -> Self {
+        TlvItemEnc {
+            tag: item.0,
+            value: item.1,
+        }
+    }
+}
+
 impl TlvItemEnc {
     fn encode_internal(&self, buf: &mut TlvBuffer) -> Result<()> {
         match &self.value {
@@ -578,7 +644,7 @@ impl TlvItemEnc {
 
 #[cfg(test)]
 mod tests {
-    use super::{TlvBuffer, TlvItemEnc, TlvItemValueEnc};
+    use super::{decode_tlv, TlvBuffer, TlvItemEnc, TlvItemValue, TlvItemValueEnc};
 
     #[test]
     fn test_1() {
@@ -614,5 +680,298 @@ mod tests {
         .encode()
         .unwrap();
         assert_eq!(hex::encode(t1), "1530010301020318");
+    }
+
+    #[test]
+    fn test_decode_integers() {
+        // Test uint8
+        let mut tlv = TlvBuffer::new();
+        tlv.write_uint8(1, 42).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_u8(&[]), Some(42));
+
+        // Test uint16
+        let mut tlv = TlvBuffer::new();
+        tlv.write_uint16(2, 1000).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_u16(&[]), Some(1000));
+
+        // Test uint32
+        let mut tlv = TlvBuffer::new();
+        tlv.write_uint32(3, 100000).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_u32(&[]), Some(100000));
+
+        // Test uint64
+        let mut tlv = TlvBuffer::new();
+        tlv.write_uint64(4, 1000000000000).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_u64(&[]), Some(1000000000000));
+    }
+
+    #[test]
+    fn test_decode_booleans() {
+        // Test true
+        let mut tlv = TlvBuffer::new();
+        tlv.write_bool(1, true).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_bool(&[]), Some(true));
+
+        // Test false
+        let mut tlv = TlvBuffer::new();
+        tlv.write_bool(2, false).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_bool(&[]), Some(false));
+        assert_eq!(decoded.get_t(&[]), Some(false));
+    }
+
+    #[test]
+    fn test_decode_strings() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_string(1, "hello world").unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(
+            decoded.get_string_owned(&[]),
+            Some("hello world".to_string())
+        );
+        assert_eq!(decoded.get_t(&[]), Some("hello world".to_string()));
+    }
+
+    #[test]
+    fn test_decode_octet_strings() {
+        // Test small octet string (L1)
+        let mut tlv = TlvBuffer::new();
+        let data = vec![1, 2, 3, 4, 5];
+        tlv.write_octetstring(1, &data).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_octet_string(&[]), Some(data.as_slice()));
+
+        // Test large octet string (L2)
+        let mut tlv = TlvBuffer::new();
+        let large_data = vec![0; 300]; // Larger than 255 bytes
+        tlv.write_octetstring(2, &large_data).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        assert_eq!(decoded.get_octet_string(&[]), Some(large_data.as_slice()));
+        assert_eq!(
+            decoded.get_octet_string_owned(&[]),
+            Some(large_data.clone())
+        );
+    }
+
+    #[test]
+    fn test_decode_structures() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_struct(1).unwrap();
+        tlv.write_uint8(0, 100).unwrap();
+        tlv.write_string(1, "test").unwrap();
+        tlv.write_bool(2, true).unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        // Test nested access
+        assert_eq!(decoded.get_u8(&[0]), Some(100));
+        assert_eq!(decoded.get_string_owned(&[1]), Some("test".to_string()));
+        assert_eq!(decoded.get_bool(&[2]), Some(true));
+
+        // Verify it's a list structure
+        if let TlvItemValue::List(items) = &decoded.value {
+            assert_eq!(items.len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_decode_anonymous_structures() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_anon_struct().unwrap();
+        tlv.write_uint8_notag(42).unwrap();
+        tlv.write_uint8_notag(84).unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        if let TlvItemValue::List(items) = &decoded.value {
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].tag, 0);
+            assert_eq!(items[1].tag, 0);
+        }
+    }
+
+    #[test]
+    fn test_decode_arrays_and_lists() {
+        // Test array
+        let mut tlv = TlvBuffer::new();
+        tlv.write_array(1).unwrap();
+        tlv.write_uint8(0, 1).unwrap();
+        tlv.write_uint8(0, 2).unwrap();
+        tlv.write_uint8(0, 3).unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        if let Some(TlvItemValue::List(items)) = decoded.get(&[]) {
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].get_u8(&[]), Some(1));
+            assert_eq!(items[1].get_u8(&[]), Some(2));
+            assert_eq!(items[2].get_u8(&[]), Some(3));
+        } else {
+            panic!("Expected array structure");
+        }
+
+        // Test list
+        let mut tlv = TlvBuffer::new();
+        tlv.write_list(2).unwrap();
+        tlv.write_string(0, "item1").unwrap();
+        tlv.write_string(1, "item2").unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+        if let Some(TlvItemValue::List(items)) = decoded.get(&[]) {
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0].get_string_owned(&[]), Some("item1".to_string()));
+            assert_eq!(items[1].get_string_owned(&[]), Some("item2".to_string()));
+        } else {
+            panic!("Expected list structure");
+        }
+    }
+
+    #[test]
+    fn test_decode_mixed_container() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_uint8(0, 255).unwrap();
+        tlv.write_string(1, "mixed").unwrap();
+        tlv.write_bool(2, false).unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        // Should create a list with multiple items
+        if let TlvItemValue::List(items) = &decoded.value {
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0].get_u8(&[]), Some(255));
+            assert_eq!(items[1].get_string_owned(&[]), Some("mixed".to_string()));
+            assert_eq!(items[2].get_bool(&[]), Some(false));
+        } else {
+            panic!("Expected list of items");
+        }
+    }
+
+    #[test]
+    fn test_decode_nested_structures() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_struct(1).unwrap();
+        tlv.write_struct(2).unwrap();
+        tlv.write_uint8(3, 42).unwrap();
+        tlv.write_struct_end().unwrap(); // End inner struct
+        tlv.write_string(4, "outer").unwrap();
+        tlv.write_struct_end().unwrap(); // End outer struct
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        // Test deep nested access
+        assert_eq!(decoded.get_u8(&[2, 3]), Some(42));
+        assert_eq!(decoded.get_string_owned(&[4]), Some("outer".to_string()));
+    }
+
+    #[test]
+    fn test_decode_getter_methods() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_struct(0).unwrap();
+        tlv.write_uint64(1, 0xFFFFFFFFFFFFFFFF).unwrap();
+        tlv.write_uint32(2, 0xFFFFFFFF).unwrap();
+        tlv.write_uint16(3, 0xFFFF).unwrap();
+        tlv.write_uint8(4, 0xFF).unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        // Test type conversions
+        assert_eq!(decoded.get_u64(&[1]), Some(0xFFFFFFFFFFFFFFFF));
+        assert_eq!(decoded.get_u32(&[2]), Some(0xFFFFFFFF));
+        assert_eq!(decoded.get_u16(&[3]), Some(0xFFFF));
+        assert_eq!(decoded.get_u8(&[4]), Some(0xFF));
+
+        // Test downcasting
+        assert_eq!(decoded.get_u8(&[1]), Some(0xFF)); // u64 -> u8
+        assert_eq!(decoded.get_u16(&[1]), Some(0xFFFF)); // u64 -> u16
+    }
+
+    #[test]
+    fn test_decode_invalid_access() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_uint8(1, 42).unwrap();
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        // Test accessing non-existent tags
+        assert_eq!(decoded.get_u8(&[99]), None);
+        assert_eq!(decoded.get_string_owned(&[1]), None); // Wrong type
+        assert_eq!(decoded.get_bool(&[1]), None); // Wrong type
+    }
+
+    #[test]
+    fn test_decode_empty_structure() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_anon_struct().unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        if let TlvItemValue::List(items) = &decoded.value {
+            assert_eq!(items.len(), 0);
+        } else {
+            panic!("Expected empty list");
+        }
+    }
+
+    #[test]
+    fn test_get_item_method() {
+        let mut tlv = TlvBuffer::new();
+        tlv.write_struct(1).unwrap();
+        tlv.write_uint8(2, 100).unwrap();
+        tlv.write_string(3, "test").unwrap();
+        tlv.write_bool(4, true).unwrap();
+        tlv.write_struct(5).unwrap();
+        tlv.write_string(1, "inner").unwrap();
+        tlv.write_struct_end().unwrap();
+        tlv.write_struct_end().unwrap();
+
+        let decoded = decode_tlv(&tlv.data).unwrap();
+
+        // Test get_item returns the actual item
+        let item = decoded.get_item(&[2]).unwrap();
+        assert_eq!(item.tag, 2);
+        if let TlvItemValue::Int(val) = &item.value {
+            assert_eq!(*val, 100);
+        } else {
+            panic!("Expected Int value");
+        }
+        let item = decoded.get_item(&[3]).unwrap();
+        assert_eq!(item.tag, 3);
+        if let TlvItemValue::String(val) = &item.value {
+            assert_eq!(*val, "test");
+        } else {
+            panic!("Expected String value");
+        }
+        let item = decoded.get_item(&[4]).unwrap();
+        assert_eq!(item.tag, 4);
+        if let TlvItemValue::Bool(val) = &item.value {
+            assert!(*val);
+        } else {
+            panic!("Expected Bool value");
+        }
+        let item = decoded.get_item(&[5]).unwrap();
+        assert_eq!(item.tag, 5);
+        if let TlvItemValue::List(items) = &item.value {
+            assert_eq!(items.len(), 1);
+            let inner_item = &items[0];
+            assert_eq!(inner_item.tag, 1);
+            if let TlvItemValue::String(val) = &inner_item.value {
+                assert_eq!(*val, "inner");
+            } else {
+                panic!("Expected String value");
+            }
+        } else {
+            panic!("Expected List value");
+        }
+        let item = decoded.get_item(&[99]);
+        assert!(item.is_none());
     }
 }

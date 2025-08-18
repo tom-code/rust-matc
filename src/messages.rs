@@ -1,7 +1,8 @@
+use anyhow::{Context, Result};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use rand::RngCore;
 use core::fmt;
-use std::io::{Read, Result, Write};
+use rand::RngCore;
+use std::io::{Read, Write};
 
 use crate::tlv::{self, TlvItem, TlvItemEnc, TlvItemValueEnc};
 
@@ -135,6 +136,8 @@ impl ProtocolMessageHeader {
     pub const INTERACTION_OPCODE_READ_REQ: u8 = 0x2;
     pub const INTERACTION_OPCODE_REPORT_DATA: u8 = 0x5;
     pub const INTERACTION_OPCODE_INVOKE_REQ: u8 = 0x8;
+    pub const INTERACTION_OPCODE_INVOKE_RESP: u8 = 0x9;
+    pub const INTERACTION_OPCODE_TIMED_REQ: u8 = 0xa;
 
     pub const PROTOCOL_ID_SECURE_CHANNEL: u16 = 0;
     pub const PROTOCOL_ID_INTERACTION: u16 = 1;
@@ -397,6 +400,24 @@ pub fn im_invoke_request(
     Ok(tlv.data)
 }
 
+pub fn im_timed_request(exchange_id: u16, timeout: u16) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 5,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_TIMED_REQ,
+        exchange_id,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: 0,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_uint16(0, timeout)?;
+    tlv.write_uint8(0xff, 10)?;
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
 pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: 5,
@@ -420,6 +441,19 @@ pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16) ->
     tlv.write_uint8(0xff, 10)?;
     tlv.write_struct_end()?;
     Ok(tlv.data)
+}
+
+pub fn parse_im_invoke_resp(resp: &TlvItem) -> Result<(u32, u32)> {
+    let common_status = resp
+        .get_int(&[1, 0, 1, 1, 0])
+        .context("parse_im_invoke_resp: status not found")?;
+    if common_status == 0 {
+        return Ok((0, 0));
+    }
+    let stat = resp
+        .get_int(&[1, 0, 1, 1, 1])
+        .context("parse_im_invoke_resp: unexpected response")?;
+    Ok((common_status as u32, stat as u32))
 }
 
 #[cfg(test)]

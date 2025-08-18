@@ -32,4 +32,11 @@ mod tests {
         assert_eq!(res.discriminator, 2816);
         assert_eq!(res.passcode, 54453390);
     }
+
+    #[test]
+    pub fn test_2() {
+        let res = decode_manual_pairing_code("34970112332").unwrap();
+        assert_eq!(res.discriminator, 3840);
+        assert_eq!(res.passcode, 20202021);
+    }
 }

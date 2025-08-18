@@ -178,6 +178,26 @@ impl Connection {
         let o = res.tlv.get(&[1, 0, 1, 1]).context("result not found")?;
         Ok(o.clone())
     }
+
+    pub async fn invoke_request_timed(
+        &mut self,
+        endpoint: u16,
+        cluster: u32,
+        command: u32,
+        payload: &[u8],
+        timeout: u16,
+    ) -> Result<Message> {
+        invoke_request_timed(
+            &self.connection,
+            &mut self.session,
+            endpoint,
+            cluster,
+            command,
+            payload,
+            timeout,
+        )
+        .await
+    }
 }
 
 /*async fn get_next_message(
@@ -204,7 +224,7 @@ impl Connection {
     }
 }*/
 
-fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
+pub fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
     let mut out = Vec::new();
     out.write_u32::<LittleEndian>(pin)?;
     Ok(out)
@@ -420,8 +440,62 @@ async fn invoke_request(
     let exchange = rand::random();
     let mut retrctx = retransmit::RetrContext::new(connection, session);
     retrctx.subscribe_exchange(exchange);
-    log::debug!("invoke_request exch:{} endpoint:{} cluster:{} command:{}", exchange, endpoint, cluster, command);
+    log::debug!(
+        "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
+        exchange,
+        endpoint,
+        cluster,
+        command
+    );
     let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
+    retrctx.send(&testm).await?;
+    let result = retrctx.get_next_message().await?;
+    Ok(result)
+}
+
+async fn invoke_request_timed(
+    connection: &transport::Connection,
+    session: &mut session::Session,
+    endpoint: u16,
+    cluster: u32,
+    command: u32,
+    payload: &[u8],
+    timeout: u16,
+) -> Result<Message> {
+    let exchange = rand::random();
+    let mut retrctx = retransmit::RetrContext::new(connection, session);
+    retrctx.subscribe_exchange(exchange);
+    let tr = messages::im_timed_request(exchange, timeout)?;
+    retrctx.send(&tr).await?;
+    let result = retrctx.get_next_message().await?;
+    if result.protocol_header.protocol_id
+        != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+        || result.protocol_header.opcode
+            != messages::ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
+    {
+        return Err(anyhow::anyhow!(
+            "invoke_request_timed: unexpected response {:?}",
+            result
+        ));
+    }
+    let status = result
+        .tlv
+        .get_int(&[0])
+        .context("invoke_request_timed: status not found")?;
+    if status != 0 {
+        return Err(anyhow::anyhow!(
+            "invoke_request_timed: unexpected status {}",
+            status
+        ));
+    }
+    log::debug!(
+        "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
+        exchange,
+        endpoint,
+        cluster,
+        command
+    );
+    let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, true)?;
     retrctx.send(&testm).await?;
     let result = retrctx.get_next_message().await?;
     Ok(result)

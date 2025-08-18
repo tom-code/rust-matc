@@ -54,6 +54,19 @@ impl Engine {
             )))
         }
     }
+
+    pub fn create_passcode_verifier(key: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
+        let mut kdf = [0; 80];
+        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(key, salt, iterations, &mut kdf);
+        let w0 = Self::p256_scalar_from_40_bytes(&kdf[..40]);
+        let w1 = Self::p256_scalar_from_40_bytes(&kdf[40..]);
+        let l = p256::ProjectivePoint::GENERATOR.mul(w1);
+        let mut out = Vec::new();
+        out.extend_from_slice(w0.to_bytes().as_slice());
+        out.extend_from_slice(l.to_encoded_point(false).as_bytes());
+        out
+    }
+
     pub fn start(&self, key: &[u8], salt: &[u8], iterations: u32) -> Result<Context> {
         let mut kdf = [0; 80];
         pbkdf2::pbkdf2_hmac::<sha2::Sha256>(key, salt, iterations, &mut kdf);

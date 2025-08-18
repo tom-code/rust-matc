@@ -75,7 +75,7 @@ impl<'b> RetrContext<'b> {
                 Ok(resp) => resp,
                 Err(e) => {
                     log::debug!("can't decode incoming message {:?}", e);
-                    continue
+                    continue;
                 }
             };
             let decoded = messages::Message::decode(&resp)?;
