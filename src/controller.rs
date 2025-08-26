@@ -342,6 +342,12 @@ pub(crate) async fn auth_sigma(
     // receive sigma2
     log::debug!("receive sigma2 {}", exchange);
     let sigma2 = retrctx.get_next_message().await?;
+    log::debug!("sigma2 received {:?}", sigma2);
+    if sigma2.protocol_header.protocol_id == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+        && sigma2.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_STATUS
+    {
+        return Err(anyhow::anyhow!("sigma2 not received, status: {}", sigma2.status_report_info.context("status report info missing")?.to_string()));
+    }
     ctx.sigma2_payload = sigma2.payload;
     ctx.responder_session = sigma2
         .tlv

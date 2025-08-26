@@ -178,11 +178,151 @@ impl ProtocolMessageHeader {
     }
 }
 
+
+#[derive(Debug, Clone, Copy)]
+pub enum SecureChannelGeneralCode {
+    Success = 0,
+    Failure = 1,
+    BadPrecondition = 2,
+    OutOfRange = 3,
+    BadRequest = 4,
+    Unsupported = 5,
+    Unexpected = 6,
+    ResourceExhausted = 7,
+    Busy = 8,
+    Timeout = 9,
+    Continue = 10,
+    Aborted = 11,
+    InvalidArgument = 12,
+    NotFound = 13,
+    AlreadyExists = 14,
+    PermissionDenied = 15,
+    DataLoss = 16,
+    MessageTooLarge = 17,
+    Unknown = 0xffff
+}
+
+impl From<u16> for SecureChannelGeneralCode {
+    fn from(value: u16) -> Self {
+        match value {
+            0 => SecureChannelGeneralCode::Success,
+            1 => SecureChannelGeneralCode::Failure,
+            2 => SecureChannelGeneralCode::BadPrecondition,
+            3 => SecureChannelGeneralCode::OutOfRange,
+            4 => SecureChannelGeneralCode::BadRequest,
+            5 => SecureChannelGeneralCode::Unsupported,
+            6 => SecureChannelGeneralCode::Unexpected,
+            7 => SecureChannelGeneralCode::ResourceExhausted,
+            8 => SecureChannelGeneralCode::Busy,
+            9 => SecureChannelGeneralCode::Timeout,
+            10 => SecureChannelGeneralCode::Continue,
+            11 => SecureChannelGeneralCode::Aborted,
+            12 => SecureChannelGeneralCode::InvalidArgument,
+            13 => SecureChannelGeneralCode::NotFound,
+            14 => SecureChannelGeneralCode::AlreadyExists,
+            15 => SecureChannelGeneralCode::PermissionDenied,
+            16 => SecureChannelGeneralCode::DataLoss,
+            17 => SecureChannelGeneralCode::MessageTooLarge,
+            _ => SecureChannelGeneralCode::Unknown
+        }
+    }
+}
+
+impl std::fmt::Display for SecureChannelGeneralCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecureChannelGeneralCode::Success => write!(f, "SUCCESS"),
+            SecureChannelGeneralCode::Failure => write!(f, "FAILURE"),
+            SecureChannelGeneralCode::BadPrecondition => write!(f, "BAD_PRECONDITION"),
+            SecureChannelGeneralCode::OutOfRange => write!(f, "OUT_OF_RANGE"),
+            SecureChannelGeneralCode::BadRequest => write!(f, "BAD_REQUEST"),
+            SecureChannelGeneralCode::Unsupported => write!(f, "UNSUPPORTED"),
+            SecureChannelGeneralCode::Unexpected => write!(f, "UNEXPECTED"),
+            SecureChannelGeneralCode::ResourceExhausted => write!(f, "RESOURCE_EXHAUSTED"),
+            SecureChannelGeneralCode::Busy => write!(f, "BUSY"),
+            SecureChannelGeneralCode::Timeout => write!(f, "TIMEOUT"),
+            SecureChannelGeneralCode::Continue => write!(f, "CONTINUE"),
+            SecureChannelGeneralCode::Aborted => write!(f, "ABORTED"),
+            SecureChannelGeneralCode::InvalidArgument => write!(f, "INVALID_ARGUMENT"),
+            SecureChannelGeneralCode::NotFound => write!(f, "NOT_FOUND"),
+            SecureChannelGeneralCode::AlreadyExists => write!(f, "ALREADY_EXISTS"),
+            SecureChannelGeneralCode::PermissionDenied => write!(f, "PERMISSION_DENIED"),
+            SecureChannelGeneralCode::DataLoss => write!(f, "DATA_LOSS"),
+            SecureChannelGeneralCode::MessageTooLarge => write!(f, "MESSAGE_TOO_LARGE"),
+            SecureChannelGeneralCode::Unknown => write!(f, "UNKNOWN {}", *self as u16),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum SecureChannelProtocolCode {
+    SessionEstablishmentSuccess = 0,
+    NoSharedTrustRoots = 1,
+    InvalidParameter = 2,
+    CloseSession = 3,
+    Busy = 4,
+    RequiredCatMismatch = 5,
+    Unknown = 0xffff
+}
+
+impl std::fmt::Display for SecureChannelProtocolCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SecureChannelProtocolCode::SessionEstablishmentSuccess => write!(f, "SESSION_ESTABLISHMENT_SUCCESS"),
+            SecureChannelProtocolCode::NoSharedTrustRoots => write!(f, "NO_SHARED_TRUST_ROOTS"),
+            SecureChannelProtocolCode::InvalidParameter => write!(f, "INVALID_PARAMETER"),
+            SecureChannelProtocolCode::CloseSession => write!(f, "CLOSE_SESSION"),
+            SecureChannelProtocolCode::Busy => write!(f, "BUSY"),
+            SecureChannelProtocolCode::RequiredCatMismatch => write!(f, "REQUIRED_CAT_MISMATCH"),
+            SecureChannelProtocolCode::Unknown => write!(f, "UNKNOWN {}", *self as u16),
+        }
+    }
+}
+
+impl From<u16> for SecureChannelProtocolCode {
+    fn from(value: u16) -> Self {
+        match value {
+            0 => SecureChannelProtocolCode::SessionEstablishmentSuccess,
+            1 => SecureChannelProtocolCode::NoSharedTrustRoots,
+            2 => SecureChannelProtocolCode::InvalidParameter,
+            3 => SecureChannelProtocolCode::CloseSession,
+            4 => SecureChannelProtocolCode::Busy,
+            5 => SecureChannelProtocolCode::RequiredCatMismatch,
+            _ => SecureChannelProtocolCode::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct StatusReportInfo {
     general_code: u16,
     protocol_id: u32,
     protocol_code: u16,
+}
+impl std::fmt::Display for StatusReportInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.general_code == 0 {
+            return write!(f, "StatusReportInfo: OK");
+        }
+        let gc = Into::<SecureChannelGeneralCode>::into(self.general_code);
+        match self.protocol_id as u16{
+            ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL => {
+                let pc = Into::<SecureChannelProtocolCode>::into(self.protocol_code);
+                write!(
+                    f,
+                    "StatusReportInfo: general_code={}, protocol_id={}, protocol_code={}",
+                    gc, self.protocol_id, pc
+                )
+
+            },
+            _ => {
+                write!(f, "StatusReportInfo: general_code={}, protocol_id={}, protocol_code={}",
+                    gc, self.protocol_id, self.protocol_code
+                )
+            }
+
+        }
+    }
 }
 impl StatusReportInfo {
     fn parse(data: &[u8]) -> Result<Self> {

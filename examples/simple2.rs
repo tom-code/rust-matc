@@ -66,28 +66,15 @@ async fn main() -> Result<()> {
         .await?;
 
     // send MoveToLevel command
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-            tlv::TlvItemEnc {
-                tag: 0,
-                value: tlv::TlvItemValueEnc::UInt8(50),
-            }, // level
-            tlv::TlvItemEnc {
-                tag: 1,
-                value: tlv::TlvItemValueEnc::UInt16(1000),
-            }, // transition time
-            tlv::TlvItemEnc {
-                tag: 2,
-                value: tlv::TlvItemValueEnc::UInt8(0),
-            }, // options mask
-            tlv::TlvItemEnc {
-                tag: 3,
-                value: tlv::TlvItemValueEnc::UInt8(0),
-            }, // options override
-        ]),
-    }
-    .encode()?;
+    let tlv = std::convert::Into::<tlv::TlvItemEnc>::into((
+        0,
+        tlv::TlvItemValueEnc::StructInvisible(vec![
+            (0, tlv::TlvItemValueEnc::UInt8(50)).into(), // level
+            (1, tlv::TlvItemValueEnc::UInt16(1000)).into(), // transition time
+            (2, tlv::TlvItemValueEnc::UInt8(0)).into(), // options mask
+            (3, tlv::TlvItemValueEnc::UInt8(0)).into(), // options override
+        ]))).encode()?;
+
     connection
         .invoke_request(
             1,
