@@ -141,6 +141,7 @@ enum CommandCommand {
         endpoint: u16,
     },
     ListParts {},
+    ListBridgedDevices {},
     StartCommissioning {
         pin: u32,
 
@@ -246,6 +247,123 @@ fn discover_cmd(discover: DiscoverCommand, timeout: u64) {
                 println!("{:#?}", info);
             }
         }),
+    }
+}
+
+fn bridged_device_attr_name_from_id(id: u32) -> &'static str {
+    match id {
+        0x0000 => "DataModelRevision",
+        0x0001 => "VendorName",
+        0x0002 => "VendorID",
+        0x0003 => "ProductName",
+        0x0004 => "ProductID",
+        0x0005 => "NodeLabel",
+        0x0006 => "Location",
+        0x0007 => "HardwareVersion",
+        0x0008 => "HardwareVersionString",
+        0x0009 => "SoftwareVersion",
+        0x000A => "SoftwareVersionString",
+        0x000B => "ManufacturingDate",
+        0x000C => "PartNumber",
+        0x000D => "ProductURL",
+        0x000E => "ProductLabel",
+        0x000F => "SerialNumber",
+        0x0010 => "LocalConfigDisabled",
+        0x0011 => "Reachable",
+        0x0012 => "UniqueID",
+        0x0013 => "CapabilityMinima",
+        0x0014 => "ProductAppearance",
+        0x0015 => "SpecificationVersion",
+        0x0016 => "MaxPathsPerInvoke",
+        0x0018 => "ConfigurationVersion",
+        _ => "Unknown",
+    }
+}
+
+
+async fn bridge_info(connection: &mut controller::Connection) {
+    let resptlv = connection
+        .read_request2(
+            0,
+            clusters::defs::CLUSTER_ID_DESCRIPTOR,
+            clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+        )
+        .await
+        .unwrap();
+    if let tlv::TlvItemValue::List(l) = resptlv {
+        for part in l {
+            if let tlv::TlvItemValue::Int(v) = part.value {
+                println!("endpoint {}", v);
+                for n in 0..0x18 {
+                    let out = connection
+                        .read_request2(
+                            v as u16,
+                            clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION,
+                            n,
+                        )
+                        .await;
+                    if let Ok(out) = out {
+                        println!("  attr 0x{:x} {}: {:?}", n, bridged_device_attr_name_from_id(n), out);
+                    }
+                }
+                let supported_clusters = connection
+                    .read_request2(v as u16, clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST)
+                    .await
+                    .unwrap();
+                println!("  Supported clusters:");
+                if let tlv::TlvItemValue::List(l) = supported_clusters {
+                    for c in l {
+                        if let tlv::TlvItemValue::Int(v) = c.value {
+                            match clusters::names::get_cluster_name(v as u32) {
+                                Some(v) => println!("    {}", v),
+                                None => println!(".   unknown cluster - id 0x{:x}", v),
+                            }
+                        }
+                    }
+                }
+                let taglist = connection
+                    .read_request2(v as u16, clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_TAGLIST)
+                    .await;
+                if let Ok(taglist) = taglist {
+                    println!("  taglist: {:?}", taglist);
+                }
+                let devtypes = connection
+                    .read_request2(v as u16, clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_DEVICETYPELIST)
+                    .await;
+                if let Ok(tlv::TlvItemValue::List(devtypes)) = devtypes {
+                    for c in devtypes {
+                            let typ = c.get_int(&[0]);
+                            if let Some(typ) = typ {
+                                if let Some(name) = clusters::dt_names::get_device_type_name(typ as u32) {
+                                    println!("  device type: {} (0x{:x})", name, typ);
+                                } else {
+                                    println!("  device type: unknown (0x{:x})", typ);
+                                }
+                            }
+                    }
+                }
+                let parts = connection
+                    .read_request2(v as u16, clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST)
+                    .await;
+                if let Ok(parts) = parts {
+                    let mut parts_str = "".to_string();
+                    if let tlv::TlvItemValue::List(l) = parts {
+                        for c in l {
+                            if let tlv::TlvItemValue::Int(v) = c.value {
+                                parts_str += &format!("{} ", v);
+                            }
+                        }
+                    }
+                    if !parts_str.is_empty() {
+                        println!("  parts: {}", parts_str);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -401,6 +519,9 @@ fn command_cmd(
                         }
                     }
                 }
+            }
+            CommandCommand::ListBridgedDevices {} => {
+                bridge_info(&mut connection).await;
             }
             CommandCommand::StartCommissioning { pin, iterations, discriminator, timeout } => {
                 let mut salt = [0; 32];
