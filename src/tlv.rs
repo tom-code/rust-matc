@@ -24,6 +24,7 @@ pub struct TlvBuffer {
 }
 
 const TYPE_INT_1: u8 = 0;
+const TYPE_INT_2: u8 = 1;
 const TYPE_INT_4: u8 = 2;
 const TYPE_UINT_1: u8 = 4;
 const TYPE_UINT_2: u8 = 5;
@@ -107,6 +108,11 @@ impl TlvBuffer {
         self.data.write_u8(CTRL_CTX_L1 | TYPE_INT_1)?;
         self.data.write_u8(tag)?;
         self.data.write_i8(value)
+    }
+    pub fn write_int16(&mut self, tag: u8, value: i16) -> Result<()> {
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_INT_2)?;
+        self.data.write_u8(tag)?;
+        self.data.write_i16::<LittleEndian>(value)
     }
     pub fn write_uint8(&mut self, tag: u8, value: u8) -> Result<()> {
         self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_1)?;
@@ -551,6 +557,7 @@ pub fn decode_tlv(data: &[u8]) -> Result<TlvItem> {
 #[derive(Debug)]
 pub enum TlvItemValueEnc {
     Int8(i8),
+    Int16(i16),
     UInt8(u8),
     UInt16(u16),
     UInt32(u32),
@@ -596,6 +603,9 @@ impl TlvItemEnc {
         match &self.value {
             TlvItemValueEnc::Int8(i) => {
                 buf.write_int8(self.tag, *i)?;
+            }
+            TlvItemValueEnc::Int16(i) => {
+                buf.write_int16(self.tag, *i)?;
             }
             TlvItemValueEnc::UInt8(i) => {
                 buf.write_uint8(self.tag, *i)?;
