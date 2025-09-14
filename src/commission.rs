@@ -49,6 +49,24 @@ async fn push_ca_cert(
     Ok(())
 }
 
+fn noc_status_to_str(status: u64) -> &'static str {
+    match status {
+        0 => "Success",
+        1 => "InvalidPublicKey",
+        2 => "InvalidNodeOpId",
+        3 => "InvalidNOC",
+        4 => "MissingCsr",
+        5 => "TableFull",
+        6 => "InvalidAdminSubject",
+        7 => "?",
+        8 => "?",
+        9 => "FabricConflict",
+        10 => "LabelConflict",
+        11 => "InvalidFabricIndex",
+        _ => "UnknownStatus",
+    }
+}
+
 async fn push_device_cert(
     retrcrx: &mut retransmit::RetrContext<'_>,
     cm: &dyn certmanager::CertManager,
@@ -97,7 +115,7 @@ async fn push_device_cert(
             .context("can't get status for AddNOC")?
     };
     if noc_status != 0 {
-        return Err(anyhow::anyhow!("AddNOC failed with status {}", noc_status));
+        return Err(anyhow::anyhow!("AddNOC failed with status {}/{}", noc_status, noc_status_to_str(noc_status)));
     }
     Ok(())
 }
