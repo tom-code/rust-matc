@@ -42,8 +42,9 @@ async fn push_ca_cert(
     };
     if noc_status != 0 {
         return Err(anyhow::anyhow!(
-            "AddTrustedRootCertificate failed with status {}",
-            noc_status
+            "AddTrustedRootCertificate failed with status {}/{}",
+            noc_status,
+            noc_status_to_str(noc_status)
         ));
     }
     Ok(())

@@ -142,6 +142,7 @@ enum CommandCommand {
     },
     ListParts {},
     ListBridgedDevices {},
+    ListAttributes {},
     StartCommissioning {
         pin: u32,
 
@@ -366,6 +367,54 @@ async fn bridge_info(connection: &mut controller::Connection) {
         }
     }
 }
+async fn all_attributes(connection: &mut controller::Connection) {
+    let resptlv = connection
+        .read_request2(
+            0,
+            clusters::defs::CLUSTER_ID_DESCRIPTOR,
+            clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+        )
+        .await
+        .unwrap();
+    if let tlv::TlvItemValue::List(l) = resptlv {
+        for part in l {
+            if let tlv::TlvItemValue::Int(v) = part.value {
+                println!("endpoint {}", v);
+                let supported_clusters = connection
+                    .read_request2(v as u16, clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST)
+                    .await
+                    .unwrap();
+                println!("  clusters:");
+                if let tlv::TlvItemValue::List(l) = supported_clusters {
+                    for c in l {
+                        if let tlv::TlvItemValue::Int(cluster) = c.value {
+                            match clusters::names::get_cluster_name(cluster as u32) {
+                                Some(v) => println!("    {}", v),
+                                None => println!("    unknown cluster - id 0x{:x}", v),
+                            }
+                            let attrlist = clusters::codec::get_attribute_list(cluster as u32);
+                            for attr in attrlist {
+                                let out = connection
+                                    .read_request2(
+                                        v as u16,
+                                        cluster as u32,
+                                        attr.0,
+                                    )
+                                    .await;
+                                if let Ok(out) = out {
+                                    println!("      attr 0x{:x} {}: {}", attr.0, attr.1, clusters::codec::decode_attribute_json(cluster as u32, attr.0, &out));
+                                } else {
+                                    //println!("      attr 0x{:x} {}: <read error> {:?}", attr.0, attr.1, out);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 fn command_cmd(
     command: CommandCommand,
@@ -522,6 +571,9 @@ fn command_cmd(
             }
             CommandCommand::ListBridgedDevices {} => {
                 bridge_info(&mut connection).await;
+            }
+            CommandCommand::ListAttributes {} => {
+                all_attributes(&mut connection).await;
             }
             CommandCommand::StartCommissioning { pin, iterations, discriminator, timeout } => {
                 let mut salt = [0; 32];

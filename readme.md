@@ -52,6 +52,8 @@ Use of demo application:
 * example how to use read command to read any attribute. This example lists all provisioned fabrics
   by reading attribute 1(fabrics) from cluster 62 (operational credentials) from endpoint 0:\
   `./demo command read --device-address 192.168.5.70:5540  --controller-id 100 --device-id 300 0 62 1`
+* example which will list all attributes in all clusters for all endpoints supported by device
+  `./demo command list-attributes --device-address 192.168.5.70:5540  --controller-id 100 --device-id 300`
 * turn device on/off:\
   `demo command invoke-command-on --device-address 192.168.5.70:5540 --controller-id 100 --device-id 300`
 

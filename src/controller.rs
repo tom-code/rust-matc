@@ -429,6 +429,7 @@ async fn read_request(
 ) -> Result<Message> {
     let exchange = rand::random();
     let mut retrctx = retransmit::RetrContext::new(connection, session);
+    retrctx.subscribe_exchange(exchange);
     let testm = messages::im_read_request(endpoint, cluster, attr, exchange)?;
     retrctx.send(&testm).await?;
     let result = retrctx.get_next_message().await?;
