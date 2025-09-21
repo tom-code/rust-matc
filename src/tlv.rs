@@ -394,6 +394,14 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 };
                 container.push(item);
             }
+            TYPE_INT_2 => {
+                let value = cursor.read_i16::<LittleEndian>()?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Int(value as u64),
+                };
+                container.push(item);
+            }
             TYPE_INT_4 => {
                 let value = cursor.read_i32::<LittleEndian>()?;
                 let item = TlvItem {
