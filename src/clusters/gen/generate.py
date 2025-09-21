@@ -255,9 +255,9 @@ pub struct {struct_name} {{
             else:
                 # Default to treating as integer
                 field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
-        
+
         assignments_str = "\n".join(field_assignments)
-        
+
         if is_list:
             decode_logic = f'''    let mut res = Vec::new();
     if let tlv::TlvItemValue::List(v) = inp {{
@@ -432,13 +432,13 @@ class AttributeField:
                             # Custom struct with known definition - generate proper decoding
                             target_struct = structs[entry_type]
                             struct_rust_name = target_struct.get_rust_struct_name()
-                            
+
                             # Generate nested field assignments for the target struct
                             nested_assignments = []
                             for nested_id, nested_name, nested_type, nested_entry_type in target_struct.fields:
                                 nested_rust_name = convert_to_snake_case(nested_name)
                                 nested_rust_name = escape_rust_keyword(nested_rust_name)
-                                
+
                                 if is_numeric_or_id_type(nested_type):
                                     nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type))
                                 elif nested_type == 'string':
@@ -452,13 +452,13 @@ class AttributeField:
                                     if nested_entry_type.endswith('Struct') and structs and nested_entry_type in structs:
                                         target_nested_struct = structs[nested_entry_type]
                                         nested_struct_rust_name = target_nested_struct.get_rust_struct_name()
-                                        
+
                                         # Generate nested assignments for the nested struct
                                         nested_nested_assignments = []
                                         for nn_id, nn_name, nn_type, nn_entry_type in target_nested_struct.fields:
                                             nn_rust_name = convert_to_snake_case(nn_name)
                                             nn_rust_name = escape_rust_keyword(nn_rust_name)
-                                            
+
                                             if is_numeric_or_id_type(nn_type):
                                                 nested_nested_assignments.append(build_nested_numeric_assignment(nn_rust_name, nn_id, nn_type, "nested_item"))
                                             elif nn_type == 'string':
@@ -469,7 +469,7 @@ class AttributeField:
                                                 nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_octet_string_owned(&[{nn_id}]),")
                                             else:
                                                 nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_int(&[{nn_id}]).map(|v| v as u8),")
-                                        
+
                                         nested_nested_str = "\n".join(nested_nested_assignments)
                                         nested_assignments.append(f'''                                {nested_rust_name}: {{
                                     if let Some(tlv::TlvItemValue::List(nested_l)) = list_item.get(&[{nested_id}]) {{
@@ -488,9 +488,9 @@ class AttributeField:
                                         nested_assignments.append(f"                                {nested_rust_name}: None, // TODO: Implement {nested_entry_type} nested list")
                                 else:
                                     nested_assignments.append(f"                                {nested_rust_name}: list_item.get_int(&[{nested_id}]).map(|v| v as u8),")
-                            
+
                             nested_assignments_str = "\n".join(nested_assignments)
-                            
+
                             field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
                         let mut items = Vec::new();
@@ -605,13 +605,13 @@ class AttributeField:
                         # Handle nested struct fields in list items
                         nested_struct = structs[field_type]
                         nested_struct_name = nested_struct.get_rust_struct_name()
-                        
+
                         # Generate nested field assignments for the nested struct
                         nested_assignments = []
                         for nested_id, nested_name, nested_type, nested_entry_type in nested_struct.fields:
                             nested_rust_name = convert_to_snake_case(nested_name)
                             nested_rust_name = escape_rust_keyword(nested_rust_name)
-                            
+
                             if is_numeric_or_id_type(nested_type):
                                 nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type, "nested_item"))
                             elif nested_type == 'string':
@@ -644,13 +644,13 @@ class AttributeField:
                                     # List of custom structs (like DatastoreAccessControlTargetStruct)
                                     target_nested_struct = structs[nested_entry_type]
                                     nested_struct_rust_name = target_nested_struct.get_rust_struct_name()
-                                    
+
                                     # Generate nested assignments for the nested struct
                                     nested_nested_assignments = []
                                     for nn_id, nn_name, nn_type, nn_entry_type in target_nested_struct.fields:
                                         nn_rust_name = convert_to_snake_case(nn_name)
                                         nn_rust_name = escape_rust_keyword(nn_rust_name)
-                                        
+
                                         if is_numeric_or_id_type(nn_type):
                                             nested_nested_assignments.append(build_nested_numeric_assignment(nn_rust_name, nn_id, nn_type, "nested_item"))
                                         elif nn_type == 'string':
@@ -661,7 +661,7 @@ class AttributeField:
                                             nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_octet_string_owned(&[{nn_id}]),")
                                         else:
                                             nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_int(&[{nn_id}]).map(|v| v as u8),")
-                                    
+
                                     nested_nested_str = "\n".join(nested_nested_assignments)
                                     nested_assignments.append(f'''                                {nested_rust_name}: {{
                                     if let Some(tlv::TlvItemValue::List(nested_l)) = nested_item.get(&[{nested_id}]) {{
@@ -698,13 +698,13 @@ class AttributeField:
                                 # Handle deeply nested structs (struct within struct within list)
                                 deep_nested_struct = structs[nested_type]
                                 deep_nested_struct_name = deep_nested_struct.get_rust_struct_name()
-                                
+
                                 # Generate deep nested field assignments
                                 deep_nested_assignments = []
                                 for deep_id, deep_name, deep_type, deep_entry_type in deep_nested_struct.fields:
                                     deep_rust_name = convert_to_snake_case(deep_name)
                                     deep_rust_name = escape_rust_keyword(deep_rust_name)
-                                    
+
                                     if is_numeric_or_id_type(deep_type):
                                         deep_nested_assignments.append(build_nested_numeric_assignment(deep_rust_name, deep_id, deep_type, "deep_nested_item"))
                                     elif deep_type == 'string':
@@ -753,9 +753,9 @@ class AttributeField:
                                             }},''')
                                     else:
                                         deep_nested_assignments.append(f"                                                {deep_rust_name}: deep_nested_item.get_int(&[{deep_id}]).map(|v| v as u8),")
-                                
+
                                 deep_nested_assignments_str = "\n".join(deep_nested_assignments)
-                                
+
                                 nested_assignments.append(f'''                                {nested_rust_name}: {{
                                     if let Some(tlv::TlvItemValue::List(_)) = nested_item.get(&[{nested_id}]) {{
                                         if let Some(deep_nested_tlv) = nested_item.get(&[{nested_id}]) {{
@@ -772,9 +772,9 @@ class AttributeField:
                                 }},''')
                             else:
                                 nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_int(&[{nested_id}]).map(|v| v as u8),")
-                        
+
                         nested_assignments_str = "\n".join(nested_assignments)
-                        
+
                         field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(_)) = item.get(&[{field_id}]) {{
                         if let Some(nested_tlv) = item.get(&[{field_id}]) {{
@@ -792,9 +792,9 @@ class AttributeField:
                     else:
                         # Default to treating as integer
                         field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
-                
+
                 assignments_str = "\n".join(field_assignments)
-                
+
                 decode_logic = f'''    let mut res = Vec::new();
     if let tlv::TlvItemValue::List(v) = inp {{
         for item in v {{
@@ -873,32 +873,32 @@ class AttributeField:
             # Single value decoder
             # Initialize tlv_type for all paths
             tlv_type = MatterType.get_tlv_type(self.attr_type)
-            
+
             # Check if this is a custom struct type
             if structs and self.attr_type in structs:
                 # Handle custom struct decoding
                 struct = structs[self.attr_type]
                 struct_name = struct.get_rust_struct_name()
-                
+
                 # Generate field assignments for the struct
                 field_assignments = []
                 for field_id, field_name, field_type, entry_type in struct.fields:
                     rust_field_name = convert_to_snake_case(field_name)
                     rust_field_name = escape_rust_keyword(rust_field_name)  # Escape Rust keywords
-                    
+
                     if field_type == 'list' and entry_type:
                         # Handle list fields within struct
                         if entry_type.endswith('Struct') and structs and entry_type in structs:
                             # Custom struct list - generate proper decoding
                             target_struct = structs[entry_type]
                             struct_rust_name = target_struct.get_rust_struct_name()
-                            
+
                             # Generate nested field assignments for the target struct
                             nested_assignments = []
                             for nested_id, nested_name, nested_type, nested_entry_type in target_struct.fields:
                                 nested_rust_name = convert_to_snake_case(nested_name)
                                 nested_rust_name = escape_rust_keyword(nested_rust_name)
-                                
+
                                 if is_numeric_or_id_type(nested_type):
                                     nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type))
                                 elif nested_type == 'string':
@@ -912,13 +912,13 @@ class AttributeField:
                                     if nested_entry_type.endswith('Struct') and structs and nested_entry_type in structs:
                                         target_nested_struct = structs[nested_entry_type]
                                         nested_struct_rust_name = target_nested_struct.get_rust_struct_name()
-                                        
+
                                         # Generate nested assignments for the nested struct
                                         nested_nested_assignments = []
                                         for nn_id, nn_name, nn_type, nn_entry_type in target_nested_struct.fields:
                                             nn_rust_name = convert_to_snake_case(nn_name)
                                             nn_rust_name = escape_rust_keyword(nn_rust_name)
-                                            
+
                                             if is_numeric_or_id_type(nn_type):
                                                 nested_nested_assignments.append(build_nested_numeric_assignment(nn_rust_name, nn_id, nn_type, "nested_item"))
                                             elif nn_type == 'string':
@@ -929,7 +929,7 @@ class AttributeField:
                                                 nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_octet_string_owned(&[{nn_id}]),")
                                             else:
                                                 nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_int(&[{nn_id}]).map(|v| v as u8),")
-                                        
+
                                         nested_nested_str = "\n".join(nested_nested_assignments)
                                         nested_assignments.append(f'''                                {nested_rust_name}: {{
                                     if let Some(tlv::TlvItemValue::List(nested_l)) = list_item.get(&[{nested_id}]) {{
@@ -948,9 +948,9 @@ class AttributeField:
                                         nested_assignments.append(f"                                {nested_rust_name}: None, // TODO: Implement {nested_entry_type} nested list")
                                 else:
                                     nested_assignments.append(f"                                {nested_rust_name}: list_item.get_int(&[{nested_id}]).map(|v| v as u8),")
-                            
+
                             nested_assignments_str = "\n".join(nested_assignments)
-                            
+
                             field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
                         let mut items = Vec::new();
@@ -1047,13 +1047,13 @@ class AttributeField:
                         # Handle nested struct fields
                         nested_struct = structs[field_type]
                         nested_struct_name = nested_struct.get_rust_struct_name()
-                        
+
                         # Generate nested field assignments for the nested struct
                         nested_assignments = []
                         for nested_id, nested_name, nested_type, nested_entry_type in nested_struct.fields:
                             nested_rust_name = convert_to_snake_case(nested_name)
                             nested_rust_name = escape_rust_keyword(nested_rust_name)
-                            
+
                             if is_numeric_or_id_type(nested_type):
                                 nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type, "nested_item"))
                             elif nested_type == 'string':
@@ -1102,9 +1102,9 @@ class AttributeField:
                                 }},''')
                             else:
                                 nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_int(&[{nested_id}]).map(|v| v as u8),")
-                        
+
                         nested_assignments_str = "\n".join(nested_assignments)
-                        
+
                         field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(_)) = item.get(&[{field_id}]) {{
                         if let Some(nested_tlv) = item.get(&[{field_id}]) {{
@@ -1122,9 +1122,9 @@ class AttributeField:
                     else:
                         # Default to treating as integer
                         field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
-                
+
                 assignments_str = "\n".join(field_assignments)
-                
+
                 if self.nullable:
                     # For nullable structs, handle null values and wrap result in Some()
                     decode_logic = f'''    if let tlv::TlvItemValue::List(_fields) = inp {{
@@ -1632,7 +1632,7 @@ def generate_rust_code(xml_file: str) -> str:
         if attr.attr_type == 'LocationDescriptorStruct':
             location_needed = True
             break
-    
+
     # Also check if any struct field references LocationDescriptorStruct
     if not location_needed:
         for struct in structs.values():
@@ -1642,7 +1642,7 @@ def generate_rust_code(xml_file: str) -> str:
                     break
             if location_needed:
                 break
-    
+
     # Add hardcoded LocationDescriptorStruct if needed and not already defined
     if location_needed and 'LocationDescriptorStruct' not in structs:
         location_struct = MatterStruct('LocationDescriptorStruct')
@@ -1650,10 +1650,10 @@ def generate_rust_code(xml_file: str) -> str:
         location_struct.add_field(1, 'FloorNumber', 'uint16')
         location_struct.add_field(2, 'AreaType', 'uint8')
         structs['LocationDescriptorStruct'] = location_struct
-    
+
     # Generate header
     cluster_name_snake = parser.cluster_name.lower().replace(' ', '_').replace('-', '_')
-    
+
     # Generate imports based on what we're generating
     imports = ""
     # Check if we have commands with fields (not field-less commands)
