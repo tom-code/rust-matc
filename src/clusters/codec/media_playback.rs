@@ -191,26 +191,20 @@ pub fn decode_active_audio_track(inp: &tlv::TlvItemValue) -> anyhow::Result<Opti
         Ok(Some(Track {
                 id: item.get_string_owned(&[0]),
                 track_attributes: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
-                        if let Some(nested_tlv) = item.get(&[1]) {
+                    if let Some(nested_tlv) = item.get(&[1]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
                             Some(TrackAttributes {
-                                language_code: nested_item.get_string_owned(&[0]),
-                                characteristics: {
-                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
-                                        let items: Vec<u8> = l.iter().filter_map(|e| {
-                                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                                Some(*v as u8)
-                                            } else {
-                                                None
-                                            }
-                                        }).collect();
-                                        Some(items)
-                                    } else {
-                                        None
-                                    }
-                                },
-                                display_name: nested_item.get_string_owned(&[2]),
+                language_code: nested_item.get_string_owned(&[0]),
+                characteristics: {
+                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                display_name: nested_item.get_string_owned(&[2]),
                             })
                         } else {
                             None
@@ -237,26 +231,20 @@ pub fn decode_available_audio_tracks(inp: &tlv::TlvItemValue) -> anyhow::Result<
             res.push(Track {
                 id: item.get_string_owned(&[0]),
                 track_attributes: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
-                        if let Some(nested_tlv) = item.get(&[1]) {
+                    if let Some(nested_tlv) = item.get(&[1]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
                             Some(TrackAttributes {
-                                language_code: nested_item.get_string_owned(&[0]),
-                                characteristics: {
-                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
-                                        let items: Vec<u8> = l.iter().filter_map(|e| {
-                                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                                Some(*v as u8)
-                                            } else {
-                                                None
-                                            }
-                                        }).collect();
-                                        Some(items)
-                                    } else {
-                                        None
-                                    }
-                                },
-                                display_name: nested_item.get_string_owned(&[2]),
+                language_code: nested_item.get_string_owned(&[0]),
+                characteristics: {
+                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                display_name: nested_item.get_string_owned(&[2]),
                             })
                         } else {
                             None
@@ -279,26 +267,20 @@ pub fn decode_active_text_track(inp: &tlv::TlvItemValue) -> anyhow::Result<Optio
         Ok(Some(Track {
                 id: item.get_string_owned(&[0]),
                 track_attributes: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
-                        if let Some(nested_tlv) = item.get(&[1]) {
+                    if let Some(nested_tlv) = item.get(&[1]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
                             Some(TrackAttributes {
-                                language_code: nested_item.get_string_owned(&[0]),
-                                characteristics: {
-                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
-                                        let items: Vec<u8> = l.iter().filter_map(|e| {
-                                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                                Some(*v as u8)
-                                            } else {
-                                                None
-                                            }
-                                        }).collect();
-                                        Some(items)
-                                    } else {
-                                        None
-                                    }
-                                },
-                                display_name: nested_item.get_string_owned(&[2]),
+                language_code: nested_item.get_string_owned(&[0]),
+                characteristics: {
+                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                display_name: nested_item.get_string_owned(&[2]),
                             })
                         } else {
                             None
@@ -325,26 +307,20 @@ pub fn decode_available_text_tracks(inp: &tlv::TlvItemValue) -> anyhow::Result<V
             res.push(Track {
                 id: item.get_string_owned(&[0]),
                 track_attributes: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
-                        if let Some(nested_tlv) = item.get(&[1]) {
+                    if let Some(nested_tlv) = item.get(&[1]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
                             Some(TrackAttributes {
-                                language_code: nested_item.get_string_owned(&[0]),
-                                characteristics: {
-                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
-                                        let items: Vec<u8> = l.iter().filter_map(|e| {
-                                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                                Some(*v as u8)
-                                            } else {
-                                                None
-                                            }
-                                        }).collect();
-                                        Some(items)
-                                    } else {
-                                        None
-                                    }
-                                },
-                                display_name: nested_item.get_string_owned(&[2]),
+                language_code: nested_item.get_string_owned(&[0]),
+                characteristics: {
+                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                display_name: nested_item.get_string_owned(&[2]),
                             })
                         } else {
                             None

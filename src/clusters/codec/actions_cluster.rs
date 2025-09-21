@@ -210,13 +210,7 @@ pub fn decode_endpoint_lists(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Endp
                 type_: item.get_int(&[2]).map(|v| v as u8),
                 endpoints: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[3]) {
-                        let items: Vec<u16> = l.iter().filter_map(|e| {
-                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                Some(*v as u16)
-                            } else {
-                                None
-                            }
-                        }).collect();
+                        let items: Vec<u16> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u16) } else { None } }).collect();
                         Some(items)
                     } else {
                         None

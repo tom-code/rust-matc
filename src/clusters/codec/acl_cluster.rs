@@ -75,13 +75,7 @@ pub fn decode_acl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<AccessControlEn
                 auth_mode: item.get_int(&[2]).map(|v| v as u8),
                 subjects: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[3]) {
-                        let items: Vec<u64> = l.iter().filter_map(|e| {
-                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                Some(*v)
-                            } else {
-                                None
-                            }
-                        }).collect();
+                        let items: Vec<u64> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v) } else { None } }).collect();
                         Some(items)
                     } else {
                         None
@@ -92,9 +86,9 @@ pub fn decode_acl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<AccessControlEn
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(AccessControlTarget {
-                                cluster: list_item.get_int(&[0]).map(|v| v as u32),
-                                endpoint: list_item.get_int(&[1]).map(|v| v as u16),
-                                device_type: list_item.get_int(&[2]).map(|v| v as u32),
+                cluster: list_item.get_int(&[0]).map(|v| v as u32),
+                endpoint: list_item.get_int(&[1]).map(|v| v as u16),
+                device_type: list_item.get_int(&[2]).map(|v| v as u32),
                             });
                         }
                         Some(items)
@@ -161,8 +155,8 @@ pub fn decode_commissioning_arl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<C
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(AccessRestriction {
-                                type_: list_item.get_int(&[0]).map(|v| v as u8),
-                                id: list_item.get_int(&[1]).map(|v| v as u32),
+                type_: list_item.get_int(&[0]).map(|v| v as u8),
+                id: list_item.get_int(&[1]).map(|v| v as u32),
                             });
                         }
                         Some(items)
@@ -189,8 +183,8 @@ pub fn decode_arl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<AccessRestricti
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(AccessRestriction {
-                                type_: list_item.get_int(&[0]).map(|v| v as u8),
-                                id: list_item.get_int(&[1]).map(|v| v as u32),
+                type_: list_item.get_int(&[0]).map(|v| v as u8),
+                id: list_item.get_int(&[1]).map(|v| v as u32),
                             });
                         }
                         Some(items)

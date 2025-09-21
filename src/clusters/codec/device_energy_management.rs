@@ -205,10 +205,10 @@ pub fn decode_power_adjustment_capability(inp: &tlv::TlvItemValue) -> anyhow::Re
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(PowerAdjust {
-                                min_power: list_item.get_int(&[0]).map(|v| v as u8),
-                                max_power: list_item.get_int(&[1]).map(|v| v as u8),
-                                min_duration: list_item.get_int(&[2]).map(|v| v as u8),
-                                max_duration: list_item.get_int(&[3]).map(|v| v as u8),
+                min_power: list_item.get_int(&[0]).map(|v| v as u8),
+                max_power: list_item.get_int(&[1]).map(|v| v as u8),
+                min_duration: list_item.get_int(&[2]).map(|v| v as u8),
+                max_duration: list_item.get_int(&[3]).map(|v| v as u8),
                             });
                         }
                         Some(items)
@@ -245,39 +245,39 @@ pub fn decode_forecast(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Forecas
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(Slot {
-                                min_duration: list_item.get_int(&[0]).map(|v| v as u8),
-                                max_duration: list_item.get_int(&[1]).map(|v| v as u8),
-                                default_duration: list_item.get_int(&[2]).map(|v| v as u8),
-                                elapsed_slot_time: list_item.get_int(&[3]).map(|v| v as u8),
-                                remaining_slot_time: list_item.get_int(&[4]).map(|v| v as u8),
-                                slot_is_pausable: list_item.get_bool(&[5]),
-                                min_pause_duration: list_item.get_int(&[6]).map(|v| v as u8),
-                                max_pause_duration: list_item.get_int(&[7]).map(|v| v as u8),
-                                manufacturer_esa_state: list_item.get_int(&[8]).map(|v| v as u16),
-                                nominal_power: list_item.get_int(&[9]).map(|v| v as u8),
-                                min_power: list_item.get_int(&[10]).map(|v| v as u8),
-                                max_power: list_item.get_int(&[11]).map(|v| v as u8),
-                                nominal_energy: list_item.get_int(&[12]).map(|v| v as u8),
-                                costs: {
-                                    if let Some(tlv::TlvItemValue::List(nested_l)) = list_item.get(&[13]) {
-                                        let mut nested_items = Vec::new();
-                                        for nested_item in nested_l {
-                                            nested_items.push(Cost {
-                                        cost_type: nested_item.get_int(&[0]).map(|v| v as u8),
-                                value: nested_item.get_int(&[1]).map(|v| v as i32),
-                                decimal_points: nested_item.get_int(&[2]).map(|v| v as u8),
-                                currency: nested_item.get_int(&[3]).map(|v| v as u16),
-                                            });
-                                        }
-                                        Some(nested_items)
-                                    } else {
-                                        None
-                                    }
-                                },
-                                min_power_adjustment: list_item.get_int(&[14]).map(|v| v as u8),
-                                max_power_adjustment: list_item.get_int(&[15]).map(|v| v as u8),
-                                min_duration_adjustment: list_item.get_int(&[16]).map(|v| v as u8),
-                                max_duration_adjustment: list_item.get_int(&[17]).map(|v| v as u8),
+                min_duration: list_item.get_int(&[0]).map(|v| v as u8),
+                max_duration: list_item.get_int(&[1]).map(|v| v as u8),
+                default_duration: list_item.get_int(&[2]).map(|v| v as u8),
+                elapsed_slot_time: list_item.get_int(&[3]).map(|v| v as u8),
+                remaining_slot_time: list_item.get_int(&[4]).map(|v| v as u8),
+                slot_is_pausable: list_item.get_bool(&[5]),
+                min_pause_duration: list_item.get_int(&[6]).map(|v| v as u8),
+                max_pause_duration: list_item.get_int(&[7]).map(|v| v as u8),
+                manufacturer_esa_state: list_item.get_int(&[8]).map(|v| v as u16),
+                nominal_power: list_item.get_int(&[9]).map(|v| v as u8),
+                min_power: list_item.get_int(&[10]).map(|v| v as u8),
+                max_power: list_item.get_int(&[11]).map(|v| v as u8),
+                nominal_energy: list_item.get_int(&[12]).map(|v| v as u8),
+                costs: {
+                    if let Some(tlv::TlvItemValue::List(l)) = list_item.get(&[13]) {
+                        let mut items = Vec::new();
+                        for list_item in l {
+                            items.push(Cost {
+                cost_type: list_item.get_int(&[0]).map(|v| v as u8),
+                value: list_item.get_int(&[1]).map(|v| v as i32),
+                decimal_points: list_item.get_int(&[2]).map(|v| v as u8),
+                currency: list_item.get_int(&[3]).map(|v| v as u16),
+                            });
+                        }
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                min_power_adjustment: list_item.get_int(&[14]).map(|v| v as u8),
+                max_power_adjustment: list_item.get_int(&[15]).map(|v| v as u8),
+                min_duration_adjustment: list_item.get_int(&[16]).map(|v| v as u8),
+                max_duration_adjustment: list_item.get_int(&[17]).map(|v| v as u8),
                             });
                         }
                         Some(items)

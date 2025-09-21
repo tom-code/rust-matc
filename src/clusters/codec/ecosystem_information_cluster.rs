@@ -58,8 +58,8 @@ pub fn decode_device_directory(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Ec
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(DeviceType {
-                                device_type: list_item.get_int(&[0]).map(|v| v as u32),
-                                revision: list_item.get_int(&[1]).map(|v| v as u16),
+                device_type: list_item.get_int(&[0]).map(|v| v as u32),
+                revision: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -69,13 +69,7 @@ pub fn decode_device_directory(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Ec
                 },
                 unique_location_i_ds: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[5]) {
-                        let items: Vec<String> = l.iter().filter_map(|e| {
-                            if let tlv::TlvItemValue::String(v) = &e.value {
-                                Some(v.clone())
-                            } else {
-                                None
-                            }
-                        }).collect();
+                        let items: Vec<String> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::String(v) = &e.value { Some(v.clone()) } else { None } }).collect();
                         Some(items)
                     } else {
                         None
@@ -96,13 +90,13 @@ pub fn decode_location_directory(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<
             res.push(EcosystemLocation {
                 unique_location_id: item.get_string_owned(&[0]),
                 location_descriptor: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
-                        if let Some(nested_tlv) = item.get(&[1]) {
+                    if let Some(nested_tlv) = item.get(&[1]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
                             Some(LocationDescriptor {
-                                location_name: nested_item.get_string_owned(&[0]),
-                                floor_number: nested_item.get_int(&[1]).map(|v| v as u16),
-                                area_type: nested_item.get_int(&[2]).map(|v| v as u8),
+                location_name: nested_item.get_string_owned(&[0]),
+                floor_number: nested_item.get_int(&[1]).map(|v| v as u16),
+                area_type: nested_item.get_int(&[2]).map(|v| v as u8),
                             })
                         } else {
                             None

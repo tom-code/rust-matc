@@ -51,8 +51,8 @@ pub fn decode_supported_modes(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Mod
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(ModeTag {
-                                mfg_code: list_item.get_int(&[0]).map(|v| v as u16),
-                                value: list_item.get_int(&[1]).map(|v| v as u8),
+                mfg_code: list_item.get_int(&[0]).map(|v| v as u16),
+                value: list_item.get_int(&[1]).map(|v| v as u8),
                             });
                         }
                         Some(items)

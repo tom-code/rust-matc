@@ -107,13 +107,7 @@ pub fn decode_group_table(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<GroupIn
                 group_id: item.get_int(&[1]).map(|v| v as u8),
                 endpoints: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[2]) {
-                        let items: Vec<u16> = l.iter().filter_map(|e| {
-                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                Some(*v as u16)
-                            } else {
-                                None
-                            }
-                        }).collect();
+                        let items: Vec<u16> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u16) } else { None } }).collect();
                         Some(items)
                     } else {
                         None

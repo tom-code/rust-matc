@@ -80,12 +80,12 @@ pub fn decode_current_app(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Appl
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(Some(ApplicationEP {
                 application: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[0]) {
-                        if let Some(nested_tlv) = item.get(&[0]) {
+                    if let Some(nested_tlv) = item.get(&[0]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 0, value: nested_tlv.clone() };
                             Some(Application {
-                                catalog_vendor_id: nested_item.get_int(&[0]).map(|v| v as u16),
-                                application_id: nested_item.get_string_owned(&[1]),
+                catalog_vendor_id: nested_item.get_int(&[0]).map(|v| v as u16),
+                application_id: nested_item.get_string_owned(&[1]),
                             })
                         } else {
                             None

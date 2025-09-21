@@ -683,12 +683,12 @@ pub fn decode_schedules(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Schedule>
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(ScheduleTransition {
-                                day_of_week: list_item.get_int(&[0]).map(|v| v as u8),
-                                transition_time: list_item.get_int(&[1]).map(|v| v as u16),
-                                preset_handle: list_item.get_octet_string_owned(&[2]),
-                                system_mode: list_item.get_int(&[3]).map(|v| v as u8),
-                                cooling_setpoint: list_item.get_int(&[4]).map(|v| v as u8),
-                                heating_setpoint: list_item.get_int(&[5]).map(|v| v as u8),
+                day_of_week: list_item.get_int(&[0]).map(|v| v as u8),
+                transition_time: list_item.get_int(&[1]).map(|v| v as u16),
+                preset_handle: list_item.get_octet_string_owned(&[2]),
+                system_mode: list_item.get_int(&[3]).map(|v| v as u8),
+                cooling_setpoint: list_item.get_int(&[4]).map(|v| v as u8),
+                heating_setpoint: list_item.get_int(&[5]).map(|v| v as u8),
                             });
                         }
                         Some(items)

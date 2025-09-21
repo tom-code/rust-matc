@@ -76,8 +76,8 @@ pub fn decode_messages(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Message>> 
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(MessageResponseOption {
-                                message_response_id: list_item.get_int(&[0]).map(|v| v as u32),
-                                label: list_item.get_string_owned(&[1]),
+                message_response_id: list_item.get_int(&[0]).map(|v| v as u32),
+                label: list_item.get_string_owned(&[1]),
                             });
                         }
                         Some(items)

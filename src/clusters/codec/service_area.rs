@@ -85,41 +85,41 @@ pub fn decode_supported_areas(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Are
                 area_id: item.get_int(&[0]).map(|v| v as u32),
                 map_id: item.get_int(&[1]).map(|v| v as u32),
                 area_info: {
-                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[2]) {
-                        if let Some(nested_tlv) = item.get(&[2]) {
+                    if let Some(nested_tlv) = item.get(&[2]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
                             Some(AreaInfo {
-                                location_info: {
-                                    if let Some(tlv::TlvItemValue::List(_)) = nested_item.get(&[0]) {
-                                        if let Some(deep_nested_tlv) = nested_item.get(&[0]) {
-                                            let deep_nested_item = tlv::TlvItem { tag: 0, value: deep_nested_tlv.clone() };
-                                            Some(LocationDescriptor {
-                                                location_name: deep_nested_item.get_string_owned(&[0]),
-                                floor_number: deep_nested_item.get_int(&[1]).map(|v| v as u16),
-                                area_type: deep_nested_item.get_int(&[2]).map(|v| v as u8),
-                                            })
-                                        } else {
-                                            None
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                },
-                                landmark_info: {
-                                    if let Some(tlv::TlvItemValue::List(_)) = nested_item.get(&[1]) {
-                                        if let Some(deep_nested_tlv) = nested_item.get(&[1]) {
-                                            let deep_nested_item = tlv::TlvItem { tag: 1, value: deep_nested_tlv.clone() };
-                                            Some(LandmarkInfo {
-                                                landmark_tag: deep_nested_item.get_int(&[0]).map(|v| v as u8),
-                                                relative_position_tag: deep_nested_item.get_int(&[1]).map(|v| v as u8),
-                                            })
-                                        } else {
-                                            None
-                                        }
-                                    } else {
-                                        None
-                                    }
-                                },
+                location_info: {
+                    if let Some(nested_tlv) = nested_item.get(&[0]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
+                            let nested_item = tlv::TlvItem { tag: 0, value: nested_tlv.clone() };
+                            Some(LocationDescriptor {
+                location_name: nested_item.get_string_owned(&[0]),
+                floor_number: nested_item.get_int(&[1]).map(|v| v as u16),
+                area_type: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+                landmark_info: {
+                    if let Some(nested_tlv) = nested_item.get(&[1]) {
+                        if let tlv::TlvItemValue::List(_) = nested_tlv {
+                            let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
+                            Some(LandmarkInfo {
+                landmark_tag: nested_item.get_int(&[0]).map(|v| v as u8),
+                relative_position_tag: nested_item.get_int(&[1]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
                             })
                         } else {
                             None

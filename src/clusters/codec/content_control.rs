@@ -297,10 +297,10 @@ pub fn decode_block_content_time_window(inp: &tlv::TlvItemValue) -> anyhow::Resu
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TimePeriod {
-                                start_hour: list_item.get_int(&[0]).map(|v| v as u8),
-                                start_minute: list_item.get_int(&[1]).map(|v| v as u8),
-                                end_hour: list_item.get_int(&[2]).map(|v| v as u8),
-                                end_minute: list_item.get_int(&[3]).map(|v| v as u8),
+                start_hour: list_item.get_int(&[0]).map(|v| v as u8),
+                start_minute: list_item.get_int(&[1]).map(|v| v as u8),
+                end_hour: list_item.get_int(&[2]).map(|v| v as u8),
+                end_minute: list_item.get_int(&[3]).map(|v| v as u8),
                             });
                         }
                         Some(items)

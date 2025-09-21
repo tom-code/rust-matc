@@ -64,13 +64,7 @@ pub fn decode_network_interfaces(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<
                 hardware_address: item.get_int(&[4]).map(|v| v as u8),
                 i_pv4_addresses: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[5]) {
-                        let items: Vec<u8> = l.iter().filter_map(|e| {
-                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                Some(*v as u8)
-                            } else {
-                                None
-                            }
-                        }).collect();
+                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
                         Some(items)
                     } else {
                         None
@@ -78,13 +72,7 @@ pub fn decode_network_interfaces(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<
                 },
                 i_pv6_addresses: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[6]) {
-                        let items: Vec<u8> = l.iter().filter_map(|e| {
-                            if let tlv::TlvItemValue::Int(v) = &e.value {
-                                Some(*v as u8)
-                            } else {
-                                None
-                            }
-                        }).collect();
+                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
                         Some(items)
                     } else {
                         None
