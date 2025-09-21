@@ -39,47 +39,106 @@ pub fn decode_accuracy(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
 }
 
 /// Decode CumulativeEnergyImported attribute (0x0001)
-pub fn decode_cumulative_energy_imported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_cumulative_energy_imported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<EnergyMeasurement>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(EnergyMeasurement {
+                energy: item.get_int(&[0]).map(|v| v as u8),
+                start_timestamp: item.get_int(&[1]),
+                end_timestamp: item.get_int(&[2]),
+                start_systime: item.get_int(&[3]).map(|v| v as u8),
+                end_systime: item.get_int(&[4]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
 /// Decode CumulativeEnergyExported attribute (0x0002)
-pub fn decode_cumulative_energy_exported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_cumulative_energy_exported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<EnergyMeasurement>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(EnergyMeasurement {
+                energy: item.get_int(&[0]).map(|v| v as u8),
+                start_timestamp: item.get_int(&[1]),
+                end_timestamp: item.get_int(&[2]),
+                start_systime: item.get_int(&[3]).map(|v| v as u8),
+                end_systime: item.get_int(&[4]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
 /// Decode PeriodicEnergyImported attribute (0x0003)
-pub fn decode_periodic_energy_imported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_periodic_energy_imported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<EnergyMeasurement>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(EnergyMeasurement {
+                energy: item.get_int(&[0]).map(|v| v as u8),
+                start_timestamp: item.get_int(&[1]),
+                end_timestamp: item.get_int(&[2]),
+                start_systime: item.get_int(&[3]).map(|v| v as u8),
+                end_systime: item.get_int(&[4]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
 /// Decode PeriodicEnergyExported attribute (0x0004)
-pub fn decode_periodic_energy_exported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_periodic_energy_exported(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<EnergyMeasurement>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(EnergyMeasurement {
+                energy: item.get_int(&[0]).map(|v| v as u8),
+                start_timestamp: item.get_int(&[1]),
+                end_timestamp: item.get_int(&[2]),
+                start_systime: item.get_int(&[3]).map(|v| v as u8),
+                end_systime: item.get_int(&[4]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
 /// Decode CumulativeEnergyReset attribute (0x0005)
-pub fn decode_cumulative_energy_reset(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_cumulative_energy_reset(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<CumulativeEnergyReset>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(CumulativeEnergyReset {
+                imported_reset_timestamp: item.get_int(&[0]),
+                exported_reset_timestamp: item.get_int(&[1]),
+                imported_reset_systime: item.get_int(&[2]).map(|v| v as u8),
+                exported_reset_systime: item.get_int(&[3]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 

@@ -23,8 +23,8 @@ pub struct ChannelInfo {
 
 #[derive(Debug, serde::Serialize)]
 pub struct ChannelPaging {
-    pub previous_token: Option<u8>,
-    pub next_token: Option<u8>,
+    pub previous_token: Option<PageToken>,
+    pub next_token: Option<PageToken>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -57,7 +57,7 @@ pub struct ProgramCategory {
 #[derive(Debug, serde::Serialize)]
 pub struct Program {
     pub identifier: Option<String>,
-    pub channel: Option<u8>,
+    pub channel: Option<ChannelInfo>,
     pub start_time: Option<u64>,
     pub end_time: Option<u64>,
     pub title: Option<String>,
@@ -71,7 +71,7 @@ pub struct Program {
     pub release_date: Option<String>,
     pub parental_guidance_text: Option<String>,
     pub recording_flag: Option<u8>,
-    pub series_info: Option<u8>,
+    pub series_info: Option<SeriesInfo>,
     pub category_list: Option<Vec<ProgramCategory>>,
     pub cast_list: Option<Vec<ProgramCast>>,
 }
@@ -185,20 +185,45 @@ pub fn decode_channel_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Channe
 }
 
 /// Decode Lineup attribute (0x0001)
-pub fn decode_lineup(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_lineup(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<LineupInfo>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(LineupInfo {
+                operator_name: item.get_string_owned(&[0]),
+                lineup_name: item.get_string_owned(&[1]),
+                postal_code: item.get_string_owned(&[2]),
+                lineup_info_type: item.get_int(&[3]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
 /// Decode CurrentChannel attribute (0x0002)
-pub fn decode_current_channel(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_current_channel(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<ChannelInfo>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(ChannelInfo {
+                major_number: item.get_int(&[0]).map(|v| v as u16),
+                minor_number: item.get_int(&[1]).map(|v| v as u16),
+                name: item.get_string_owned(&[2]),
+                call_sign: item.get_string_owned(&[3]),
+                affiliate_call_sign: item.get_string_owned(&[4]),
+                identifier: item.get_string_owned(&[5]),
+                type_: item.get_int(&[6]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 

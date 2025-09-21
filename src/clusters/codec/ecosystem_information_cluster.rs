@@ -30,8 +30,15 @@ pub struct EcosystemDevice {
 #[derive(Debug, serde::Serialize)]
 pub struct EcosystemLocation {
     pub unique_location_id: Option<String>,
-    pub location_descriptor: Option<u8>,
+    pub location_descriptor: Option<LocationDescriptor>,
     pub location_descriptor_last_edit: Option<u8>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct LocationDescriptor {
+    pub location_name: Option<String>,
+    pub floor_number: Option<u16>,
+    pub area_type: Option<u8>,
 }
 
 // Attribute decoders
@@ -88,7 +95,22 @@ pub fn decode_location_directory(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<
         for item in v {
             res.push(EcosystemLocation {
                 unique_location_id: item.get_string_owned(&[0]),
-                location_descriptor: item.get_int(&[1]).map(|v| v as u8),
+                location_descriptor: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
+                        if let Some(nested_tlv) = item.get(&[1]) {
+                            let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
+                            Some(LocationDescriptor {
+                                location_name: nested_item.get_string_owned(&[0]),
+                                floor_number: nested_item.get_int(&[1]).map(|v| v as u16),
+                                area_type: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
                 location_descriptor_last_edit: item.get_int(&[2]).map(|v| v as u8),
             });
         }

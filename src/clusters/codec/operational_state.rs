@@ -82,11 +82,17 @@ pub fn decode_operational_state(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
 }
 
 /// Decode OperationalError attribute (0x0005)
-pub fn decode_operational_error(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_operational_error(inp: &tlv::TlvItemValue) -> anyhow::Result<ErrorState> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(ErrorState {
+                error_state_id: item.get_int(&[0]).map(|v| v as u8),
+                error_state_label: item.get_string_owned(&[1]),
+                error_state_details: item.get_string_owned(&[2]),
+        })
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 

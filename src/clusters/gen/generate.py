@@ -140,7 +140,7 @@ class MatterStruct:
         words = re.findall(r'[A-Z][a-z]*', name)
         return ''.join(words) if words else name
     
-    def generate_rust_struct(self) -> str:
+    def generate_rust_struct(self, structs: Dict[str, 'MatterStruct'] = None) -> str:
         """Generate Rust struct definition."""
         struct_name = self.get_rust_struct_name()
         
@@ -160,6 +160,15 @@ class MatterStruct:
                     # Primitive type or known type
                     entry_rust_type = MatterType.get_rust_type(entry_type)
                     rust_type = f"Vec<{entry_rust_type}>"
+            elif field_type.endswith('Struct'):
+                # Handle custom struct type
+                if structs and field_type in structs:
+                    # Use the struct's rust name
+                    rust_type = structs[field_type].get_rust_struct_name()
+                else:
+                    # Fallback: convert struct name
+                    rust_type = field_type.replace('Struct', '')
+                    rust_type = ''.join(word.capitalize() for word in re.findall(r'[A-Z][a-z]*', rust_type))
             else:
                 rust_type = MatterType.get_rust_type(field_type)
             
@@ -387,10 +396,17 @@ class AttributeField:
                 # Default to Vec<String> for unknown list types
                 return "Vec<String>"
         else:
-            rust_type = MatterType.get_rust_type(self.attr_type)
-            if self.nullable:
-                return f"Option<{rust_type}>"
-            return rust_type
+            # Check if it's a custom struct
+            if structs and self.attr_type in structs:
+                struct_name = structs[self.attr_type].get_rust_struct_name()
+                if self.nullable:
+                    return f"Option<{struct_name}>"
+                return struct_name
+            else:
+                rust_type = MatterType.get_rust_type(self.attr_type)
+                if self.nullable:
+                    return f"Option<{rust_type}>"
+                return rust_type
     
     def generate_decode_function(self, structs: Dict[str, MatterStruct] = None) -> str:
         """Generate Rust decode function for this attribute."""
@@ -431,6 +447,45 @@ class AttributeField:
                                     nested_assignments.append(f"                                {nested_rust_name}: list_item.get_bool(&[{nested_id}]),")
                                 elif nested_type == 'octstr':
                                     nested_assignments.append(f"                                {nested_rust_name}: list_item.get_octet_string_owned(&[{nested_id}]),")
+                                elif nested_type == 'list' and nested_entry_type:
+                                    # Handle nested list fields with custom struct entries
+                                    if nested_entry_type.endswith('Struct') and structs and nested_entry_type in structs:
+                                        target_nested_struct = structs[nested_entry_type]
+                                        nested_struct_rust_name = target_nested_struct.get_rust_struct_name()
+                                        
+                                        # Generate nested assignments for the nested struct
+                                        nested_nested_assignments = []
+                                        for nn_id, nn_name, nn_type, nn_entry_type in target_nested_struct.fields:
+                                            nn_rust_name = convert_to_snake_case(nn_name)
+                                            nn_rust_name = escape_rust_keyword(nn_rust_name)
+                                            
+                                            if is_numeric_or_id_type(nn_type):
+                                                nested_nested_assignments.append(build_nested_numeric_assignment(nn_rust_name, nn_id, nn_type, "nested_item"))
+                                            elif nn_type == 'string':
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_string_owned(&[{nn_id}]),")
+                                            elif nn_type == 'bool':
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_bool(&[{nn_id}]),")
+                                            elif nn_type == 'octstr':
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_octet_string_owned(&[{nn_id}]),")
+                                            else:
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_int(&[{nn_id}]).map(|v| v as u8),")
+                                        
+                                        nested_nested_str = "\n".join(nested_nested_assignments)
+                                        nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(nested_l)) = list_item.get(&[{nested_id}]) {{
+                                        let mut nested_items = Vec::new();
+                                        for nested_item in nested_l {{
+                                            nested_items.push({nested_struct_rust_name} {{
+{nested_nested_str}
+                                            }});
+                                        }}
+                                        Some(nested_items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                                    else:
+                                        nested_assignments.append(f"                                {nested_rust_name}: None, // TODO: Implement {nested_entry_type} nested list")
                                 else:
                                     nested_assignments.append(f"                                {nested_rust_name}: list_item.get_int(&[{nested_id}]).map(|v| v as u8),")
                             
@@ -543,6 +598,197 @@ class AttributeField:
                         field_assignments.append(f"                {rust_field_name}: item.get_bool(&[{field_id}]),")
                     elif field_type == 'octstr':
                         field_assignments.append(f"                {rust_field_name}: item.get_octet_string_owned(&[{field_id}]),")
+                    elif field_type.endswith('Enum'):
+                        # Handle enum fields as integers
+                        field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
+                    elif field_type.endswith('Struct') and structs and field_type in structs:
+                        # Handle nested struct fields in list items
+                        nested_struct = structs[field_type]
+                        nested_struct_name = nested_struct.get_rust_struct_name()
+                        
+                        # Generate nested field assignments for the nested struct
+                        nested_assignments = []
+                        for nested_id, nested_name, nested_type, nested_entry_type in nested_struct.fields:
+                            nested_rust_name = convert_to_snake_case(nested_name)
+                            nested_rust_name = escape_rust_keyword(nested_rust_name)
+                            
+                            if is_numeric_or_id_type(nested_type):
+                                nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type, "nested_item"))
+                            elif nested_type == 'string':
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_string_owned(&[{nested_id}]),")
+                            elif nested_type == 'bool':
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_bool(&[{nested_id}]),")
+                            elif nested_type == 'octstr':
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_octet_string_owned(&[{nested_id}]),")
+                            elif nested_type.endswith('Enum'):
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_int(&[{nested_id}]).map(|v| v as u8),")
+                            elif nested_type == 'list' and nested_entry_type:
+                                # Handle list fields in nested structs
+                                if nested_entry_type.endswith('Enum'):
+                                    # List of enums (like CharacteristicEnum)
+                                    nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[{nested_id}]) {{
+                                        let items: Vec<u8> = l.iter().filter_map(|e| {{
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                                Some(*v as u8)
+                                            }} else {{
+                                                None
+                                            }}
+                                        }}).collect();
+                                        Some(items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                                elif nested_entry_type.endswith('Struct') and structs and nested_entry_type in structs:
+                                    # List of custom structs (like DatastoreAccessControlTargetStruct)
+                                    target_nested_struct = structs[nested_entry_type]
+                                    nested_struct_rust_name = target_nested_struct.get_rust_struct_name()
+                                    
+                                    # Generate nested assignments for the nested struct
+                                    nested_nested_assignments = []
+                                    for nn_id, nn_name, nn_type, nn_entry_type in target_nested_struct.fields:
+                                        nn_rust_name = convert_to_snake_case(nn_name)
+                                        nn_rust_name = escape_rust_keyword(nn_rust_name)
+                                        
+                                        if is_numeric_or_id_type(nn_type):
+                                            nested_nested_assignments.append(build_nested_numeric_assignment(nn_rust_name, nn_id, nn_type, "nested_item"))
+                                        elif nn_type == 'string':
+                                            nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_string_owned(&[{nn_id}]),")
+                                        elif nn_type == 'bool':
+                                            nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_bool(&[{nn_id}]),")
+                                        elif nn_type == 'octstr':
+                                            nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_octet_string_owned(&[{nn_id}]),")
+                                        else:
+                                            nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_int(&[{nn_id}]).map(|v| v as u8),")
+                                    
+                                    nested_nested_str = "\n".join(nested_nested_assignments)
+                                    nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(nested_l)) = nested_item.get(&[{nested_id}]) {{
+                                        let mut nested_items = Vec::new();
+                                        for nested_item in nested_l {{
+                                            nested_items.push({nested_struct_rust_name} {{
+{nested_nested_str}
+                                            }});
+                                        }}
+                                        Some(nested_items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                                else:
+                                    # Other list types
+                                    rust_type = MatterType.get_rust_type(nested_entry_type)
+                                    cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
+                                    nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[{nested_id}]) {{
+                                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                                Some({cast_expr})
+                                            }} else {{
+                                                None
+                                            }}
+                                        }}).collect();
+                                        Some(items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                            elif nested_type.endswith('Struct') and structs and nested_type in structs:
+                                # Handle deeply nested structs (struct within struct within list)
+                                deep_nested_struct = structs[nested_type]
+                                deep_nested_struct_name = deep_nested_struct.get_rust_struct_name()
+                                
+                                # Generate deep nested field assignments
+                                deep_nested_assignments = []
+                                for deep_id, deep_name, deep_type, deep_entry_type in deep_nested_struct.fields:
+                                    deep_rust_name = convert_to_snake_case(deep_name)
+                                    deep_rust_name = escape_rust_keyword(deep_rust_name)
+                                    
+                                    if is_numeric_or_id_type(deep_type):
+                                        deep_nested_assignments.append(build_nested_numeric_assignment(deep_rust_name, deep_id, deep_type, "deep_nested_item"))
+                                    elif deep_type == 'string':
+                                        deep_nested_assignments.append(f"                                                {deep_rust_name}: deep_nested_item.get_string_owned(&[{deep_id}]),")
+                                    elif deep_type == 'bool':
+                                        deep_nested_assignments.append(f"                                                {deep_rust_name}: deep_nested_item.get_bool(&[{deep_id}]),")
+                                    elif deep_type == 'octstr':
+                                        deep_nested_assignments.append(f"                                                {deep_rust_name}: deep_nested_item.get_octet_string_owned(&[{deep_id}]),")
+                                    elif deep_type.endswith('Enum'):
+                                        deep_nested_assignments.append(f"                                                {deep_rust_name}: deep_nested_item.get_int(&[{deep_id}]).map(|v| v as u8),")
+                                    elif deep_type == 'list' and deep_entry_type:
+                                        # Handle list fields in deeply nested structs
+                                        if deep_entry_type.endswith('Enum'):
+                                            # List of enums
+                                            deep_nested_assignments.append(f'''                                                {deep_rust_name}: {{
+                                                if let Some(tlv::TlvItemValue::List(l)) = deep_nested_item.get(&[{deep_id}]) {{
+                                                    let items: Vec<u8> = l.iter().filter_map(|e| {{
+                                                        if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                                            Some(*v as u8)
+                                                        }} else {{
+                                                            None
+                                                        }}
+                                                    }}).collect();
+                                                    Some(items)
+                                                }} else {{
+                                                    None
+                                                }}
+                                            }},''')
+                                        else:
+                                            # Other list types
+                                            rust_type = MatterType.get_rust_type(deep_entry_type)
+                                            cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
+                                            deep_nested_assignments.append(f'''                                                {deep_rust_name}: {{
+                                                if let Some(tlv::TlvItemValue::List(l)) = deep_nested_item.get(&[{deep_id}]) {{
+                                                    let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                                                        if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                                            Some({cast_expr})
+                                                        }} else {{
+                                                            None
+                                                        }}
+                                                    }}).collect();
+                                                    Some(items)
+                                                }} else {{
+                                                    None
+                                                }}
+                                            }},''')
+                                    else:
+                                        deep_nested_assignments.append(f"                                                {deep_rust_name}: deep_nested_item.get_int(&[{deep_id}]).map(|v| v as u8),")
+                                
+                                deep_nested_assignments_str = "\n".join(deep_nested_assignments)
+                                
+                                nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(_)) = nested_item.get(&[{nested_id}]) {{
+                                        if let Some(deep_nested_tlv) = nested_item.get(&[{nested_id}]) {{
+                                            let deep_nested_item = tlv::TlvItem {{ tag: {nested_id}, value: deep_nested_tlv.clone() }};
+                                            Some({deep_nested_struct_name} {{
+{deep_nested_assignments_str}
+                                            }})
+                                        }} else {{
+                                            None
+                                        }}
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                            else:
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_int(&[{nested_id}]).map(|v| v as u8),")
+                        
+                        nested_assignments_str = "\n".join(nested_assignments)
+                        
+                        field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[{field_id}]) {{
+                        if let Some(nested_tlv) = item.get(&[{field_id}]) {{
+                            let nested_item = tlv::TlvItem {{ tag: {field_id}, value: nested_tlv.clone() }};
+                            Some({nested_struct_name} {{
+{nested_assignments_str}
+                            }})
+                        }} else {{
+                            None
+                        }}
+                    }} else {{
+                        None
+                    }}
+                }},''')
                     else:
                         # Default to treating as integer
                         field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
@@ -625,70 +871,351 @@ class AttributeField:
     Ok(res)'''
         else:
             # Single value decoder
+            # Initialize tlv_type for all paths
             tlv_type = MatterType.get_tlv_type(self.attr_type)
-            if self.nullable:
-                # Handle nullable single values
-                if tlv_type == "String":
-                    decode_logic = '''    if let tlv::TlvItemValue::String(v) = inp {
+            
+            # Check if this is a custom struct type
+            if structs and self.attr_type in structs:
+                # Handle custom struct decoding
+                struct = structs[self.attr_type]
+                struct_name = struct.get_rust_struct_name()
+                
+                # Generate field assignments for the struct
+                field_assignments = []
+                for field_id, field_name, field_type, entry_type in struct.fields:
+                    rust_field_name = convert_to_snake_case(field_name)
+                    rust_field_name = escape_rust_keyword(rust_field_name)  # Escape Rust keywords
+                    
+                    if field_type == 'list' and entry_type:
+                        # Handle list fields within struct
+                        if entry_type.endswith('Struct') and structs and entry_type in structs:
+                            # Custom struct list - generate proper decoding
+                            target_struct = structs[entry_type]
+                            struct_rust_name = target_struct.get_rust_struct_name()
+                            
+                            # Generate nested field assignments for the target struct
+                            nested_assignments = []
+                            for nested_id, nested_name, nested_type, nested_entry_type in target_struct.fields:
+                                nested_rust_name = convert_to_snake_case(nested_name)
+                                nested_rust_name = escape_rust_keyword(nested_rust_name)
+                                
+                                if is_numeric_or_id_type(nested_type):
+                                    nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type))
+                                elif nested_type == 'string':
+                                    nested_assignments.append(f"                                {nested_rust_name}: list_item.get_string_owned(&[{nested_id}]),")
+                                elif nested_type == 'bool':
+                                    nested_assignments.append(f"                                {nested_rust_name}: list_item.get_bool(&[{nested_id}]),")
+                                elif nested_type == 'octstr':
+                                    nested_assignments.append(f"                                {nested_rust_name}: list_item.get_octet_string_owned(&[{nested_id}]),")
+                                elif nested_type == 'list' and nested_entry_type:
+                                    # Handle nested list fields with custom struct entries
+                                    if nested_entry_type.endswith('Struct') and structs and nested_entry_type in structs:
+                                        target_nested_struct = structs[nested_entry_type]
+                                        nested_struct_rust_name = target_nested_struct.get_rust_struct_name()
+                                        
+                                        # Generate nested assignments for the nested struct
+                                        nested_nested_assignments = []
+                                        for nn_id, nn_name, nn_type, nn_entry_type in target_nested_struct.fields:
+                                            nn_rust_name = convert_to_snake_case(nn_name)
+                                            nn_rust_name = escape_rust_keyword(nn_rust_name)
+                                            
+                                            if is_numeric_or_id_type(nn_type):
+                                                nested_nested_assignments.append(build_nested_numeric_assignment(nn_rust_name, nn_id, nn_type, "nested_item"))
+                                            elif nn_type == 'string':
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_string_owned(&[{nn_id}]),")
+                                            elif nn_type == 'bool':
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_bool(&[{nn_id}]),")
+                                            elif nn_type == 'octstr':
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_octet_string_owned(&[{nn_id}]),")
+                                            else:
+                                                nested_nested_assignments.append(f"                                        {nn_rust_name}: nested_item.get_int(&[{nn_id}]).map(|v| v as u8),")
+                                        
+                                        nested_nested_str = "\n".join(nested_nested_assignments)
+                                        nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(nested_l)) = list_item.get(&[{nested_id}]) {{
+                                        let mut nested_items = Vec::new();
+                                        for nested_item in nested_l {{
+                                            nested_items.push({nested_struct_rust_name} {{
+{nested_nested_str}
+                                            }});
+                                        }}
+                                        Some(nested_items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                                    else:
+                                        nested_assignments.append(f"                                {nested_rust_name}: None, // TODO: Implement {nested_entry_type} nested list")
+                                else:
+                                    nested_assignments.append(f"                                {nested_rust_name}: list_item.get_int(&[{nested_id}]).map(|v| v as u8),")
+                            
+                            nested_assignments_str = "\n".join(nested_assignments)
+                            
+                            field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
+                        let mut items = Vec::new();
+                        for list_item in l {{
+                            items.push({struct_rust_name} {{
+{nested_assignments_str}
+                            }});
+                        }}
+                        Some(items)
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                        elif entry_type.endswith('Struct'):
+                            # Custom struct without definition
+                            field_assignments.append(f"                {rust_field_name}: None, // TODO: Implement {entry_type} list decoding")
+                        else:
+                            # Primitive type list
+                            rust_type = MatterType.get_rust_type(entry_type)
+                            if entry_type == 'string':
+                                field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
+                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                            if let tlv::TlvItemValue::String(v) = &e.value {{
+                                Some(v.clone())
+                            }} else {{
+                                None
+                            }}
+                        }}).collect();
+                        Some(items)
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                            elif entry_type == 'octstr':
+                                field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
+                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                            if let tlv::TlvItemValue::OctetString(v) = &e.value {{
+                                Some(v.clone())
+                            }} else {{
+                                None
+                            }}
+                        }}).collect();
+                        Some(items)
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                            elif entry_type == 'bool':
+                                field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
+                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                            if let tlv::TlvItemValue::Bool(v) = &e.value {{
+                                Some(*v)
+                            }} else {{
+                                None
+                            }}
+                        }}).collect();
+                        Some(items)
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                            else:
+                                # Numeric types
+                                cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
+                                field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
+                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                            if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                Some({cast_expr})
+                            }} else {{
+                                None
+                            }}
+                        }}).collect();
+                        Some(items)
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                    elif is_numeric_or_id_type(field_type):
+                        field_assignments.append(build_numeric_field_assignment(rust_field_name, field_id, field_type))
+                    elif field_type == 'string':
+                        field_assignments.append(f"                {rust_field_name}: item.get_string_owned(&[{field_id}]),")
+                    elif field_type == 'bool':
+                        field_assignments.append(f"                {rust_field_name}: item.get_bool(&[{field_id}]),")
+                    elif field_type == 'octstr':
+                        field_assignments.append(f"                {rust_field_name}: item.get_octet_string_owned(&[{field_id}]),")
+                    elif field_type.endswith('Enum'):
+                        # Handle enum fields as integers
+                        field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
+                    elif field_type.endswith('Struct') and structs and field_type in structs:
+                        # Handle nested struct fields
+                        nested_struct = structs[field_type]
+                        nested_struct_name = nested_struct.get_rust_struct_name()
+                        
+                        # Generate nested field assignments for the nested struct
+                        nested_assignments = []
+                        for nested_id, nested_name, nested_type, nested_entry_type in nested_struct.fields:
+                            nested_rust_name = convert_to_snake_case(nested_name)
+                            nested_rust_name = escape_rust_keyword(nested_rust_name)
+                            
+                            if is_numeric_or_id_type(nested_type):
+                                nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type, "nested_item"))
+                            elif nested_type == 'string':
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_string_owned(&[{nested_id}]),")
+                            elif nested_type == 'bool':
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_bool(&[{nested_id}]),")
+                            elif nested_type == 'octstr':
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_octet_string_owned(&[{nested_id}]),")
+                            elif nested_type.endswith('Enum'):
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_int(&[{nested_id}]).map(|v| v as u8),")
+                            elif nested_type == 'list' and nested_entry_type:
+                                # Handle list fields in nested structs (single-struct decode path)
+                                if nested_entry_type.endswith('Enum'):
+                                    # List of enums (like CharacteristicEnum)
+                                    nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[{nested_id}]) {{
+                                        let items: Vec<u8> = l.iter().filter_map(|e| {{
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                                Some(*v as u8)
+                                            }} else {{
+                                                None
+                                            }}
+                                        }}).collect();
+                                        Some(items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                                else:
+                                    # Other list types
+                                    rust_type = MatterType.get_rust_type(nested_entry_type)
+                                    cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
+                                    nested_assignments.append(f'''                                {nested_rust_name}: {{
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[{nested_id}]) {{
+                                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {{
+                                                Some({cast_expr})
+                                            }} else {{
+                                                None
+                                            }}
+                                        }}).collect();
+                                        Some(items)
+                                    }} else {{
+                                        None
+                                    }}
+                                }},''')
+                            else:
+                                nested_assignments.append(f"                                {nested_rust_name}: nested_item.get_int(&[{nested_id}]).map(|v| v as u8),")
+                        
+                        nested_assignments_str = "\n".join(nested_assignments)
+                        
+                        field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[{field_id}]) {{
+                        if let Some(nested_tlv) = item.get(&[{field_id}]) {{
+                            let nested_item = tlv::TlvItem {{ tag: {field_id}, value: nested_tlv.clone() }};
+                            Some({nested_struct_name} {{
+{nested_assignments_str}
+                            }})
+                        }} else {{
+                            None
+                        }}
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                    else:
+                        # Default to treating as integer
+                        field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as u8),")
+                
+                assignments_str = "\n".join(field_assignments)
+                
+                if self.nullable:
+                    # For nullable structs, handle null values and wrap result in Some()
+                    decode_logic = f'''    if let tlv::TlvItemValue::List(_fields) = inp {{
+        // Struct with fields
+        let item = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
+        Ok(Some({struct_name} {{
+{assignments_str}
+        }}))
+    //}} else if let tlv::TlvItemValue::Null = inp {{
+    //    // Null value for nullable struct
+    //    Ok(None)
+    }} else {{
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
+    }}'''
+                else:
+                    # For non-nullable structs
+                    decode_logic = f'''    if let tlv::TlvItemValue::List(_fields) = inp {{
+        // Struct with fields
+        let item = tlv::TlvItem {{ tag: 0, value: inp.clone() }};
+        Ok({struct_name} {{
+{assignments_str}
+        }})
+    }} else {{
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }}'''
+            else:
+                # For non-struct types, handle the decoding logic based on tlv_type
+                if self.nullable:
+                    # Handle nullable single values
+                    if tlv_type == "String":
+                        decode_logic = '''    if let tlv::TlvItemValue::String(v) = inp {
         Ok(Some(v.clone()))
     } else {
         Ok(None)
     }'''
-                elif tlv_type.startswith("UInt") or tlv_type.startswith("Int"):
-                    rust_type = MatterType.get_rust_type(self.attr_type)
-                    # Avoid unnecessary cast when target type is u64 (same as TlvItemValue::Int)
-                    cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
-                    decode_logic = f'''    if let tlv::TlvItemValue::Int(v) = inp {{
+                    elif tlv_type.startswith("UInt") or tlv_type.startswith("Int"):
+                        rust_type = MatterType.get_rust_type(self.attr_type)
+                        # Avoid unnecessary cast when target type is u64 (same as TlvItemValue::Int)
+                        cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
+                        decode_logic = f'''    if let tlv::TlvItemValue::Int(v) = inp {{
         Ok(Some({cast_expr}))
     }} else {{
         Ok(None)
     }}'''
-                elif tlv_type == "Bool":
-                    decode_logic = '''    if let tlv::TlvItemValue::Bool(v) = inp {
+                    elif tlv_type == "Bool":
+                        decode_logic = '''    if let tlv::TlvItemValue::Bool(v) = inp {
         Ok(Some(*v))
     } else {
         Ok(None)
     }'''
-                elif tlv_type == "OctetString":
-                    decode_logic = '''    if let tlv::TlvItemValue::OctetString(v) = inp {
+                    elif tlv_type == "OctetString":
+                        decode_logic = '''    if let tlv::TlvItemValue::OctetString(v) = inp {
         Ok(Some(v.clone()))
     } else {
         Ok(None)
     }'''
-                else:
-                    decode_logic = '''    // TODO: Handle nullable custom type decoding
+                    else:
+                        decode_logic = '''    // TODO: Handle nullable custom type decoding
     Ok(None)'''
-            else:
-                # Non-nullable single values
-                if tlv_type == "String":
-                    decode_logic = '''    if let tlv::TlvItemValue::String(v) = inp {
+                else:
+                    # Non-nullable single values
+                    if tlv_type == "String":
+                        decode_logic = '''    if let tlv::TlvItemValue::String(v) = inp {
         Ok(v.clone())
     } else {
         Err(anyhow::anyhow!("Expected String"))
     }'''
-                elif tlv_type.startswith("UInt") or tlv_type.startswith("Int"):
-                    rust_type = MatterType.get_rust_type(self.attr_type)
-                    # Avoid unnecessary cast when target type is u64 (same as TlvItemValue::Int)
-                    cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
-                    decode_logic = f'''    if let tlv::TlvItemValue::Int(v) = inp {{
+                    elif tlv_type.startswith("UInt") or tlv_type.startswith("Int"):
+                        rust_type = MatterType.get_rust_type(self.attr_type)
+                        # Avoid unnecessary cast when target type is u64 (same as TlvItemValue::Int)
+                        cast_expr = "*v" if rust_type == "u64" else f"*v as {rust_type}"
+                        decode_logic = f'''    if let tlv::TlvItemValue::Int(v) = inp {{
         Ok({cast_expr})
     }} else {{
         Err(anyhow::anyhow!("Expected Integer"))
     }}'''
-                elif tlv_type == "Bool":
-                    decode_logic = '''    if let tlv::TlvItemValue::Bool(v) = inp {
+                    elif tlv_type == "Bool":
+                        decode_logic = '''    if let tlv::TlvItemValue::Bool(v) = inp {
         Ok(*v)
     } else {
         Err(anyhow::anyhow!("Expected Bool"))
     }'''
-                elif tlv_type == "OctetString":
-                    decode_logic = '''    if let tlv::TlvItemValue::OctetString(v) = inp {
+                    elif tlv_type == "OctetString":
+                        decode_logic = '''    if let tlv::TlvItemValue::OctetString(v) = inp {
         Ok(v.clone())
     } else {
         Err(anyhow::anyhow!("Expected OctetString"))
     }'''
-                else:
-                    decode_logic = '''    // TODO: Handle custom type decoding
+                    else:
+                        decode_logic = '''    // TODO: Handle custom type decoding
     Err(anyhow::anyhow!("Unsupported type"))'''
         
         return f'''/// Decode {self.name} attribute ({clean_id})
@@ -878,6 +1405,7 @@ class ClusterParser:
                 entry_type = None
                 if entry_elem is not None:
                     entry_type = entry_elem.get('type')
+
                 
                 # Check if field is nullable
                 quality_elem = field_elem.find('quality')
@@ -981,6 +1509,7 @@ class ClusterParser:
                 entry_type = None
                 if entry_elem is not None:
                     entry_type = entry_elem.get('type')
+
                 
                 struct.add_field(field_id, field_name, field_type, entry_type)
             
@@ -1097,6 +1626,31 @@ def generate_rust_code(xml_file: str) -> str:
     attributes = parser.parse_attributes()
     structs = parser.parse_structs()
     
+    # Add LocationDescriptorStruct only if needed by this cluster
+    location_needed = False
+    for attr in attributes:
+        if attr.attr_type == 'LocationDescriptorStruct':
+            location_needed = True
+            break
+    
+    # Also check if any struct field references LocationDescriptorStruct
+    if not location_needed:
+        for struct in structs.values():
+            for field_id, field_name, field_type, entry_type in struct.fields:
+                if field_type == 'LocationDescriptorStruct' or entry_type == 'LocationDescriptorStruct':
+                    location_needed = True
+                    break
+            if location_needed:
+                break
+    
+    # Add hardcoded LocationDescriptorStruct if needed and not already defined
+    if location_needed and 'LocationDescriptorStruct' not in structs:
+        location_struct = MatterStruct('LocationDescriptorStruct')
+        location_struct.add_field(0, 'LocationName', 'string')
+        location_struct.add_field(1, 'FloorNumber', 'uint16')
+        location_struct.add_field(2, 'AreaType', 'uint8')
+        structs['LocationDescriptorStruct'] = location_struct
+    
     # Generate header
     cluster_name_snake = parser.cluster_name.lower().replace(' ', '_').replace('-', '_')
     
@@ -1124,7 +1678,7 @@ def generate_rust_code(xml_file: str) -> str:
     if structs:
         code += "// Struct definitions\n\n"
         for struct in structs.values():
-            code += struct.generate_rust_struct() + "\n\n"
+            code += struct.generate_rust_struct(structs) + "\n\n"
     
     # Generate command encoders
     if commands:

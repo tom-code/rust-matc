@@ -12,7 +12,7 @@ use serde_json;
 
 #[derive(Debug, serde::Serialize)]
 pub struct ApplicationEP {
-    pub application: Option<u8>,
+    pub application: Option<Application>,
     pub endpoint: Option<u16>,
 }
 
@@ -74,11 +74,34 @@ pub fn decode_catalog_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<u16>> 
 }
 
 /// Decode CurrentApp attribute (0x0001)
-pub fn decode_current_app(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_current_app(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<ApplicationEP>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(ApplicationEP {
+                application: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[0]) {
+                        if let Some(nested_tlv) = item.get(&[0]) {
+                            let nested_item = tlv::TlvItem { tag: 0, value: nested_tlv.clone() };
+                            Some(Application {
+                                catalog_vendor_id: nested_item.get_int(&[0]).map(|v| v as u16),
+                                application_id: nested_item.get_string_owned(&[1]),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+                endpoint: item.get_int(&[1]).map(|v| v as u16),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 

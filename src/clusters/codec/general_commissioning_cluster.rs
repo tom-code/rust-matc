@@ -67,11 +67,16 @@ pub fn decode_breadcrumb(inp: &tlv::TlvItemValue) -> anyhow::Result<u64> {
 }
 
 /// Decode BasicCommissioningInfo attribute (0x0001)
-pub fn decode_basic_commissioning_info(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_basic_commissioning_info(inp: &tlv::TlvItemValue) -> anyhow::Result<BasicCommissioningInfo> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(BasicCommissioningInfo {
+                fail_safe_expiry_length_seconds: item.get_int(&[0]).map(|v| v as u16),
+                max_cumulative_failsafe_seconds: item.get_int(&[1]).map(|v| v as u16),
+        })
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 

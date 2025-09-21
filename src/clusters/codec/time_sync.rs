@@ -126,11 +126,21 @@ pub fn decode_time_source(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
 }
 
 /// Decode TrustedTimeSource attribute (0x0003)
-pub fn decode_trusted_time_source(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_trusted_time_source(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<TrustedTimeSource>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(TrustedTimeSource {
+                fabric_index: item.get_int(&[0]).map(|v| v as u8),
+                node_id: item.get_int(&[1]),
+                endpoint: item.get_int(&[2]).map(|v| v as u16),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 

@@ -195,20 +195,104 @@ pub fn decode_abs_max_power(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
 }
 
 /// Decode PowerAdjustmentCapability attribute (0x0005)
-pub fn decode_power_adjustment_capability(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_power_adjustment_capability(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<PowerAdjustCapability>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(PowerAdjustCapability {
+                power_adjust_capability: {
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[0]) {
+                        let mut items = Vec::new();
+                        for list_item in l {
+                            items.push(PowerAdjust {
+                                min_power: list_item.get_int(&[0]).map(|v| v as u8),
+                                max_power: list_item.get_int(&[1]).map(|v| v as u8),
+                                min_duration: list_item.get_int(&[2]).map(|v| v as u8),
+                                max_duration: list_item.get_int(&[3]).map(|v| v as u8),
+                            });
+                        }
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                cause: item.get_int(&[1]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
 /// Decode Forecast attribute (0x0006)
-pub fn decode_forecast(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_forecast(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Forecast>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(Forecast {
+                forecast_id: item.get_int(&[0]).map(|v| v as u32),
+                active_slot_number: item.get_int(&[1]).map(|v| v as u16),
+                start_time: item.get_int(&[2]),
+                end_time: item.get_int(&[3]),
+                earliest_start_time: item.get_int(&[4]),
+                latest_end_time: item.get_int(&[5]),
+                is_pausable: item.get_bool(&[6]),
+                slots: {
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[7]) {
+                        let mut items = Vec::new();
+                        for list_item in l {
+                            items.push(Slot {
+                                min_duration: list_item.get_int(&[0]).map(|v| v as u8),
+                                max_duration: list_item.get_int(&[1]).map(|v| v as u8),
+                                default_duration: list_item.get_int(&[2]).map(|v| v as u8),
+                                elapsed_slot_time: list_item.get_int(&[3]).map(|v| v as u8),
+                                remaining_slot_time: list_item.get_int(&[4]).map(|v| v as u8),
+                                slot_is_pausable: list_item.get_bool(&[5]),
+                                min_pause_duration: list_item.get_int(&[6]).map(|v| v as u8),
+                                max_pause_duration: list_item.get_int(&[7]).map(|v| v as u8),
+                                manufacturer_esa_state: list_item.get_int(&[8]).map(|v| v as u16),
+                                nominal_power: list_item.get_int(&[9]).map(|v| v as u8),
+                                min_power: list_item.get_int(&[10]).map(|v| v as u8),
+                                max_power: list_item.get_int(&[11]).map(|v| v as u8),
+                                nominal_energy: list_item.get_int(&[12]).map(|v| v as u8),
+                                costs: {
+                                    if let Some(tlv::TlvItemValue::List(nested_l)) = list_item.get(&[13]) {
+                                        let mut nested_items = Vec::new();
+                                        for nested_item in nested_l {
+                                            nested_items.push(Cost {
+                                        cost_type: nested_item.get_int(&[0]).map(|v| v as u8),
+                                value: nested_item.get_int(&[1]).map(|v| v as i32),
+                                decimal_points: nested_item.get_int(&[2]).map(|v| v as u8),
+                                currency: nested_item.get_int(&[3]).map(|v| v as u16),
+                                            });
+                                        }
+                                        Some(nested_items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                                min_power_adjustment: list_item.get_int(&[14]).map(|v| v as u8),
+                                max_power_adjustment: list_item.get_int(&[15]).map(|v| v as u8),
+                                min_duration_adjustment: list_item.get_int(&[16]).map(|v| v as u8),
+                                max_duration_adjustment: list_item.get_int(&[17]).map(|v| v as u8),
+                            });
+                        }
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                forecast_update_reason: item.get_int(&[8]).map(|v| v as u8),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 

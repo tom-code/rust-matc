@@ -12,15 +12,15 @@ use serde_json;
 
 #[derive(Debug, serde::Serialize)]
 pub struct AreaInfo {
-    pub location_info: Option<u8>,
-    pub landmark_info: Option<u8>,
+    pub location_info: Option<LocationDescriptor>,
+    pub landmark_info: Option<LandmarkInfo>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct Area {
     pub area_id: Option<u32>,
     pub map_id: Option<u32>,
-    pub area_info: Option<u8>,
+    pub area_info: Option<AreaInfo>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -41,6 +41,13 @@ pub struct Progress {
     pub status: Option<u8>,
     pub total_operational_time: Option<u8>,
     pub estimated_time: Option<u8>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct LocationDescriptor {
+    pub location_name: Option<String>,
+    pub floor_number: Option<u16>,
+    pub area_type: Option<u8>,
 }
 
 // Command encoders
@@ -77,7 +84,50 @@ pub fn decode_supported_areas(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Are
             res.push(Area {
                 area_id: item.get_int(&[0]).map(|v| v as u32),
                 map_id: item.get_int(&[1]).map(|v| v as u32),
-                area_info: item.get_int(&[2]).map(|v| v as u8),
+                area_info: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[2]) {
+                        if let Some(nested_tlv) = item.get(&[2]) {
+                            let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
+                            Some(AreaInfo {
+                                location_info: {
+                                    if let Some(tlv::TlvItemValue::List(_)) = nested_item.get(&[0]) {
+                                        if let Some(deep_nested_tlv) = nested_item.get(&[0]) {
+                                            let deep_nested_item = tlv::TlvItem { tag: 0, value: deep_nested_tlv.clone() };
+                                            Some(LocationDescriptor {
+                                                location_name: deep_nested_item.get_string_owned(&[0]),
+                                floor_number: deep_nested_item.get_int(&[1]).map(|v| v as u16),
+                                area_type: deep_nested_item.get_int(&[2]).map(|v| v as u8),
+                                            })
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                },
+                                landmark_info: {
+                                    if let Some(tlv::TlvItemValue::List(_)) = nested_item.get(&[1]) {
+                                        if let Some(deep_nested_tlv) = nested_item.get(&[1]) {
+                                            let deep_nested_item = tlv::TlvItem { tag: 1, value: deep_nested_tlv.clone() };
+                                            Some(LandmarkInfo {
+                                                landmark_tag: deep_nested_item.get_int(&[0]).map(|v| v as u8),
+                                                relative_position_tag: deep_nested_item.get_int(&[1]).map(|v| v as u8),
+                                            })
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                },
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }

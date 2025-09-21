@@ -26,7 +26,7 @@ pub struct TrackAttributes {
 #[derive(Debug, serde::Serialize)]
 pub struct Track {
     pub id: Option<String>,
-    pub track_attributes: Option<u8>,
+    pub track_attributes: Option<TrackAttributes>,
 }
 
 // Command encoders
@@ -139,11 +139,20 @@ pub fn decode_duration(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u64>> {
 }
 
 /// Decode SampledPosition attribute (0x0003)
-pub fn decode_sampled_position(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_sampled_position(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<PlaybackPosition>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(PlaybackPosition {
+                updated_at: item.get_int(&[0]).map(|v| v as u8),
+                position: item.get_int(&[1]),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
@@ -175,11 +184,48 @@ pub fn decode_seek_range_start(inp: &tlv::TlvItemValue) -> anyhow::Result<Option
 }
 
 /// Decode ActiveAudioTrack attribute (0x0007)
-pub fn decode_active_audio_track(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_active_audio_track(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Track>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(Track {
+                id: item.get_string_owned(&[0]),
+                track_attributes: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
+                        if let Some(nested_tlv) = item.get(&[1]) {
+                            let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
+                            Some(TrackAttributes {
+                                language_code: nested_item.get_string_owned(&[0]),
+                                characteristics: {
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                                        let items: Vec<u8> = l.iter().filter_map(|e| {
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {
+                                                Some(*v as u8)
+                                            } else {
+                                                None
+                                            }
+                                        }).collect();
+                                        Some(items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                                display_name: nested_item.get_string_owned(&[2]),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
@@ -190,7 +236,35 @@ pub fn decode_available_audio_tracks(inp: &tlv::TlvItemValue) -> anyhow::Result<
         for item in v {
             res.push(Track {
                 id: item.get_string_owned(&[0]),
-                track_attributes: item.get_int(&[1]).map(|v| v as u8),
+                track_attributes: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
+                        if let Some(nested_tlv) = item.get(&[1]) {
+                            let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
+                            Some(TrackAttributes {
+                                language_code: nested_item.get_string_owned(&[0]),
+                                characteristics: {
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                                        let items: Vec<u8> = l.iter().filter_map(|e| {
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {
+                                                Some(*v as u8)
+                                            } else {
+                                                None
+                                            }
+                                        }).collect();
+                                        Some(items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                                display_name: nested_item.get_string_owned(&[2]),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }
@@ -198,11 +272,48 @@ pub fn decode_available_audio_tracks(inp: &tlv::TlvItemValue) -> anyhow::Result<
 }
 
 /// Decode ActiveTextTrack attribute (0x0009)
-pub fn decode_active_text_track(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_active_text_track(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Track>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(Track {
+                id: item.get_string_owned(&[0]),
+                track_attributes: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
+                        if let Some(nested_tlv) = item.get(&[1]) {
+                            let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
+                            Some(TrackAttributes {
+                                language_code: nested_item.get_string_owned(&[0]),
+                                characteristics: {
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                                        let items: Vec<u8> = l.iter().filter_map(|e| {
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {
+                                                Some(*v as u8)
+                                            } else {
+                                                None
+                                            }
+                                        }).collect();
+                                        Some(items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                                display_name: nested_item.get_string_owned(&[2]),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
@@ -213,7 +324,35 @@ pub fn decode_available_text_tracks(inp: &tlv::TlvItemValue) -> anyhow::Result<V
         for item in v {
             res.push(Track {
                 id: item.get_string_owned(&[0]),
-                track_attributes: item.get_int(&[1]).map(|v| v as u8),
+                track_attributes: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[1]) {
+                        if let Some(nested_tlv) = item.get(&[1]) {
+                            let nested_item = tlv::TlvItem { tag: 1, value: nested_tlv.clone() };
+                            Some(TrackAttributes {
+                                language_code: nested_item.get_string_owned(&[0]),
+                                characteristics: {
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[1]) {
+                                        let items: Vec<u8> = l.iter().filter_map(|e| {
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {
+                                                Some(*v as u8)
+                                            } else {
+                                                None
+                                            }
+                                        }).collect();
+                                        Some(items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                                display_name: nested_item.get_string_owned(&[2]),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }

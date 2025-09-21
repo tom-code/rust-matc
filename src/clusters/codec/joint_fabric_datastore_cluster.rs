@@ -14,8 +14,8 @@ use serde_json;
 pub struct DatastoreACLEntry {
     pub node_id: Option<u64>,
     pub list_id: Option<u16>,
-    pub acl_entry: Option<u8>,
-    pub status_entry: Option<u8>,
+    pub acl_entry: Option<DatastoreAccessControlEntry>,
+    pub status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -54,8 +54,8 @@ pub struct DatastoreEndpointBindingEntry {
     pub node_id: Option<u64>,
     pub endpoint_id: Option<u16>,
     pub list_id: Option<u16>,
-    pub binding: Option<u8>,
-    pub status_entry: Option<u8>,
+    pub binding: Option<DatastoreBindingTarget>,
+    pub status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -63,7 +63,7 @@ pub struct DatastoreEndpointEntry {
     pub endpoint_id: Option<u16>,
     pub node_id: Option<u64>,
     pub friendly_name: Option<String>,
-    pub status_entry: Option<u8>,
+    pub status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -71,7 +71,7 @@ pub struct DatastoreEndpointGroupIDEntry {
     pub node_id: Option<u64>,
     pub endpoint_id: Option<u16>,
     pub group_id: Option<u8>,
-    pub status_entry: Option<u8>,
+    pub status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -101,14 +101,14 @@ pub struct DatastoreGroupKeySet {
 pub struct DatastoreNodeInformationEntry {
     pub node_id: Option<u64>,
     pub friendly_name: Option<String>,
-    pub commissioning_status_entry: Option<u8>,
+    pub commissioning_status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct DatastoreNodeKeySetEntry {
     pub node_id: Option<u64>,
     pub group_key_set_id: Option<u16>,
-    pub status_entry: Option<u8>,
+    pub status_entry: Option<DatastoreStatusEntry>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -454,7 +454,22 @@ pub fn decode_node_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Datastore
             res.push(DatastoreNodeInformationEntry {
                 node_id: item.get_int(&[1]),
                 friendly_name: item.get_string_owned(&[2]),
-                commissioning_status_entry: item.get_int(&[3]).map(|v| v as u8),
+                commissioning_status_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[3]) {
+                        if let Some(nested_tlv) = item.get(&[3]) {
+                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
+                            Some(DatastoreStatusEntry {
+                                state: nested_item.get_int(&[0]).map(|v| v as u8),
+                                update_timestamp: nested_item.get_int(&[1]),
+                                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }
@@ -478,11 +493,17 @@ pub fn decode_admin_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Datastor
 }
 
 /// Decode Status attribute (0x0008)
-pub fn decode_status(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_status(inp: &tlv::TlvItemValue) -> anyhow::Result<DatastoreStatusEntry> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(DatastoreStatusEntry {
+                state: item.get_int(&[0]).map(|v| v as u8),
+                update_timestamp: item.get_int(&[1]),
+                failure_code: item.get_int(&[2]).map(|v| v as u8),
+        })
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 
@@ -495,7 +516,22 @@ pub fn decode_endpoint_group_id_list(inp: &tlv::TlvItemValue) -> anyhow::Result<
                 node_id: item.get_int(&[0]),
                 endpoint_id: item.get_int(&[1]).map(|v| v as u16),
                 group_id: item.get_int(&[2]).map(|v| v as u8),
-                status_entry: item.get_int(&[3]).map(|v| v as u8),
+                status_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[3]) {
+                        if let Some(nested_tlv) = item.get(&[3]) {
+                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
+                            Some(DatastoreStatusEntry {
+                                state: nested_item.get_int(&[0]).map(|v| v as u8),
+                                update_timestamp: nested_item.get_int(&[1]),
+                                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }
@@ -511,8 +547,39 @@ pub fn decode_endpoint_binding_list(inp: &tlv::TlvItemValue) -> anyhow::Result<V
                 node_id: item.get_int(&[0]),
                 endpoint_id: item.get_int(&[1]).map(|v| v as u16),
                 list_id: item.get_int(&[2]).map(|v| v as u16),
-                binding: item.get_int(&[3]).map(|v| v as u8),
-                status_entry: item.get_int(&[4]).map(|v| v as u8),
+                binding: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[3]) {
+                        if let Some(nested_tlv) = item.get(&[3]) {
+                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
+                            Some(DatastoreBindingTarget {
+                                node: nested_item.get_int(&[1]),
+                                group: nested_item.get_int(&[2]).map(|v| v as u8),
+                                endpoint: nested_item.get_int(&[3]).map(|v| v as u16),
+                                cluster: nested_item.get_int(&[4]).map(|v| v as u32),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+                status_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[4]) {
+                        if let Some(nested_tlv) = item.get(&[4]) {
+                            let nested_item = tlv::TlvItem { tag: 4, value: nested_tlv.clone() };
+                            Some(DatastoreStatusEntry {
+                                state: nested_item.get_int(&[0]).map(|v| v as u8),
+                                update_timestamp: nested_item.get_int(&[1]),
+                                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }
@@ -527,7 +594,22 @@ pub fn decode_node_key_set_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<D
             res.push(DatastoreNodeKeySetEntry {
                 node_id: item.get_int(&[0]),
                 group_key_set_id: item.get_int(&[1]).map(|v| v as u16),
-                status_entry: item.get_int(&[2]).map(|v| v as u8),
+                status_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[2]) {
+                        if let Some(nested_tlv) = item.get(&[2]) {
+                            let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
+                            Some(DatastoreStatusEntry {
+                                state: nested_item.get_int(&[0]).map(|v| v as u8),
+                                update_timestamp: nested_item.get_int(&[1]),
+                                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }
@@ -542,8 +624,66 @@ pub fn decode_node_acl_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Datas
             res.push(DatastoreACLEntry {
                 node_id: item.get_int(&[0]),
                 list_id: item.get_int(&[1]).map(|v| v as u16),
-                acl_entry: item.get_int(&[2]).map(|v| v as u8),
-                status_entry: item.get_int(&[3]).map(|v| v as u8),
+                acl_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[2]) {
+                        if let Some(nested_tlv) = item.get(&[2]) {
+                            let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
+                            Some(DatastoreAccessControlEntry {
+                                privilege: nested_item.get_int(&[1]).map(|v| v as u8),
+                                auth_mode: nested_item.get_int(&[2]).map(|v| v as u8),
+                                subjects: {
+                                    if let Some(tlv::TlvItemValue::List(l)) = nested_item.get(&[3]) {
+                                        let items: Vec<u64> = l.iter().filter_map(|e| {
+                                            if let tlv::TlvItemValue::Int(v) = &e.value {
+                                                Some(*v)
+                                            } else {
+                                                None
+                                            }
+                                        }).collect();
+                                        Some(items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                                targets: {
+                                    if let Some(tlv::TlvItemValue::List(nested_l)) = nested_item.get(&[4]) {
+                                        let mut nested_items = Vec::new();
+                                        for nested_item in nested_l {
+                                            nested_items.push(DatastoreAccessControlTarget {
+                                cluster: nested_item.get_int(&[0]).map(|v| v as u32),
+                                endpoint: nested_item.get_int(&[1]).map(|v| v as u16),
+                                device_type: nested_item.get_int(&[2]).map(|v| v as u32),
+                                            });
+                                        }
+                                        Some(nested_items)
+                                    } else {
+                                        None
+                                    }
+                                },
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
+                status_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[3]) {
+                        if let Some(nested_tlv) = item.get(&[3]) {
+                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
+                            Some(DatastoreStatusEntry {
+                                state: nested_item.get_int(&[0]).map(|v| v as u8),
+                                update_timestamp: nested_item.get_int(&[1]),
+                                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }
@@ -559,7 +699,22 @@ pub fn decode_node_endpoint_list(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<
                 endpoint_id: item.get_int(&[0]).map(|v| v as u16),
                 node_id: item.get_int(&[1]),
                 friendly_name: item.get_string_owned(&[2]),
-                status_entry: item.get_int(&[3]).map(|v| v as u8),
+                status_entry: {
+                    if let Some(tlv::TlvItemValue::List(_)) = item.get(&[3]) {
+                        if let Some(nested_tlv) = item.get(&[3]) {
+                            let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
+                            Some(DatastoreStatusEntry {
+                                state: nested_item.get_int(&[0]).map(|v| v as u8),
+                                update_timestamp: nested_item.get_int(&[1]),
+                                failure_code: nested_item.get_int(&[2]).map(|v| v as u8),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                },
             });
         }
     }

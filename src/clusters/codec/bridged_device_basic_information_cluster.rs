@@ -210,20 +210,30 @@ pub fn decode_unique_id(inp: &tlv::TlvItemValue) -> anyhow::Result<String> {
 }
 
 /// Decode CapabilityMinima attribute (0x0013)
-pub fn decode_capability_minima(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_capability_minima(inp: &tlv::TlvItemValue) -> anyhow::Result<CapabilityMinima> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(CapabilityMinima {
+                case_sessions_per_fabric: item.get_int(&[0]).map(|v| v as u16),
+                subscriptions_per_fabric: item.get_int(&[1]).map(|v| v as u16),
+        })
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 
 /// Decode ProductAppearance attribute (0x0014)
-pub fn decode_product_appearance(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_product_appearance(inp: &tlv::TlvItemValue) -> anyhow::Result<ProductAppearance> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(ProductAppearance {
+                finish: item.get_int(&[0]).map(|v| v as u8),
+                primary_color: item.get_int(&[1]).map(|v| v as u8),
+        })
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 

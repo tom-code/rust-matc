@@ -630,11 +630,20 @@ pub fn decode_delay(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u32>> {
 }
 
 /// Decode SecurityPolicy attribute (0x003B)
-pub fn decode_security_policy(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_security_policy(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<SecurityPolicy>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(SecurityPolicy {
+                rotation_time: item.get_int(&[0]).map(|v| v as u16),
+                flags: item.get_int(&[1]).map(|v| v as u16),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 
@@ -648,11 +657,30 @@ pub fn decode_channel_page0_mask(inp: &tlv::TlvItemValue) -> anyhow::Result<Opti
 }
 
 /// Decode OperationalDatasetComponents attribute (0x003D)
-pub fn decode_operational_dataset_components(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+pub fn decode_operational_dataset_components(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<OperationalDatasetComponents>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(OperationalDatasetComponents {
+                active_timestamp_present: item.get_bool(&[0]),
+                pending_timestamp_present: item.get_bool(&[1]),
+                master_key_present: item.get_bool(&[2]),
+                network_name_present: item.get_bool(&[3]),
+                extended_pan_id_present: item.get_bool(&[4]),
+                mesh_local_prefix_present: item.get_bool(&[5]),
+                delay_present: item.get_bool(&[6]),
+                pan_id_present: item.get_bool(&[7]),
+                channel_present: item.get_bool(&[8]),
+                pskc_present: item.get_bool(&[9]),
+                security_policy_present: item.get_bool(&[10]),
+                channel_mask_present: item.get_bool(&[11]),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
     } else {
-        Ok(None)
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
     }
 }
 

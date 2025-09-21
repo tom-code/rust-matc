@@ -19,11 +19,11 @@ pub struct AdditionalInfo {
 #[derive(Debug, serde::Serialize)]
 pub struct BrandingInformation {
     pub provider_name: Option<String>,
-    pub background: Option<u8>,
-    pub logo: Option<u8>,
-    pub progress_bar: Option<u8>,
-    pub splash: Option<u8>,
-    pub water_mark: Option<u8>,
+    pub background: Option<StyleInformation>,
+    pub logo: Option<StyleInformation>,
+    pub progress_bar: Option<StyleInformation>,
+    pub splash: Option<StyleInformation>,
+    pub water_mark: Option<StyleInformation>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -48,7 +48,7 @@ pub struct Parameter {
 #[derive(Debug, serde::Serialize)]
 pub struct PlaybackPreferences {
     pub playback_position: Option<u64>,
-    pub text_track: Option<u8>,
+    pub text_track: Option<TrackPreference>,
     pub audio_tracks: Option<Vec<TrackPreference>>,
 }
 
@@ -56,7 +56,7 @@ pub struct PlaybackPreferences {
 pub struct StyleInformation {
     pub image_url: Option<String>,
     pub color: Option<String>,
-    pub size: Option<u8>,
+    pub size: Option<Dimension>,
 }
 
 #[derive(Debug, serde::Serialize)]

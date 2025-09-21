@@ -56,11 +56,17 @@ pub fn decode_hold_time(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
 }
 
 /// Decode HoldTimeLimits attribute (0x0004)
-pub fn decode_hold_time_limits(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+pub fn decode_hold_time_limits(inp: &tlv::TlvItemValue) -> anyhow::Result<HoldTimeLimits> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(HoldTimeLimits {
+                hold_time_min: item.get_int(&[0]).map(|v| v as u16),
+                hold_time_max: item.get_int(&[1]).map(|v| v as u16),
+                hold_time_default: item.get_int(&[2]).map(|v| v as u16),
+        })
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 
