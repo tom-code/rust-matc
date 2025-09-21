@@ -281,7 +281,6 @@ fn bridged_device_attr_name_from_id(id: u32) -> &'static str {
     }
 }
 
-
 async fn bridge_info(connection: &mut controller::Connection) {
     let resptlv = connection
         .read_request2(
@@ -367,6 +366,49 @@ async fn bridge_info(connection: &mut controller::Connection) {
         }
     }
 }
+
+async fn print_cluster_attributes(
+    connection: &mut controller::Connection,
+    endpoint: u16,
+    cluster: u32,
+) {
+    match clusters::names::get_cluster_name(cluster) {
+        Some(v) => println!("    {}", v),
+        None => println!("    unknown cluster - id 0x{:x}", cluster),
+    }
+    let attrlist = clusters::codec::get_attribute_list(cluster);
+    for attr in attrlist {
+        let out = connection.read_request2(endpoint, cluster, attr.0).await;
+        if let Ok(out) = out {
+            println!(
+                "      attr 0x{:x} {}: {}",
+                attr.0,
+                attr.1,
+                clusters::codec::decode_attribute_json(cluster, attr.0, &out)
+            );
+        } else {
+            //println!("      attr 0x{:x} {}: <read error> {:?}", attr.0, attr.1, out);
+        }
+    }
+}
+async fn print_endpoint_attributes(connection: &mut controller::Connection, endpoint: u16) {
+    let resptlv = connection
+        .read_request2(
+            endpoint,
+            clusters::defs::CLUSTER_ID_DESCRIPTOR,
+            clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
+        )
+        .await
+        .unwrap();
+    println!("  clusters:");
+    if let tlv::TlvItemValue::List(l) = resptlv {
+        for c in l {
+            if let tlv::TlvItemValue::Int(cluster) = c.value {
+                print_cluster_attributes(connection, endpoint, cluster as u32).await;
+            }
+        }
+    }
+}
 async fn all_attributes(connection: &mut controller::Connection) {
     let resptlv = connection
         .read_request2(
@@ -380,40 +422,12 @@ async fn all_attributes(connection: &mut controller::Connection) {
         for part in l {
             if let tlv::TlvItemValue::Int(v) = part.value {
                 println!("endpoint {}", v);
-                let supported_clusters = connection
-                    .read_request2(v as u16, clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST)
-                    .await
-                    .unwrap();
-                println!("  clusters:");
-                if let tlv::TlvItemValue::List(l) = supported_clusters {
-                    for c in l {
-                        if let tlv::TlvItemValue::Int(cluster) = c.value {
-                            match clusters::names::get_cluster_name(cluster as u32) {
-                                Some(v) => println!("    {}", v),
-                                None => println!("    unknown cluster - id 0x{:x}", v),
-                            }
-                            let attrlist = clusters::codec::get_attribute_list(cluster as u32);
-                            for attr in attrlist {
-                                let out = connection
-                                    .read_request2(
-                                        v as u16,
-                                        cluster as u32,
-                                        attr.0,
-                                    )
-                                    .await;
-                                if let Ok(out) = out {
-                                    println!("      attr 0x{:x} {}: {}", attr.0, attr.1, clusters::codec::decode_attribute_json(cluster as u32, attr.0, &out));
-                                } else {
-                                    //println!("      attr 0x{:x} {}: <read error> {:?}", attr.0, attr.1, out);
-                                }
-                            }
-                        }
-                    }
-                }
+                print_endpoint_attributes(connection, v as u16).await;
             }
         }
     }
+    println!("endpoint 0");
+    print_endpoint_attributes(connection, 0).await;
 }
 
 fn command_cmd(

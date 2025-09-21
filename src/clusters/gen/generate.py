@@ -16,6 +16,30 @@ import glob
 import re
 from typing import Dict, List, Optional, Tuple
 
+# Helper constants / utilities to reduce duplication when generating Rust code
+NUMERIC_OR_ID_TYPES = {
+    'devtype-id', 'cluster-id', 'endpoint-no', 'node-id', 'vendor-id', 'epoch-s', 'subject-id'
+}
+
+def is_numeric_or_id_type(t: str) -> bool:
+    """Return True if the Matter type is numeric or a well-known ID type."""
+    return t.startswith('uint') or t.startswith('int') or t in NUMERIC_OR_ID_TYPES
+
+def build_numeric_field_assignment(var_name: str, field_id: int, matter_type: str, indent: str = '                ') -> str:
+    """Generate Rust code snippet for assigning a numeric/ID field with proper casting."""
+    rust_type = MatterType.get_rust_type(matter_type)
+    if rust_type == 'u64':
+        return f"{indent}{var_name}: item.get_int(&[{field_id}]),"
+    else:
+        return f"{indent}{var_name}: item.get_int(&[{field_id}]).map(|v| v as {rust_type}),"
+
+def build_nested_numeric_assignment(var_name: str, field_id: int, matter_type: str, list_item_var: str = 'list_item', indent: str = '                                ') -> str:
+    rust_type = MatterType.get_rust_type(matter_type)
+    if rust_type == 'u64':
+        return f"{indent}{var_name}: {list_item_var}.get_int(&[{field_id}]),"
+    else:
+        return f"{indent}{var_name}: {list_item_var}.get_int(&[{field_id}]).map(|v| v as {rust_type}),"
+
 
 def convert_to_snake_case(name: str) -> str:
     """
@@ -205,7 +229,7 @@ pub struct {struct_name} {{
                         None
                     }}
                 }},''')
-            elif field_type.startswith('uint') or field_type.startswith('int') or field_type in ['devtype-id', 'cluster-id', 'endpoint-no', 'node-id', 'vendor-id', 'epoch-s', 'subject-id']:
+            elif is_numeric_or_id_type(field_type):
                 rust_type = MatterType.get_rust_type(field_type)
                 if rust_type == "u64":
                     # No casting needed, get_int already returns u64
@@ -399,14 +423,8 @@ class AttributeField:
                                 nested_rust_name = convert_to_snake_case(nested_name)
                                 nested_rust_name = escape_rust_keyword(nested_rust_name)
                                 
-                                if nested_type.startswith('uint') or nested_type.startswith('int') or nested_type in ['devtype-id', 'cluster-id', 'endpoint-no', 'node-id', 'vendor-id', 'epoch-s', 'subject-id']:
-                                    nested_rust_type = MatterType.get_rust_type(nested_type)
-                                    if nested_rust_type == "u64":
-                                        # No casting needed, get_int already returns u64
-                                        nested_assignments.append(f"                                {nested_rust_name}: list_item.get_int(&[{nested_id}]),")
-                                    else:
-                                        # Casting needed
-                                        nested_assignments.append(f"                                {nested_rust_name}: list_item.get_int(&[{nested_id}]).map(|v| v as {nested_rust_type}),")
+                                if is_numeric_or_id_type(nested_type):
+                                    nested_assignments.append(build_nested_numeric_assignment(nested_rust_name, nested_id, nested_type))
                                 elif nested_type == 'string':
                                     nested_assignments.append(f"                                {nested_rust_name}: list_item.get_string_owned(&[{nested_id}]),")
                                 elif nested_type == 'bool':
@@ -517,14 +535,8 @@ class AttributeField:
                         None
                     }}
                 }},''')
-                    elif field_type.startswith('uint') or field_type.startswith('int') or field_type in ['devtype-id', 'cluster-id', 'endpoint-no', 'node-id', 'epoch-s', 'subject-id', 'vendor-id']:
-                        rust_type = MatterType.get_rust_type(field_type)
-                        if rust_type == "u64":
-                            # No casting needed, get_int already returns u64
-                            field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]),")
-                        else:
-                            # Casting needed
-                            field_assignments.append(f"                {rust_field_name}: item.get_int(&[{field_id}]).map(|v| v as {rust_type}),")
+                    elif is_numeric_or_id_type(field_type):
+                        field_assignments.append(build_numeric_field_assignment(rust_field_name, field_id, field_type))
                     elif field_type == 'string':
                         field_assignments.append(f"                {rust_field_name}: item.get_string_owned(&[{field_id}]),")
                     elif field_type == 'bool':
@@ -1061,7 +1073,6 @@ def generate_attribute_list_function(cluster_id: str, attributes: List[Attribute
         
         # Create attribute entry with ID and name
         attribute_entries.append(f'        ({clean_attr_id}, "{attribute.name}"),')
-    
     entries_str = "\n".join(attribute_entries)
     
     function = f'''/// Get list of all attributes supported by this cluster
@@ -1191,7 +1202,6 @@ def generate_main_dispatcher(cluster_info: List[Dict[str, str]]) -> str:
         if info['has_attributes'] and info['cluster_id'] not in seen_cluster_ids:
             match_arms.append(f"        {info['cluster_id']} => {info['module_name']}::decode_attribute_json(cluster_id, attribute_id, tlv_value),")
             seen_cluster_ids.add(info['cluster_id'])
-    
     match_arms_str = '\n'.join(match_arms)
     
     dispatcher_function = f'''
@@ -1228,7 +1238,6 @@ def generate_main_attribute_list_dispatcher(cluster_info: List[Dict[str, str]]) 
         if info['has_attributes'] and info['cluster_id'] not in seen_cluster_ids:
             match_arms.append(f"        {info['cluster_id']} => {info['module_name']}::get_attribute_list(),")
             seen_cluster_ids.add(info['cluster_id'])
-    
     match_arms_str = '\n'.join(match_arms)
     
     dispatcher_function = f'''
