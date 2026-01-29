@@ -26,6 +26,7 @@ pub struct TlvBuffer {
 const TYPE_INT_1: u8 = 0;
 const TYPE_INT_2: u8 = 1;
 const TYPE_INT_4: u8 = 2;
+const TYPE_INT_8: u8 = 3;
 const TYPE_UINT_1: u8 = 4;
 const TYPE_UINT_2: u8 = 5;
 const TYPE_UINT_4: u8 = 6;
@@ -113,6 +114,16 @@ impl TlvBuffer {
         self.data.write_u8(CTRL_CTX_L1 | TYPE_INT_2)?;
         self.data.write_u8(tag)?;
         self.data.write_i16::<LittleEndian>(value)
+    }
+    pub fn write_int32(&mut self, tag: u8, value: i32) -> Result<()> {
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_INT_4)?;
+        self.data.write_u8(tag)?;
+        self.data.write_i32::<LittleEndian>(value)
+    }
+    pub fn write_int64(&mut self, tag: u8, value: i64) -> Result<()> {
+        self.data.write_u8(CTRL_CTX_L1 | TYPE_INT_8)?;
+        self.data.write_u8(tag)?;
+        self.data.write_i64::<LittleEndian>(value)
     }
     pub fn write_uint8(&mut self, tag: u8, value: u8) -> Result<()> {
         self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_1)?;
@@ -566,7 +577,10 @@ pub fn decode_tlv(data: &[u8]) -> Result<TlvItem> {
 pub enum TlvItemValueEnc {
     Int8(i8),
     Int16(i16),
+    Int32(i32),
+    Int64(i64),
     UInt8(u8),
+    UInt8Anonymous(u8),
     UInt16(u16),
     UInt32(u32),
     UInt64(u64),
@@ -575,6 +589,9 @@ pub enum TlvItemValueEnc {
     OctetString(Vec<u8>),
     StructAnon(Vec<TlvItemEnc>),
     StructInvisible(Vec<TlvItemEnc>),
+    Struct(Vec<TlvItemEnc>),
+    List(Vec<TlvItemEnc>),
+    Array(Vec<TlvItemEnc>),
     Invalid(),
 }
 
@@ -615,8 +632,17 @@ impl TlvItemEnc {
             TlvItemValueEnc::Int16(i) => {
                 buf.write_int16(self.tag, *i)?;
             }
+            TlvItemValueEnc::Int32(i) => {
+                buf.write_int32(self.tag, *i)?;
+            }
+            TlvItemValueEnc::Int64(i) => {
+                buf.write_int64(self.tag, *i)?;
+            }
             TlvItemValueEnc::UInt8(i) => {
                 buf.write_uint8(self.tag, *i)?;
+            }
+            TlvItemValueEnc::UInt8Anonymous(i) => {
+                buf.write_uint8_notag(*i)?;
             }
             TlvItemValueEnc::UInt16(i) => {
                 buf.write_uint16(self.tag, *i)?;
@@ -638,6 +664,27 @@ impl TlvItemEnc {
             }
             TlvItemValueEnc::StructAnon(vec) => {
                 buf.write_anon_struct()?;
+                for i in vec {
+                    i.encode_internal(buf)?;
+                }
+                buf.write_struct_end()?;
+            }
+            TlvItemValueEnc::Struct(vec) => {
+                buf.write_struct(self.tag)?;
+                for i in vec {
+                    i.encode_internal(buf)?;
+                }
+                buf.write_struct_end()?;
+            }
+            TlvItemValueEnc::List(vec) => {
+                buf.write_list(self.tag)?;
+                for i in vec {
+                    i.encode_internal(buf)?;
+                }
+                buf.write_struct_end()?;
+            }
+            TlvItemValueEnc::Array(vec) => {
+                buf.write_array(self.tag)?;
                 for i in vec {
                     i.encode_internal(buf)?;
                 }
