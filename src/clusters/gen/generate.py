@@ -33,14 +33,6 @@ def build_numeric_field_assignment(var_name: str, field_id: int, matter_type: st
     else:
         return f"{indent}{var_name}: {item_var}.get_int(&[{field_id}]).map(|v| v as {rust_type}),"
 
-def build_nested_numeric_assignment(var_name: str, field_id: int, matter_type: str, list_item_var: str = 'list_item', indent: str = '                                ') -> str:
-    rust_type = MatterType.get_rust_type(matter_type)
-    if rust_type == 'u64':
-        return f"{indent}{var_name}: {list_item_var}.get_int(&[{field_id}]),"
-    else:
-        return f"{indent}{var_name}: {list_item_var}.get_int(&[{field_id}]).map(|v| v as {rust_type}),"
-
-
 def convert_to_snake_case(name: str) -> str:
     """
     Convert CamelCase to snake_case with proper handling of abbreviations.
@@ -492,7 +484,7 @@ class AttributeField:
         """Generate Rust decode function for this attribute."""
         func_name = self.get_rust_function_name()
         return_type = self.get_rust_return_type(structs)
-        clean_id = self.id.replace('0x0x', '0x') if self.id.startswith('0x0x') else self.id
+        clean_id = self.id
         
         if self.is_list:
             if self.entry_type and structs and self.entry_type in structs:
@@ -812,7 +804,7 @@ class MatterCommand:
         tlv_fields_str = "\n".join(tlv_fields) if tlv_fields else "        // No fields"
         
         # Clean up command ID format
-        clean_id = self.id.replace('0x0x', '0x') if self.id.startswith('0x0x') else self.id
+        clean_id = self.id
         
         # Generate function
         function = f'''/// Encode {self.name} command ({clean_id})
@@ -825,7 +817,6 @@ pub fn {func_name}({param_str}) -> anyhow::Result<Vec<u8>> {{
     }};
     Ok(tlv.encode()?)
 }}'''
-        
         return function
 
 
@@ -992,16 +983,14 @@ def generate_json_dispatcher_function(cluster_id: str, attributes: List[Attribut
     if not attributes:
         return ""
     
-    # Clean up cluster ID format
-    clean_cluster_id = cluster_id.replace('0x0x', '0x') if cluster_id.startswith('0x0x') else cluster_id
+    clean_cluster_id = cluster_id
     
     # Generate match arms for each unique attribute (deduplicate by ID)
     match_arms = []
     seen_ids = set()
     for attribute in attributes:
-        # Clean up attribute ID format
-        clean_attr_id = attribute.id.replace('0x0x', '0x') if attribute.id.startswith('0x0x') else attribute.id
-        
+        clean_attr_id = attribute.id
+
         # Skip duplicates
         if clean_attr_id in seen_ids:
             continue
@@ -1052,17 +1041,13 @@ def generate_attribute_list_function(cluster_id: str, attributes: List[Attribute
     """Generate a function that returns all attributes for this cluster as a list."""
     if not attributes:
         return ""
-    
-    # Clean up cluster ID format
-    clean_cluster_id = cluster_id.replace('0x0x', '0x') if cluster_id.startswith('0x0x') else cluster_id
-    
+
     # Generate attribute list entries
     attribute_entries = []
     seen_ids = set()
     
     for attribute in attributes:
-        # Clean up attribute ID format
-        clean_attr_id = attribute.id.replace('0x0x', '0x') if attribute.id.startswith('0x0x') else attribute.id
+        clean_attr_id = attribute.id
         
         # Skip duplicates
         if clean_attr_id in seen_ids:

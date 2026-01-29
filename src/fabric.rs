@@ -19,6 +19,7 @@ impl Fabric {
         }
     }
 
+    /// Compressed fabric identifier
     pub fn compressed(&self) -> Result<Vec<u8>> {
         let mut buf_id = Vec::new();
         buf_id.write_u64::<BigEndian>(self.id)?;
@@ -30,6 +31,7 @@ impl Fabric {
         )
     }
 
+    /// Integrity Protection Key
     pub fn signed_ipk(&self) -> Result<Vec<u8>> {
         crate::util::cryptoutil::hkdf_sha256(
             &self.compressed()?,

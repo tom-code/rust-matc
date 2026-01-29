@@ -1,3 +1,7 @@
+// Simple UDP transport abstraction that multiplexes datagrams by remote address
+// into per-connection mpsc channels. Each Connection is a logical association
+// identified solely by the peer's socket address string.
+
 use anyhow::{Context, Result};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::Mutex};
@@ -7,6 +11,11 @@ struct ConnectionInfo {
     sender: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
+/// Shared transport holding:
+/// * a single UDP socket
+/// * a map of remote_addr -> channel sender
+/// * a task to read incoming datagrams and dispatch them
+/// * a task to remove connection entries when Connections drop
 pub struct Transport {
     socket: Arc<UdpSocket>,
     connections: Mutex<HashMap<String, ConnectionInfo>>,
@@ -14,6 +23,8 @@ pub struct Transport {
     stop_receive_token: tokio_util::sync::CancellationToken,
 }
 
+/// Logical connection bound to a remote UDP address. Receiving is done by
+/// reading from an mpsc channel populated by the Transport reader task.
 pub struct Connection {
     transport: Arc<Transport>,
     remote_address: String,
@@ -55,6 +66,7 @@ impl Transport {
             match to_remove {
                 Some(to_remove) => {
                     if to_remove.is_empty() {
+                        // Empty string used as sentinel to terminate this task.
                         break;
                     }
                     let self_strong = self_weak
@@ -63,12 +75,13 @@ impl Transport {
                     let mut cons = self_strong.connections.lock().await;
                     _ = cons.remove(&to_remove);
                 }
-                None => break,
+                None => break, // Sender dropped => shutdown
             }
         }
         Ok(())
     }
 
+    /// Bind a UDP socket and spawn background tasks.
     pub async fn new(local: &str) -> Result<Arc<Self>> {
         let socket = UdpSocket::bind(local).await?;
         let (remove_channel_sender, remove_channel_receiver) =
@@ -93,6 +106,7 @@ impl Transport {
         Ok(o)
     }
 
+    /// Create (or replace) a logical connection entry for the given remote address.
     pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<Connection> {
         let mut clock = self.connections.lock().await;
         let (sender, receiver) = tokio::sync::mpsc::channel(32);
@@ -106,6 +120,7 @@ impl Transport {
 }
 
 impl Connection {
+    /// Send a datagram to the remote address.
     pub async fn send(&self, data: &[u8]) -> Result<()> {
         self.transport
             .socket
@@ -113,6 +128,7 @@ impl Connection {
             .await?;
         Ok(())
     }
+    /// Receive the next datagram for this connection (with timeout).
     pub async fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
         let mut ch = self.receiver.lock().await;
         let rec_future = ch.recv();

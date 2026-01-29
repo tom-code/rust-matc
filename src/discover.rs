@@ -43,7 +43,7 @@ fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
         let len = cursor.read_u8()?;
         let mut buf = vec![0; len as usize];
         cursor.read_exact(buf.as_mut_slice())?;
-        let splitstr = std::str::from_utf8(&buf)?.split("=");
+        let splitstr = std::str::from_utf8(&buf)?.splitn(2, "=");
         let x: Vec<&str> = splitstr.collect();
         if x.len() == 2 {
             out.insert(x[0].to_owned(), x[1].to_owned());
