@@ -5,5 +5,16 @@
 
 
 
+// Bitmap definitions
+
+/// Alarm bitmap type
+pub type Alarm = u8;
+
+/// Constants for Alarm
+pub mod alarm {
+    /// The cabinet's door has been open for a vendor defined amount of time.
+    pub const DOOR_OPEN: u8 = 0x01;
+}
+
 // Command encoders
 

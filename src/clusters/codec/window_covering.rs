@@ -168,18 +168,78 @@ impl From<Type> for u8 {
     }
 }
 
-// Command encoders
+// Bitmap definitions
 
-/// Encode GoToLiftValue command (0x04)
-pub fn encode_go_to_lift_value(lift_value: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(lift_value)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
+/// ConfigStatus bitmap type
+pub type ConfigStatus = u8;
+
+/// Constants for ConfigStatus
+pub mod configstatus {
+    /// Device is operational.
+    pub const OPERATIONAL: u8 = 0x01;
+    pub const ONLINE_RESERVED: u8 = 0x02;
+    /// The lift movement is reversed.
+    pub const LIFT_MOVEMENT_REVERSED: u8 = 0x04;
+    /// Supports the PositionAwareLift feature (PA_LF).
+    pub const LIFT_POSITION_AWARE: u8 = 0x08;
+    /// Supports the PositionAwareTilt feature (PA_TL).
+    pub const TILT_POSITION_AWARE: u8 = 0x10;
+    /// Uses an encoder for lift.
+    pub const LIFT_ENCODER_CONTROLLED: u8 = 0x20;
+    /// Uses an encoder for tilt.
+    pub const TILT_ENCODER_CONTROLLED: u8 = 0x40;
 }
+
+/// Mode bitmap type
+pub type Mode = u8;
+
+/// Constants for Mode
+pub mod mode {
+    /// Reverse the lift direction.
+    pub const MOTOR_DIRECTION_REVERSED: u8 = 0x01;
+    /// Perform a calibration.
+    pub const CALIBRATION_MODE: u8 = 0x02;
+    /// Freeze all motions for maintenance.
+    pub const MAINTENANCE_MODE: u8 = 0x04;
+    /// Control the LEDs feedback.
+    pub const LED_FEEDBACK: u8 = 0x08;
+}
+
+/// OperationalStatus bitmap type
+pub type OperationalStatus = u8;
+
+/// SafetyStatus bitmap type
+pub type SafetyStatus = u16;
+
+/// Constants for SafetyStatus
+pub mod safetystatus {
+    /// Movement commands are ignored (locked out). e.g. not granted authorization, outside some time/date range.
+    pub const REMOTE_LOCKOUT: u16 = 0x01;
+    /// Tampering detected on sensors or any other safety equipment. Ex: a device has been forcedly moved without its actuator(s).
+    pub const TAMPER_DETECTION: u16 = 0x02;
+    /// Communication failure to sensors or other safety equipment.
+    pub const FAILED_COMMUNICATION: u16 = 0x04;
+    /// Device has failed to reach the desired position. e.g. with position aware device, time expired before TargetPosition is reached.
+    pub const POSITION_FAILURE: u16 = 0x08;
+    /// Motor(s) and/or electric circuit thermal protection activated.
+    pub const THERMAL_PROTECTION: u16 = 0x10;
+    /// An obstacle is preventing actuator movement.
+    pub const OBSTACLE_DETECTED: u16 = 0x20;
+    /// Device has power related issue or limitation e.g. device is running w/ the help of a backup battery or power might not be fully available at the moment.
+    pub const POWER: u16 = 0x40;
+    /// Local safety sensor (not a direct obstacle) is preventing movements (e.g. Safety EU Standard EN60335).
+    pub const STOP_INPUT: u16 = 0x80;
+    /// Mechanical problem related to the motor(s) detected.
+    pub const MOTOR_JAMMED: u16 = 0x100;
+    /// PCB, fuse and other electrics problems.
+    pub const HARDWARE_FAILURE: u16 = 0x200;
+    /// Actuator is manually operated and is preventing actuator movement (e.g. actuator is disengaged/decoupled).
+    pub const MANUAL_OPERATION: u16 = 0x400;
+    /// Protection is activated.
+    pub const PROTECTION: u16 = 0x800;
+}
+
+// Command encoders
 
 /// Encode GoToLiftPercentage command (0x05)
 pub fn encode_go_to_lift_percentage(lift_percent100ths_value: u8) -> anyhow::Result<Vec<u8>> {
@@ -187,17 +247,6 @@ pub fn encode_go_to_lift_percentage(lift_percent100ths_value: u8) -> anyhow::Res
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt8(lift_percent100ths_value)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode GoToTiltValue command (0x07)
-pub fn encode_go_to_tilt_value(tilt_value: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(tilt_value)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -225,42 +274,6 @@ pub fn decode_type_(inp: &tlv::TlvItemValue) -> anyhow::Result<Type> {
     }
 }
 
-/// Decode PhysicalClosedLimitLift attribute (0x0001)
-pub fn decode_physical_closed_limit_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u16)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt16"))
-    }
-}
-
-/// Decode PhysicalClosedLimitTilt attribute (0x0002)
-pub fn decode_physical_closed_limit_tilt(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u16)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt16"))
-    }
-}
-
-/// Decode CurrentPositionLift attribute (0x0003)
-pub fn decode_current_position_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u16>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u16))
-    } else {
-        Ok(None)
-    }
-}
-
-/// Decode CurrentPositionTilt attribute (0x0004)
-pub fn decode_current_position_tilt(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u16>> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u16))
-    } else {
-        Ok(None)
-    }
-}
-
 /// Decode NumberOfActuationsLift attribute (0x0005)
 pub fn decode_number_of_actuations_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
     if let tlv::TlvItemValue::Int(v) = inp {
@@ -280,11 +293,11 @@ pub fn decode_number_of_actuations_tilt(inp: &tlv::TlvItemValue) -> anyhow::Resu
 }
 
 /// Decode ConfigStatus attribute (0x0007)
-pub fn decode_config_status(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_config_status(inp: &tlv::TlvItemValue) -> anyhow::Result<ConfigStatus> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -307,11 +320,11 @@ pub fn decode_current_position_tilt_percentage(inp: &tlv::TlvItemValue) -> anyho
 }
 
 /// Decode OperationalStatus attribute (0x000A)
-pub fn decode_operational_status(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_operational_status(inp: &tlv::TlvItemValue) -> anyhow::Result<OperationalStatus> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -360,102 +373,21 @@ pub fn decode_current_position_tilt_percent100ths(inp: &tlv::TlvItemValue) -> an
     }
 }
 
-/// Decode InstalledOpenLimitLift attribute (0x0010)
-pub fn decode_installed_open_limit_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u16)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt16"))
-    }
-}
-
-/// Decode InstalledClosedLimitLift attribute (0x0011)
-pub fn decode_installed_closed_limit_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u16)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt16"))
-    }
-}
-
-/// Decode InstalledOpenLimitTilt attribute (0x0012)
-pub fn decode_installed_open_limit_tilt(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u16)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt16"))
-    }
-}
-
-/// Decode InstalledClosedLimitTilt attribute (0x0013)
-pub fn decode_installed_closed_limit_tilt(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u16)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt16"))
-    }
-}
-
-/// Decode VelocityLift attribute (0x0014)
-pub fn decode_velocity_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
-/// Decode AccelerationTimeLift attribute (0x0015)
-pub fn decode_acceleration_time_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
-/// Decode DecelerationTimeLift attribute (0x0016)
-pub fn decode_deceleration_time_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
 /// Decode Mode attribute (0x0017)
-pub fn decode_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<Mode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
-/// Decode IntermediateSetpointsLift attribute (0x0018)
-pub fn decode_intermediate_setpoints_lift(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
-/// Decode IntermediateSetpointsTilt attribute (0x0019)
-pub fn decode_intermediate_setpoints_tilt(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode SafetyStatus attribute (0x001A)
-pub fn decode_safety_status(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_safety_status(inp: &tlv::TlvItemValue) -> anyhow::Result<SafetyStatus> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as u16)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -480,30 +412,6 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
     match attribute_id {
         0x0000 => {
             match decode_type_(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0001 => {
-            match decode_physical_closed_limit_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0002 => {
-            match decode_physical_closed_limit_tilt(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0003 => {
-            match decode_current_position_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0004 => {
-            match decode_current_position_tilt(tlv_value) {
                 Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
@@ -574,62 +482,8 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
-        0x0010 => {
-            match decode_installed_open_limit_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0011 => {
-            match decode_installed_closed_limit_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0012 => {
-            match decode_installed_open_limit_tilt(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0013 => {
-            match decode_installed_closed_limit_tilt(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0014 => {
-            match decode_velocity_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0015 => {
-            match decode_acceleration_time_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0016 => {
-            match decode_deceleration_time_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
         0x0017 => {
             match decode_mode(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0018 => {
-            match decode_intermediate_setpoints_lift(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0019 => {
-            match decode_intermediate_setpoints_tilt(tlv_value) {
                 Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
@@ -651,10 +505,6 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
 pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     vec![
         (0x0000, "Type"),
-        (0x0001, "PhysicalClosedLimitLift"),
-        (0x0002, "PhysicalClosedLimitTilt"),
-        (0x0003, "CurrentPositionLift"),
-        (0x0004, "CurrentPositionTilt"),
         (0x0005, "NumberOfActuationsLift"),
         (0x0006, "NumberOfActuationsTilt"),
         (0x0007, "ConfigStatus"),
@@ -666,16 +516,7 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x000D, "EndProductType"),
         (0x000E, "CurrentPositionLiftPercent100ths"),
         (0x000F, "CurrentPositionTiltPercent100ths"),
-        (0x0010, "InstalledOpenLimitLift"),
-        (0x0011, "InstalledClosedLimitLift"),
-        (0x0012, "InstalledOpenLimitTilt"),
-        (0x0013, "InstalledClosedLimitTilt"),
-        (0x0014, "VelocityLift"),
-        (0x0015, "AccelerationTimeLift"),
-        (0x0016, "DecelerationTimeLift"),
         (0x0017, "Mode"),
-        (0x0018, "IntermediateSetpointsLift"),
-        (0x0019, "IntermediateSetpointsTilt"),
         (0x001A, "SafetyStatus"),
     ]
 }

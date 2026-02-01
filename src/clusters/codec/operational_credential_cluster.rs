@@ -8,6 +8,9 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -106,18 +109,23 @@ impl From<NodeOperationalCertStatus> for u8 {
 
 #[derive(Debug, serde::Serialize)]
 pub struct FabricDescriptor {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub root_public_key: Option<Vec<u8>>,
     pub vendor_id: Option<u16>,
     pub fabric_id: Option<u8>,
     pub node_id: Option<u64>,
     pub label: Option<String>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub vid_verification_statement: Option<Vec<u8>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct NOC {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub noc: Option<Vec<u8>>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub icac: Option<Vec<u8>>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub vvsc: Option<Vec<u8>>,
 }
 
@@ -362,7 +370,15 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         }
         0x0004 => {
             match decode_trusted_root_certificates(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Ok(value) => {
+                    // Serialize Vec<Vec<u8>> as array of hex strings
+                    let hex_array: Vec<String> = value.iter()
+                        .map(|bytes| bytes.iter()
+                            .map(|byte| format!("{:02x}", byte))
+                            .collect::<String>())
+                        .collect();
+                    serde_json::to_string(&hex_array).unwrap_or_else(|_| "null".to_string())
+                },
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }

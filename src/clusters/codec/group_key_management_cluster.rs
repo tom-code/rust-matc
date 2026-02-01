@@ -8,6 +8,9 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -91,10 +94,13 @@ pub struct GroupKeyMap {
 pub struct GroupKeySet {
     pub group_key_set_id: Option<u16>,
     pub group_key_security_policy: Option<GroupKeySecurityPolicy>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub epoch_key0: Option<Vec<u8>>,
     pub epoch_start_time0: Option<u64>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub epoch_key1: Option<Vec<u8>>,
     pub epoch_start_time1: Option<u64>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub epoch_key2: Option<Vec<u8>>,
     pub epoch_start_time2: Option<u64>,
     pub group_key_multicast_policy: Option<GroupKeyMulticastPolicy>,

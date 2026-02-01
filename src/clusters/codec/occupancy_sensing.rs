@@ -47,6 +47,30 @@ impl From<OccupancySensorType> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// Occupancy bitmap type
+pub type Occupancy = u8;
+
+/// Constants for Occupancy
+pub mod occupancy {
+    /// Indicates the sensed occupancy state
+    pub const OCCUPIED: u8 = 0x01;
+}
+
+/// OccupancySensorTypeBitmap bitmap type
+pub type OccupancySensorTypeBitmap = u8;
+
+/// Constants for OccupancySensorTypeBitmap
+pub mod occupancysensortype {
+    /// Indicates a passive infrared sensor.
+    pub const PIR: u8 = 0x01;
+    /// Indicates a ultrasonic sensor.
+    pub const ULTRASONIC: u8 = 0x02;
+    /// Indicates a physical contact sensor.
+    pub const PHYSICAL_CONTACT: u8 = 0x04;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -59,11 +83,11 @@ pub struct HoldTimeLimits {
 // Attribute decoders
 
 /// Decode Occupancy attribute (0x0000)
-pub fn decode_occupancy(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_occupancy(inp: &tlv::TlvItemValue) -> anyhow::Result<Occupancy> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -77,11 +101,11 @@ pub fn decode_occupancy_sensor_type(inp: &tlv::TlvItemValue) -> anyhow::Result<O
 }
 
 /// Decode OccupancySensorTypeBitmap attribute (0x0002)
-pub fn decode_occupancy_sensor_type_bitmap(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_occupancy_sensor_type_bitmap(inp: &tlv::TlvItemValue) -> anyhow::Result<OccupancySensorTypeBitmap> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

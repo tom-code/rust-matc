@@ -157,6 +157,19 @@ impl From<Status> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// SupportedProtocols bitmap type
+pub type SupportedProtocols = u8;
+
+/// Constants for SupportedProtocols
+pub mod supportedprotocols {
+    /// Device supports Dynamic Adaptive Streaming over HTTP (DASH)
+    pub const DASH: u8 = 0x01;
+    /// Device supports HTTP Live Streaming (HLS)
+    pub const HLS: u8 = 0x02;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -356,11 +369,11 @@ pub fn decode_accept_header(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Strin
 }
 
 /// Decode SupportedStreamingProtocols attribute (0x0001)
-pub fn decode_supported_streaming_protocols(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_supported_streaming_protocols(inp: &tlv::TlvItemValue) -> anyhow::Result<SupportedProtocols> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

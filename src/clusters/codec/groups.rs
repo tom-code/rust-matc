@@ -8,6 +8,17 @@ use anyhow;
 use serde_json;
 
 
+// Bitmap definitions
+
+/// NameSupport bitmap type
+pub type NameSupport = u8;
+
+/// Constants for NameSupport
+pub mod namesupport {
+    /// The ability to store a name for a group.
+    pub const GROUP_NAMES: u8 = 0x80;
+}
+
 // Command encoders
 
 /// Encode AddGroup command (0x00)
@@ -70,11 +81,11 @@ pub fn encode_add_group_if_identifying(group_id: u8, group_name: String) -> anyh
 // Attribute decoders
 
 /// Decode NameSupport attribute (0x0000)
-pub fn decode_name_support(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_name_support(inp: &tlv::TlvItemValue) -> anyhow::Result<NameSupport> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

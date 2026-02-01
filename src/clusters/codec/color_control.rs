@@ -288,10 +288,53 @@ impl From<StepMode> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// ColorCapabilities bitmap type
+pub type ColorCapabilities = u8;
+
+/// Constants for ColorCapabilities
+pub mod colorcapabilities {
+    /// Supports color specification via hue/saturation.
+    pub const HUE_SATURATION: u8 = 0x01;
+    /// Enhanced hue is supported.
+    pub const ENHANCED_HUE: u8 = 0x02;
+    /// Color loop is supported.
+    pub const COLOR_LOOP: u8 = 0x04;
+    /// Supports color specification via XY.
+    pub const XY: u8 = 0x08;
+    /// Supports color specification via color temperature.
+    pub const COLOR_TEMPERATURE: u8 = 0x10;
+}
+
+/// Options bitmap type
+pub type Options = u8;
+
+/// Constants for Options
+pub mod options {
+    /// Dependency on On/Off cluster
+    pub const EXECUTE_IF_OFF: u8 = 0x01;
+}
+
+/// UpdateFlags bitmap type
+pub type UpdateFlags = u8;
+
+/// Constants for UpdateFlags
+pub mod updateflags {
+    /// Device adheres to the associated action field.
+    pub const UPDATE_ACTION: u8 = 0x01;
+    /// Device updates the associated direction attribute.
+    pub const UPDATE_DIRECTION: u8 = 0x02;
+    /// Device updates the associated time attribute.
+    pub const UPDATE_TIME: u8 = 0x04;
+    /// Device updates the associated start hue attribute.
+    pub const UPDATE_START_HUE: u8 = 0x08;
+}
+
 // Command encoders
 
 /// Encode MoveToHue command (0x00)
-pub fn encode_move_to_hue(hue: u8, direction: Direction, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_hue(hue: u8, direction: Direction, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -306,7 +349,7 @@ pub fn encode_move_to_hue(hue: u8, direction: Direction, transition_time: u16, o
 }
 
 /// Encode MoveHue command (0x01)
-pub fn encode_move_hue(move_mode: MoveMode, rate: u8, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_hue(move_mode: MoveMode, rate: u8, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -320,7 +363,7 @@ pub fn encode_move_hue(move_mode: MoveMode, rate: u8, options_mask: u8, options_
 }
 
 /// Encode StepHue command (0x02)
-pub fn encode_step_hue(step_mode: StepMode, step_size: u8, transition_time: u8, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step_hue(step_mode: StepMode, step_size: u8, transition_time: u8, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -335,7 +378,7 @@ pub fn encode_step_hue(step_mode: StepMode, step_size: u8, transition_time: u8, 
 }
 
 /// Encode MoveToSaturation command (0x03)
-pub fn encode_move_to_saturation(saturation: u8, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_saturation(saturation: u8, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -349,7 +392,7 @@ pub fn encode_move_to_saturation(saturation: u8, transition_time: u16, options_m
 }
 
 /// Encode MoveSaturation command (0x04)
-pub fn encode_move_saturation(move_mode: MoveMode, rate: u8, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_saturation(move_mode: MoveMode, rate: u8, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -363,7 +406,7 @@ pub fn encode_move_saturation(move_mode: MoveMode, rate: u8, options_mask: u8, o
 }
 
 /// Encode StepSaturation command (0x05)
-pub fn encode_step_saturation(step_mode: StepMode, step_size: u8, transition_time: u8, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step_saturation(step_mode: StepMode, step_size: u8, transition_time: u8, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -378,7 +421,7 @@ pub fn encode_step_saturation(step_mode: StepMode, step_size: u8, transition_tim
 }
 
 /// Encode MoveToHueAndSaturation command (0x06)
-pub fn encode_move_to_hue_and_saturation(hue: u8, saturation: u8, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_hue_and_saturation(hue: u8, saturation: u8, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -393,7 +436,7 @@ pub fn encode_move_to_hue_and_saturation(hue: u8, saturation: u8, transition_tim
 }
 
 /// Encode MoveToColor command (0x07)
-pub fn encode_move_to_color(color_x: u16, color_y: u16, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_color(color_x: u16, color_y: u16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -408,7 +451,7 @@ pub fn encode_move_to_color(color_x: u16, color_y: u16, transition_time: u16, op
 }
 
 /// Encode MoveColor command (0x08)
-pub fn encode_move_color(rate_x: i16, rate_y: i16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_color(rate_x: i16, rate_y: i16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -422,7 +465,7 @@ pub fn encode_move_color(rate_x: i16, rate_y: i16, options_mask: u8, options_ove
 }
 
 /// Encode StepColor command (0x09)
-pub fn encode_step_color(step_x: i16, step_y: i16, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step_color(step_x: i16, step_y: i16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -437,7 +480,7 @@ pub fn encode_step_color(step_x: i16, step_y: i16, transition_time: u16, options
 }
 
 /// Encode MoveToColorTemperature command (0x0A)
-pub fn encode_move_to_color_temperature(color_temperature_mireds: u16, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_color_temperature(color_temperature_mireds: u16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -451,7 +494,7 @@ pub fn encode_move_to_color_temperature(color_temperature_mireds: u16, transitio
 }
 
 /// Encode EnhancedMoveToHue command (0x40)
-pub fn encode_enhanced_move_to_hue(enhanced_hue: u16, direction: Direction, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enhanced_move_to_hue(enhanced_hue: u16, direction: Direction, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -466,7 +509,7 @@ pub fn encode_enhanced_move_to_hue(enhanced_hue: u16, direction: Direction, tran
 }
 
 /// Encode EnhancedMoveHue command (0x41)
-pub fn encode_enhanced_move_hue(move_mode: MoveMode, rate: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enhanced_move_hue(move_mode: MoveMode, rate: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -480,7 +523,7 @@ pub fn encode_enhanced_move_hue(move_mode: MoveMode, rate: u16, options_mask: u8
 }
 
 /// Encode EnhancedStepHue command (0x42)
-pub fn encode_enhanced_step_hue(step_mode: StepMode, step_size: u16, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enhanced_step_hue(step_mode: StepMode, step_size: u16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -495,7 +538,7 @@ pub fn encode_enhanced_step_hue(step_mode: StepMode, step_size: u16, transition_
 }
 
 /// Encode EnhancedMoveToHueAndSaturation command (0x43)
-pub fn encode_enhanced_move_to_hue_and_saturation(enhanced_hue: u16, saturation: u8, transition_time: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enhanced_move_to_hue_and_saturation(enhanced_hue: u16, saturation: u8, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -510,7 +553,7 @@ pub fn encode_enhanced_move_to_hue_and_saturation(enhanced_hue: u16, saturation:
 }
 
 /// Encode ColorLoopSet command (0x44)
-pub fn encode_color_loop_set(update_flags: u8, action: ColorLoopAction, direction: ColorLoopDirection, time: u16, start_hue: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_color_loop_set(update_flags: UpdateFlags, action: ColorLoopAction, direction: ColorLoopDirection, time: u16, start_hue: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -527,7 +570,7 @@ pub fn encode_color_loop_set(update_flags: u8, action: ColorLoopAction, directio
 }
 
 /// Encode StopMoveStep command (0x47)
-pub fn encode_stop_move_step(options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_stop_move_step(options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -539,7 +582,7 @@ pub fn encode_stop_move_step(options_mask: u8, options_override: u8) -> anyhow::
 }
 
 /// Encode MoveColorTemperature command (0x4B)
-pub fn encode_move_color_temperature(move_mode: MoveMode, rate: u16, color_temperature_minimum_mireds: u16, color_temperature_maximum_mireds: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_color_temperature(move_mode: MoveMode, rate: u16, color_temperature_minimum_mireds: u16, color_temperature_maximum_mireds: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -555,7 +598,7 @@ pub fn encode_move_color_temperature(move_mode: MoveMode, rate: u16, color_tempe
 }
 
 /// Encode StepColorTemperature command (0x4C)
-pub fn encode_step_color_temperature(step_mode: StepMode, step_size: u16, transition_time: u16, color_temperature_minimum_mireds: u16, color_temperature_maximum_mireds: u16, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step_color_temperature(step_mode: StepMode, step_size: u16, transition_time: u16, color_temperature_minimum_mireds: u16, color_temperature_maximum_mireds: u16, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -655,11 +698,11 @@ pub fn decode_color_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<ColorMode> {
 }
 
 /// Decode Options attribute (0x000F)
-pub fn decode_options(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_options(inp: &tlv::TlvItemValue) -> anyhow::Result<Options> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -997,11 +1040,11 @@ pub fn decode_color_loop_stored_enhanced_hue(inp: &tlv::TlvItemValue) -> anyhow:
 }
 
 /// Decode ColorCapabilities attribute (0x400A)
-pub fn decode_color_capabilities(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_color_capabilities(inp: &tlv::TlvItemValue) -> anyhow::Result<ColorCapabilities> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

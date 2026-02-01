@@ -8,10 +8,32 @@ use anyhow;
 use serde_json;
 
 
+// Bitmap definitions
+
+/// AlarmMode bitmap type
+pub type AlarmMode = u8;
+
+/// Constants for AlarmMode
+pub mod alarmmode {
+    /// Visual alarming
+    pub const VISUAL: u8 = 0x01;
+    /// Audible alarming
+    pub const AUDIBLE: u8 = 0x02;
+}
+
+/// SensorFault bitmap type
+pub type SensorFault = u8;
+
+/// Constants for SensorFault
+pub mod sensorfault {
+    /// Unspecified fault detected
+    pub const GENERAL_FAULT: u8 = 0x01;
+}
+
 // Command encoders
 
 /// Encode SuppressAlarm command (0x00)
-pub fn encode_suppress_alarm(alarms_to_suppress: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_suppress_alarm(alarms_to_suppress: AlarmMode) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -22,7 +44,7 @@ pub fn encode_suppress_alarm(alarms_to_suppress: u8) -> anyhow::Result<Vec<u8>> 
 }
 
 /// Encode EnableDisableAlarm command (0x01)
-pub fn encode_enable_disable_alarm(alarms_to_enable_disable: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enable_disable_alarm(alarms_to_enable_disable: AlarmMode) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -62,47 +84,47 @@ pub fn decode_default_sensitivity_level(inp: &tlv::TlvItemValue) -> anyhow::Resu
 }
 
 /// Decode AlarmsActive attribute (0x0003)
-pub fn decode_alarms_active(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_alarms_active(inp: &tlv::TlvItemValue) -> anyhow::Result<AlarmMode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode AlarmsSuppressed attribute (0x0004)
-pub fn decode_alarms_suppressed(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_alarms_suppressed(inp: &tlv::TlvItemValue) -> anyhow::Result<AlarmMode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode AlarmsEnabled attribute (0x0005)
-pub fn decode_alarms_enabled(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_alarms_enabled(inp: &tlv::TlvItemValue) -> anyhow::Result<AlarmMode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode AlarmsSupported attribute (0x0006)
-pub fn decode_alarms_supported(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_alarms_supported(inp: &tlv::TlvItemValue) -> anyhow::Result<AlarmMode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode SensorFault attribute (0x0007)
-pub fn decode_sensor_fault(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_sensor_fault(inp: &tlv::TlvItemValue) -> anyhow::Result<SensorFault> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

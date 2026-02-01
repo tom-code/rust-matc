@@ -8,6 +8,17 @@ use anyhow;
 use serde_json;
 
 
+// Bitmap definitions
+
+/// CopyMode bitmap type
+pub type CopyMode = u8;
+
+/// Constants for CopyMode
+pub mod copymode {
+    /// Copy all scenes in the scene table
+    pub const COPY_ALL_SCENES: u8 = 0x01;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -49,7 +60,7 @@ pub fn encode_add_scene(group_id: u8, scene_id: u8, transition_time: u32, scene_
         (1, tlv::TlvItemValueEnc::UInt8(scene_id)).into(),
         (2, tlv::TlvItemValueEnc::UInt32(transition_time)).into(),
         (3, tlv::TlvItemValueEnc::String(scene_name)).into(),
-        (4, tlv::TlvItemValueEnc::StructAnon(extension_field_set_structs.into_iter().map(|v| {
+        (4, tlv::TlvItemValueEnc::Array(extension_field_set_structs.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.cluster_id { fields.push((0, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
                     if let Some(listv) = v.attribute_value_list {
@@ -64,11 +75,11 @@ pub fn encode_add_scene(group_id: u8, scene_id: u8, transition_time: u32, scene_
                                 if let Some(x) = inner.value_signed32 { nested_fields.push((6, tlv::TlvItemValueEnc::Int32(x as i32)).into()); }
                                 if let Some(x) = inner.value_unsigned64 { nested_fields.push((7, tlv::TlvItemValueEnc::UInt64(x)).into()); }
                                 if let Some(x) = inner.value_signed64 { nested_fields.push((8, tlv::TlvItemValueEnc::Int64(x as i64)).into()); }
-                            (0, tlv::TlvItemValueEnc::StructInvisible(nested_fields)).into()
+                            (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                         }).collect();
-                        fields.push((1, tlv::TlvItemValueEnc::StructAnon(inner_vec)).into());
+                        fields.push((1, tlv::TlvItemValueEnc::Array(inner_vec)).into());
                     }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };
@@ -147,7 +158,7 @@ pub fn encode_get_scene_membership(group_id: u8) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode CopyScene command (0x40)
-pub fn encode_copy_scene(mode: u8, group_identifier_from: u8, scene_identifier_from: u8, group_identifier_to: u8, scene_identifier_to: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_copy_scene(mode: CopyMode, group_identifier_from: u8, scene_identifier_from: u8, group_identifier_to: u8, scene_identifier_to: u8) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![

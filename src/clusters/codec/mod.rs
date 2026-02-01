@@ -16,9 +16,17 @@ pub mod binding_cluster;
 pub mod boolean_state;
 pub mod boolean_state_configuration;
 pub mod bridged_device_basic_information_cluster;
+pub mod camera_av_settings_user_level_management;
+pub mod camera_av_stream_management;
 pub mod channel;
+pub mod chime;
+pub mod closure_control;
+pub mod closure_dimension;
 pub mod color_control;
 pub mod commissioner_control_cluster;
+pub mod commodity_metering;
+pub mod commodity_price;
+pub mod commodity_tariff;
 pub mod concentration_measurement;
 pub mod content_app_observer;
 pub mod content_control;
@@ -35,6 +43,7 @@ pub mod dishwasher_alarm;
 pub mod door_lock;
 pub mod ecosystem_information_cluster;
 pub mod electrical_energy_measurement;
+pub mod electrical_grid_conditions;
 pub mod electrical_power_measurement;
 pub mod energy_evse;
 pub mod energy_preference;
@@ -61,6 +70,7 @@ pub mod low_power;
 pub mod media_input;
 pub mod media_playback;
 pub mod messages;
+pub mod meter_identification;
 pub mod microwave_oven_control;
 pub mod mode_base;
 pub mod mode_device_energy_management;
@@ -88,11 +98,13 @@ pub mod power_source_configuration_cluster;
 pub mod power_topology;
 pub mod pressure_measurement;
 pub mod pump_configuration_control;
+pub mod push_av_stream_transport;
 pub mod refrigerator_alarm;
 pub mod resource_monitoring;
 pub mod scenes;
 pub mod service_area;
 pub mod smoke_co_alarm;
+pub mod soil_measurement;
 pub mod switch;
 pub mod target_navigator;
 pub mod temperature_control;
@@ -102,13 +114,18 @@ pub mod thermostat_user_interface_configuration;
 pub mod thread_border_router_management;
 pub mod thread_network_directory;
 pub mod time_sync;
+pub mod tls_certificate_management;
+pub mod tls_client_management;
 pub mod user_label_cluster;
 pub mod valve_configuration_control;
 pub mod wake_on_lan;
 pub mod water_content_measurement;
 pub mod water_heater_management;
+pub mod web_rtc_provider;
+pub mod web_rtc_requestor;
 pub mod wifi_network_management;
 pub mod window_covering;
+pub mod zone_management;
 
 
 /// Main dispatcher function for decoding attributes to JSON
@@ -178,6 +195,7 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x0090 => electrical_power_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0091 => electrical_energy_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0094 => water_heater_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0095 => commodity_price::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0097 => messages::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0098 => device_energy_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0099 => energy_evse::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -186,8 +204,11 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x009D => mode_evse::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x009E => mode_water_heater::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x009F => mode_device_energy_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x00A0 => electrical_grid_conditions::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0101 => door_lock::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0102 => window_covering::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0104 => closure_control::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0105 => closure_dimension::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0150 => service_area::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0200 => pump_configuration_control::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0201 => thermostat::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -199,6 +220,7 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x0403 => pressure_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0404 => flow_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0406 => occupancy_sensing::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0430 => soil_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0451 => wifi_network_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0452 => thread_border_router_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0453 => thread_network_directory::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -212,10 +234,22 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x050C => application_launcher::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x050D => application_basic::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x050F => content_control::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0550 => zone_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0551 => camera_av_stream_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0552 => camera_av_settings_user_level_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0553 => web_rtc_provider::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0554 => web_rtc_requestor::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0555 => push_av_stream_transport::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0556 => chime::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0700 => commodity_tariff::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0750 => ecosystem_information_cluster::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0751 => commissioner_control_cluster::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0752 => joint_fabric_datastore_cluster::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0753 => joint_fabric_administrator_cluster::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0801 => tls_certificate_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0802 => tls_client_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0B06 => meter_identification::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0B07 => commodity_metering::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         _ => format!("{{\"error\": \"Unsupported cluster ID: {}\"}}", cluster_id),
     }
 }
@@ -286,6 +320,7 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0090 => electrical_power_measurement::get_attribute_list(),
         0x0091 => electrical_energy_measurement::get_attribute_list(),
         0x0094 => water_heater_management::get_attribute_list(),
+        0x0095 => commodity_price::get_attribute_list(),
         0x0097 => messages::get_attribute_list(),
         0x0098 => device_energy_management::get_attribute_list(),
         0x0099 => energy_evse::get_attribute_list(),
@@ -294,8 +329,11 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x009D => mode_evse::get_attribute_list(),
         0x009E => mode_water_heater::get_attribute_list(),
         0x009F => mode_device_energy_management::get_attribute_list(),
+        0x00A0 => electrical_grid_conditions::get_attribute_list(),
         0x0101 => door_lock::get_attribute_list(),
         0x0102 => window_covering::get_attribute_list(),
+        0x0104 => closure_control::get_attribute_list(),
+        0x0105 => closure_dimension::get_attribute_list(),
         0x0150 => service_area::get_attribute_list(),
         0x0200 => pump_configuration_control::get_attribute_list(),
         0x0201 => thermostat::get_attribute_list(),
@@ -307,6 +345,7 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0403 => pressure_measurement::get_attribute_list(),
         0x0404 => flow_measurement::get_attribute_list(),
         0x0406 => occupancy_sensing::get_attribute_list(),
+        0x0430 => soil_measurement::get_attribute_list(),
         0x0451 => wifi_network_management::get_attribute_list(),
         0x0452 => thread_border_router_management::get_attribute_list(),
         0x0453 => thread_network_directory::get_attribute_list(),
@@ -320,10 +359,22 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x050C => application_launcher::get_attribute_list(),
         0x050D => application_basic::get_attribute_list(),
         0x050F => content_control::get_attribute_list(),
+        0x0550 => zone_management::get_attribute_list(),
+        0x0551 => camera_av_stream_management::get_attribute_list(),
+        0x0552 => camera_av_settings_user_level_management::get_attribute_list(),
+        0x0553 => web_rtc_provider::get_attribute_list(),
+        0x0554 => web_rtc_requestor::get_attribute_list(),
+        0x0555 => push_av_stream_transport::get_attribute_list(),
+        0x0556 => chime::get_attribute_list(),
+        0x0700 => commodity_tariff::get_attribute_list(),
         0x0750 => ecosystem_information_cluster::get_attribute_list(),
         0x0751 => commissioner_control_cluster::get_attribute_list(),
         0x0752 => joint_fabric_datastore_cluster::get_attribute_list(),
         0x0753 => joint_fabric_administrator_cluster::get_attribute_list(),
+        0x0801 => tls_certificate_management::get_attribute_list(),
+        0x0802 => tls_client_management::get_attribute_list(),
+        0x0B06 => meter_identification::get_attribute_list(),
+        0x0B07 => commodity_metering::get_attribute_list(),
         _ => vec![],
     }
 }

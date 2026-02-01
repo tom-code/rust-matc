@@ -8,6 +8,9 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -209,6 +212,7 @@ pub struct DatastoreAdministratorInformationEntry {
     pub node_id: Option<u64>,
     pub friendly_name: Option<String>,
     pub vendor_id: Option<u16>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub icac: Option<Vec<u8>>,
 }
 
@@ -259,10 +263,13 @@ pub struct DatastoreGroupInformationEntry {
 pub struct DatastoreGroupKeySet {
     pub group_key_set_id: Option<u16>,
     pub group_key_security_policy: Option<DatastoreGroupKeySecurityPolicy>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub epoch_key0: Option<Vec<u8>>,
     pub epoch_start_time0: Option<u64>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub epoch_key1: Option<Vec<u8>>,
     pub epoch_start_time1: Option<u64>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub epoch_key2: Option<Vec<u8>>,
     pub epoch_start_time2: Option<u64>,
     pub group_key_multicast_policy: Option<DatastoreGroupKeyMulticastPolicy>,
@@ -363,7 +370,7 @@ pub fn encode_add_group(group_id: u8, friendly_name: String, group_key_set_id: O
 }
 
 /// Encode UpdateGroup command (0x04)
-pub fn encode_update_group(group_id: u8, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: DatastoreAccessControlEntryPrivilege) -> anyhow::Result<Vec<u8>> {
+pub fn encode_update_group(group_id: u8, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: Option<DatastoreAccessControlEntryPrivilege>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -372,7 +379,7 @@ pub fn encode_update_group(group_id: u8, friendly_name: Option<String>, group_ke
         (2, tlv::TlvItemValueEnc::UInt16(group_key_set_id.unwrap_or(0))).into(),
         (3, tlv::TlvItemValueEnc::UInt16(group_cat.unwrap_or(0))).into(),
         (4, tlv::TlvItemValueEnc::UInt16(group_cat_version.unwrap_or(0))).into(),
-        (5, tlv::TlvItemValueEnc::UInt8(group_permission.to_u8())).into(),
+        (5, tlv::TlvItemValueEnc::UInt8(group_permission.map(|e| e.to_u8()).unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)

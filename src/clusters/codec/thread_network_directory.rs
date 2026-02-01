@@ -8,10 +8,14 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
 pub struct ThreadNetwork {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub extended_pan_id: Option<Vec<u8>>,
     pub network_name: Option<String>,
     pub channel: Option<u16>,

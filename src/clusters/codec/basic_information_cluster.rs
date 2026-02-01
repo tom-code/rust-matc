@@ -21,7 +21,7 @@ pub enum Color {
     Green = 2,
     /// Approximately RGB #008080.
     Teal = 3,
-    /// Approximately RGB #800080.
+    /// Approximately RGB #800000.
     Maroon = 4,
     /// Approximately RGB #800080.
     Purple = 5,

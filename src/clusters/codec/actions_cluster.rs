@@ -158,6 +158,39 @@ impl From<EndpointListType> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// CommandBits bitmap type
+pub type CommandBits = u16;
+
+/// Constants for CommandBits
+pub mod commandbits {
+    /// Indicate support for InstantAction command
+    pub const INSTANT_ACTION: u16 = 0x01;
+    /// Indicate support for InstantActionWithTransition command
+    pub const INSTANT_ACTION_WITH_TRANSITION: u16 = 0x02;
+    /// Indicate support for StartAction command
+    pub const START_ACTION: u16 = 0x04;
+    /// Indicate support for StartActionWithDuration command
+    pub const START_ACTION_WITH_DURATION: u16 = 0x08;
+    /// Indicate support for StopAction command
+    pub const STOP_ACTION: u16 = 0x10;
+    /// Indicate support for PauseAction command
+    pub const PAUSE_ACTION: u16 = 0x20;
+    /// Indicate support for PauseActionWithDuration command
+    pub const PAUSE_ACTION_WITH_DURATION: u16 = 0x40;
+    /// Indicate support for ResumeAction command
+    pub const RESUME_ACTION: u16 = 0x80;
+    /// Indicate support for EnableAction command
+    pub const ENABLE_ACTION: u16 = 0x100;
+    /// Indicate support for EnableActionWithDuration command
+    pub const ENABLE_ACTION_WITH_DURATION: u16 = 0x200;
+    /// Indicate support for DisableAction command
+    pub const DISABLE_ACTION: u16 = 0x400;
+    /// Indicate support for DisableActionWithDuration command
+    pub const DISABLE_ACTION_WITH_DURATION: u16 = 0x800;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]

@@ -65,6 +65,29 @@ impl From<StatusCode> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// DayOfWeek bitmap type
+pub type DayOfWeek = u8;
+
+/// Constants for DayOfWeek
+pub mod dayofweek {
+    /// Sunday
+    pub const SUNDAY: u8 = 0x01;
+    /// Monday
+    pub const MONDAY: u8 = 0x02;
+    /// Tuesday
+    pub const TUESDAY: u8 = 0x04;
+    /// Wednesday
+    pub const WEDNESDAY: u8 = 0x08;
+    /// Thursday
+    pub const THURSDAY: u8 = 0x10;
+    /// Friday
+    pub const FRIDAY: u8 = 0x20;
+    /// Saturday
+    pub const SATURDAY: u8 = 0x40;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -98,7 +121,7 @@ pub struct TimePeriod {
 #[derive(Debug, serde::Serialize)]
 pub struct TimeWindow {
     pub time_window_index: Option<u16>,
-    pub day_of_week: Option<u8>,
+    pub day_of_week: Option<DayOfWeek>,
     pub time_period: Option<Vec<TimePeriod>>,
 }
 
@@ -166,13 +189,13 @@ pub fn encode_add_block_channels(channels: Vec<BlockChannel>) -> anyhow::Result<
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(channels.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(channels.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.block_channel_index { fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.major_number { fields.push((1, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.minor_number { fields.push((2, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.identifier { fields.push((3, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };
@@ -195,11 +218,11 @@ pub fn encode_add_block_applications(applications: Vec<AppInfo>) -> anyhow::Resu
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(applications.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(applications.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.catalog_vendor_id { fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.application_id { fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };
@@ -211,11 +234,11 @@ pub fn encode_remove_block_applications(applications: Vec<AppInfo>) -> anyhow::R
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(applications.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(applications.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.catalog_vendor_id { fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.application_id { fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };
@@ -227,7 +250,7 @@ pub fn encode_set_block_content_time_window(time_window: TimeWindow) -> anyhow::
             // Encode struct TimeWindowStruct
             let mut time_window_fields = Vec::new();
             if let Some(x) = time_window.time_window_index { time_window_fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
-            if let Some(x) = time_window.day_of_week { time_window_fields.push((1, tlv::TlvItemValueEnc::UInt8(x as u8)).into()); }
+            if let Some(x) = time_window.day_of_week { time_window_fields.push((1, tlv::TlvItemValueEnc::UInt8(x)).into()); }
             // TODO: list of TimePeriodStruct encoding not fully implemented
     let tlv = tlv::TlvItemEnc {
         tag: 0,

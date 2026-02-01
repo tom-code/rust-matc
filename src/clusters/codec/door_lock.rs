@@ -108,11 +108,11 @@ pub enum CredentialType {
     Fingervein = 4,
     /// Face identifier credential type
     Face = 5,
-    /// A Credential Issuer public key as defined in [Aliro&#93;
+    /// A Credential Issuer public key as defined in Aliro
     Alirocredentialissuerkey = 6,
-    /// An Endpoint public key as defined in [Aliro&#93; which can be evicted if space is needed for another endpoint key
+    /// An Endpoint public key as defined in Aliro which can be evicted if space is needed for another endpoint key
     Aliroevictableendpointkey = 7,
-    /// An Endpoint public key as defined in [Aliro&#93; which cannot be evicted if space is needed for another endpoint key
+    /// An Endpoint public key as defined in Aliro which cannot be evicted if space is needed for another endpoint key
     Alirononevictableendpointkey = 8,
 }
 
@@ -593,7 +593,7 @@ pub enum OperationSource {
     Rfid = 8,
     /// Lock/unlock operation came from biometric source (e.g. face, fingerprint/fingervein)
     Biometric = 9,
-    /// Lock/unlock operation came from an interaction defined in [Aliro&#93;, or user change operation was a step-up credential provisioning as defined in [Aliro&#93;
+    /// Lock/unlock operation came from an interaction defined in Aliro, or user change operation was a step-up credential provisioning as defined in Aliro
     Aliro = 10,
 }
 
@@ -785,6 +785,112 @@ impl From<UserType> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// AlarmMask bitmap type
+pub type AlarmMask = u8;
+
+/// Constants for AlarmMask
+pub mod alarmmask {
+    /// Locking Mechanism Jammed
+    pub const LOCK_JAMMED: u8 = 0x01;
+    /// Lock Reset to Factory Defaults
+    pub const LOCK_FACTORY_RESET: u8 = 0x02;
+    /// RF Module Power Cycled
+    pub const LOCK_RADIO_POWER_CYCLED: u8 = 0x08;
+    /// Tamper Alarm - wrong code entry limit
+    pub const WRONG_CODE_ENTRY_LIMIT: u8 = 0x10;
+    /// Tamper Alarm - front escutcheon removed from main
+    pub const FRONT_ESCUTCHEON_REMOVED: u8 = 0x20;
+    /// Forced Door Open under Door Locked Condition
+    pub const DOOR_FORCED_OPEN: u8 = 0x40;
+}
+
+/// ConfigurationRegister bitmap type
+pub type ConfigurationRegister = u8;
+
+/// Constants for ConfigurationRegister
+pub mod configurationregister {
+    /// The state of local programming functionality
+    pub const LOCAL_PROGRAMMING: u8 = 0x01;
+    /// The state of the keypad interface
+    pub const KEYPAD_INTERFACE: u8 = 0x02;
+    /// The state of the remote interface
+    pub const REMOTE_INTERFACE: u8 = 0x04;
+    /// Sound volume is set to Silent value
+    pub const SOUND_VOLUME: u8 = 0x20;
+    /// Auto relock time it set to 0
+    pub const AUTO_RELOCK_TIME: u8 = 0x40;
+    /// LEDs is disabled
+    pub const LEDSETTINGS: u8 = 0x80;
+}
+
+/// CredentialRules bitmap type
+pub type CredentialRules = u8;
+
+/// Constants for CredentialRules
+pub mod credentialrules {
+    /// Only one credential is required for lock operation
+    pub const SINGLE: u8 = 0x01;
+    /// Any two credentials are required for lock operation
+    pub const DUAL: u8 = 0x02;
+    /// Any three credentials are required for lock operation
+    pub const TRI: u8 = 0x04;
+}
+
+/// DaysMask bitmap type
+pub type DaysMask = u8;
+
+/// Constants for DaysMask
+pub mod daysmask {
+    /// Schedule is applied on Sunday
+    pub const SUNDAY: u8 = 0x01;
+    /// Schedule is applied on Monday
+    pub const MONDAY: u8 = 0x02;
+    /// Schedule is applied on Tuesday
+    pub const TUESDAY: u8 = 0x04;
+    /// Schedule is applied on Wednesday
+    pub const WEDNESDAY: u8 = 0x08;
+    /// Schedule is applied on Thursday
+    pub const THURSDAY: u8 = 0x10;
+    /// Schedule is applied on Friday
+    pub const FRIDAY: u8 = 0x20;
+    /// Schedule is applied on Saturday
+    pub const SATURDAY: u8 = 0x40;
+}
+
+/// LocalProgrammingFeatures bitmap type
+pub type LocalProgrammingFeatures = u8;
+
+/// Constants for LocalProgrammingFeatures
+pub mod localprogrammingfeatures {
+    /// The state of the ability to add users, credentials or schedules on the device
+    pub const ADD_USERS_CREDENTIALS_SCHEDULES: u8 = 0x01;
+    /// The state of the ability to modify users, credentials or schedules on the device
+    pub const MODIFY_USERS_CREDENTIALS_SCHEDULES: u8 = 0x02;
+    /// The state of the ability to clear users, credentials or schedules on the device
+    pub const CLEAR_USERS_CREDENTIALS_SCHEDULES: u8 = 0x04;
+    /// The state of the ability to adjust settings on the device
+    pub const ADJUST_SETTINGS: u8 = 0x08;
+}
+
+/// OperatingModes bitmap type
+pub type OperatingModes = u8;
+
+/// Constants for OperatingModes
+pub mod operatingmodes {
+    /// Normal operation mode
+    pub const NORMAL: u8 = 0x01;
+    /// Vacation operation mode
+    pub const VACATION: u8 = 0x02;
+    /// Privacy operation mode
+    pub const PRIVACY: u8 = 0x04;
+    /// No remote lock and unlock operation mode
+    pub const NO_REMOTE_LOCK_UNLOCK: u8 = 0x08;
+    /// Passage operation mode
+    pub const PASSAGE: u8 = 0x10;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -829,67 +935,8 @@ pub fn encode_unlock_with_timeout(timeout: u16, pin_code: Vec<u8>) -> anyhow::Re
     Ok(tlv.encode()?)
 }
 
-/// Encode SetPINCode command (0x05)
-pub fn encode_set_pin_code(user_id: u16, user_status: Option<UserStatus>, user_type: Option<UserType>, pin: Vec<u8>) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(user_status.map(|e| e.to_u8()).unwrap_or(0))).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(user_type.map(|e| e.to_u8()).unwrap_or(0))).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(pin)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode GetPINCode command (0x06)
-pub fn encode_get_pin_code(user_id: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode ClearPINCode command (0x07)
-pub fn encode_clear_pin_code(pin_slot_index: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(pin_slot_index)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode SetUserStatus command (0x09)
-pub fn encode_set_user_status(user_id: u16, user_status: UserStatus) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(user_status.to_u8())).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode GetUserStatus command (0x0A)
-pub fn encode_get_user_status(user_id: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
 /// Encode SetWeekDaySchedule command (0x0B)
-pub fn encode_set_week_day_schedule(week_day_index: u8, user_index: u16, days_mask: u8, start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_week_day_schedule(week_day_index: u8, user_index: u16, days_mask: DaysMask, start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -998,65 +1045,6 @@ pub fn encode_clear_holiday_schedule(holiday_index: u8) -> anyhow::Result<Vec<u8
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt8(holiday_index)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode SetUserType command (0x14)
-pub fn encode_set_user_type(user_id: u16, user_type: UserType) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(user_type.to_u8())).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode GetUserType command (0x15)
-pub fn encode_get_user_type(user_id: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode SetRFIDCode command (0x16)
-pub fn encode_set_rfid_code(user_id: u16, user_status: Option<UserStatus>, user_type: Option<UserType>, rfid_code: Vec<u8>) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(user_status.map(|e| e.to_u8()).unwrap_or(0))).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(user_type.map(|e| e.to_u8()).unwrap_or(0))).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(rfid_code)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode GetRFIDCode command (0x17)
-pub fn encode_get_rfid_code(user_id: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(user_id)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode ClearRFIDCode command (0x18)
-pub fn encode_clear_rfid_code(rfid_slot_index: u16) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(rfid_slot_index)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -1337,11 +1325,11 @@ pub fn decode_min_rfid_code_length(inp: &tlv::TlvItemValue) -> anyhow::Result<u8
 }
 
 /// Decode CredentialRulesSupport attribute (0x001B)
-pub fn decode_credential_rules_support(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_credential_rules_support(inp: &tlv::TlvItemValue) -> anyhow::Result<CredentialRules> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -1400,20 +1388,20 @@ pub fn decode_operating_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<Operatin
 }
 
 /// Decode SupportedOperatingModes attribute (0x0026)
-pub fn decode_supported_operating_modes(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_supported_operating_modes(inp: &tlv::TlvItemValue) -> anyhow::Result<OperatingModes> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode DefaultConfigurationRegister attribute (0x0027)
-pub fn decode_default_configuration_register(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_default_configuration_register(inp: &tlv::TlvItemValue) -> anyhow::Result<ConfigurationRegister> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -1454,11 +1442,11 @@ pub fn decode_enable_privacy_mode_button(inp: &tlv::TlvItemValue) -> anyhow::Res
 }
 
 /// Decode LocalProgrammingFeatures attribute (0x002C)
-pub fn decode_local_programming_features(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_local_programming_features(inp: &tlv::TlvItemValue) -> anyhow::Result<LocalProgrammingFeatures> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -1866,7 +1854,15 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         }
         0x0083 => {
             match decode_aliro_expedited_transaction_supported_protocol_versions(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Ok(value) => {
+                    // Serialize Vec<Vec<u8>> as array of hex strings
+                    let hex_array: Vec<String> = value.iter()
+                        .map(|bytes| bytes.iter()
+                            .map(|byte| format!("{:02x}", byte))
+                            .collect::<String>())
+                        .collect();
+                    serde_json::to_string(&hex_array).unwrap_or_else(|_| "null".to_string())
+                },
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
@@ -1878,7 +1874,15 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         }
         0x0085 => {
             match decode_aliro_supported_bleuwb_protocol_versions(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Ok(value) => {
+                    // Serialize Vec<Vec<u8>> as array of hex strings
+                    let hex_array: Vec<String> = value.iter()
+                        .map(|bytes| bytes.iter()
+                            .map(|byte| format!("{:02x}", byte))
+                            .collect::<String>())
+                        .collect();
+                    serde_json::to_string(&hex_array).unwrap_or_else(|_| "null".to_string())
+                },
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }

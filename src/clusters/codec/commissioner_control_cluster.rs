@@ -8,6 +8,17 @@ use anyhow;
 use serde_json;
 
 
+// Bitmap definitions
+
+/// SupportedDeviceCategory bitmap type
+pub type SupportedDeviceCategory = u8;
+
+/// Constants for SupportedDeviceCategory
+pub mod supporteddevicecategory {
+    /// Aggregators which support Fabric Synchronization may be commissioned.
+    pub const FABRIC_SYNCHRONIZATION: u8 = 0x01;
+}
+
 // Command encoders
 
 /// Encode RequestCommissioningApproval command (0x00)
@@ -39,11 +50,11 @@ pub fn encode_commission_node(request_id: u64, response_timeout_seconds: u16) ->
 // Attribute decoders
 
 /// Decode SupportedDeviceCategories attribute (0x0000)
-pub fn decode_supported_device_categories(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_supported_device_categories(inp: &tlv::TlvItemValue) -> anyhow::Result<SupportedDeviceCategory> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

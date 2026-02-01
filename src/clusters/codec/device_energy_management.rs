@@ -453,12 +453,12 @@ pub fn encode_modify_forecast_request(forecast_id: u32, slot_adjustments: Vec<Sl
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt32(forecast_id)).into(),
-        (1, tlv::TlvItemValueEnc::StructAnon(slot_adjustments.into_iter().map(|v| {
+        (1, tlv::TlvItemValueEnc::Array(slot_adjustments.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.slot_index { fields.push((0, tlv::TlvItemValueEnc::UInt8(x as u8)).into()); }
                     if let Some(x) = v.nominal_power { fields.push((1, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
                     if let Some(x) = v.duration { fields.push((2, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         (2, tlv::TlvItemValueEnc::UInt8(cause.to_u8())).into(),
         ]),
@@ -471,14 +471,14 @@ pub fn encode_request_constraint_based_forecast(constraints: Vec<Constraints>, c
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(constraints.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(constraints.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.start_time { fields.push((0, tlv::TlvItemValueEnc::UInt64(x)).into()); }
                     if let Some(x) = v.duration { fields.push((1, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
                     if let Some(x) = v.nominal_power { fields.push((2, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
                     if let Some(x) = v.maximum_energy { fields.push((3, tlv::TlvItemValueEnc::UInt64(x)).into()); }
                     if let Some(x) = v.load_control { fields.push((4, tlv::TlvItemValueEnc::Int8(x as i8)).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         (1, tlv::TlvItemValueEnc::UInt8(cause.to_u8())).into(),
         ]),

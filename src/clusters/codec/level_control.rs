@@ -72,10 +72,23 @@ impl From<StepMode> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// Options bitmap type
+pub type Options = u8;
+
+/// Constants for Options
+pub mod options {
+    /// Dependency on On/Off cluster
+    pub const EXECUTE_IF_OFF: u8 = 0x01;
+    /// Dependency on Color Control cluster
+    pub const COUPLE_COLOR_TEMP_TO_LEVEL: u8 = 0x02;
+}
+
 // Command encoders
 
 /// Encode MoveToLevel command (0x00)
-pub fn encode_move_to_level(level: u8, transition_time: Option<u16>, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_level(level: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -89,7 +102,7 @@ pub fn encode_move_to_level(level: u8, transition_time: Option<u16>, options_mas
 }
 
 /// Encode Move command (0x01)
-pub fn encode_move_(move_mode: MoveMode, rate: Option<u8>, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_(move_mode: MoveMode, rate: Option<u8>, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -103,7 +116,7 @@ pub fn encode_move_(move_mode: MoveMode, rate: Option<u8>, options_mask: u8, opt
 }
 
 /// Encode Step command (0x02)
-pub fn encode_step(step_mode: StepMode, step_size: u8, transition_time: Option<u16>, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step(step_mode: StepMode, step_size: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -118,7 +131,7 @@ pub fn encode_step(step_mode: StepMode, step_size: u8, transition_time: Option<u
 }
 
 /// Encode Stop command (0x03)
-pub fn encode_stop(options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_stop(options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -130,7 +143,7 @@ pub fn encode_stop(options_mask: u8, options_override: u8) -> anyhow::Result<Vec
 }
 
 /// Encode MoveToLevelWithOnOff command (0x04)
-pub fn encode_move_to_level_with_on_off(level: u8, transition_time: Option<u16>, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to_level_with_on_off(level: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -144,7 +157,7 @@ pub fn encode_move_to_level_with_on_off(level: u8, transition_time: Option<u16>,
 }
 
 /// Encode MoveWithOnOff command (0x05)
-pub fn encode_move_with_on_off(move_mode: MoveMode, rate: Option<u8>, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_with_on_off(move_mode: MoveMode, rate: Option<u8>, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -158,7 +171,7 @@ pub fn encode_move_with_on_off(move_mode: MoveMode, rate: Option<u8>, options_ma
 }
 
 /// Encode StepWithOnOff command (0x06)
-pub fn encode_step_with_on_off(step_mode: StepMode, step_size: u8, transition_time: Option<u16>, options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step_with_on_off(step_mode: StepMode, step_size: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -173,7 +186,7 @@ pub fn encode_step_with_on_off(step_mode: StepMode, step_size: u8, transition_ti
 }
 
 /// Encode StopWithOnOff command (0x07)
-pub fn encode_stop_with_on_off(options_mask: u8, options_override: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_stop_with_on_off(options_mask: Options, options_override: Options) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -261,11 +274,11 @@ pub fn decode_max_frequency(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
 }
 
 /// Decode Options attribute (0x000F)
-pub fn decode_options(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_options(inp: &tlv::TlvItemValue) -> anyhow::Result<Options> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

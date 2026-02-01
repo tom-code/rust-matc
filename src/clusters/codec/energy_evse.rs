@@ -209,11 +209,34 @@ impl From<SupplyState> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// TargetDayOfWeek bitmap type
+pub type TargetDayOfWeek = u8;
+
+/// Constants for TargetDayOfWeek
+pub mod targetdayofweek {
+    /// Sunday
+    pub const SUNDAY: u8 = 0x01;
+    /// Monday
+    pub const MONDAY: u8 = 0x02;
+    /// Tuesday
+    pub const TUESDAY: u8 = 0x04;
+    /// Wednesday
+    pub const WEDNESDAY: u8 = 0x08;
+    /// Thursday
+    pub const THURSDAY: u8 = 0x10;
+    /// Friday
+    pub const FRIDAY: u8 = 0x20;
+    /// Saturday
+    pub const SATURDAY: u8 = 0x40;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
 pub struct ChargingTargetSchedule {
-    pub day_of_week_for_sequence: Option<u8>,
+    pub day_of_week_for_sequence: Option<TargetDayOfWeek>,
     pub charging_targets: Option<Vec<ChargingTarget>>,
 }
 
@@ -256,20 +279,20 @@ pub fn encode_set_targets(charging_target_schedules: Vec<ChargingTargetSchedule>
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(charging_target_schedules.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(charging_target_schedules.into_iter().map(|v| {
                     let mut fields = Vec::new();
-                    if let Some(x) = v.day_of_week_for_sequence { fields.push((0, tlv::TlvItemValueEnc::UInt8(x as u8)).into()); }
+                    if let Some(x) = v.day_of_week_for_sequence { fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
                     if let Some(listv) = v.charging_targets {
                         let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                             let mut nested_fields = Vec::new();
                                 if let Some(x) = inner.target_time_minutes_past_midnight { nested_fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                                 // TODO: encoding for field target_so_c (percent) not implemented
                                 if let Some(x) = inner.added_energy { nested_fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
-                            (0, tlv::TlvItemValueEnc::StructInvisible(nested_fields)).into()
+                            (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                         }).collect();
-                        fields.push((1, tlv::TlvItemValueEnc::StructAnon(inner_vec)).into());
+                        fields.push((1, tlv::TlvItemValueEnc::Array(inner_vec)).into());
                     }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };

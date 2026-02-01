@@ -8,10 +8,15 @@ use anyhow;
 use serde_json;
 
 
+// Bitmap definitions
+
+/// Alarm bitmap type
+pub type Alarm = u8;
+
 // Command encoders
 
 /// Encode Reset command (0x00)
-pub fn encode_reset(alarms: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_reset(alarms: Alarm) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -22,7 +27,7 @@ pub fn encode_reset(alarms: u8) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode ModifyEnabledAlarms command (0x01)
-pub fn encode_modify_enabled_alarms(mask: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_modify_enabled_alarms(mask: Alarm) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -35,38 +40,38 @@ pub fn encode_modify_enabled_alarms(mask: u8) -> anyhow::Result<Vec<u8>> {
 // Attribute decoders
 
 /// Decode Mask attribute (0x0000)
-pub fn decode_mask(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_mask(inp: &tlv::TlvItemValue) -> anyhow::Result<Alarm> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode Latch attribute (0x0001)
-pub fn decode_latch(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_latch(inp: &tlv::TlvItemValue) -> anyhow::Result<Alarm> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode State attribute (0x0002)
-pub fn decode_state(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_state(inp: &tlv::TlvItemValue) -> anyhow::Result<Alarm> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode Supported attribute (0x0003)
-pub fn decode_supported(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_supported(inp: &tlv::TlvItemValue) -> anyhow::Result<Alarm> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

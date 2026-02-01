@@ -8,6 +8,9 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -502,10 +505,146 @@ impl From<ThermostatRunningMode> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// ACErrorCode bitmap type
+pub type ACErrorCode = u8;
+
+/// Constants for ACErrorCode
+pub mod acerrorcode {
+    /// Compressor Failure or Refrigerant Leakage
+    pub const COMPRESSOR_FAIL: u8 = 0x01;
+    /// Room Temperature Sensor Failure
+    pub const ROOM_SENSOR_FAIL: u8 = 0x02;
+    /// Outdoor Temperature Sensor Failure
+    pub const OUTDOOR_SENSOR_FAIL: u8 = 0x04;
+    /// Indoor Coil Temperature Sensor Failure
+    pub const COIL_SENSOR_FAIL: u8 = 0x08;
+    /// Fan Failure
+    pub const FAN_FAIL: u8 = 0x10;
+}
+
+/// Occupancy bitmap type
+pub type Occupancy = u8;
+
+/// Constants for Occupancy
+pub mod occupancy {
+    /// Indicates the occupancy state
+    pub const OCCUPIED: u8 = 0x01;
+}
+
+/// PresetTypeFeatures bitmap type
+pub type PresetTypeFeatures = u8;
+
+/// Constants for PresetTypeFeatures
+pub mod presettypefeatures {
+    /// Preset may be automatically activated by the thermostat
+    pub const AUTOMATIC: u8 = 0x01;
+    /// Preset supports user-provided names
+    pub const SUPPORTS_NAMES: u8 = 0x02;
+}
+
+/// ProgrammingOperationMode bitmap type
+pub type ProgrammingOperationMode = u8;
+
+/// Constants for ProgrammingOperationMode
+pub mod programmingoperationmode {
+    /// Schedule programming mode. This enables any programmed weekly schedule configurations.
+    pub const SCHEDULE_ACTIVE: u8 = 0x01;
+    /// Auto/recovery mode
+    pub const AUTO_RECOVERY: u8 = 0x02;
+    /// Economy/EnergyStar mode
+    pub const ECONOMY: u8 = 0x04;
+}
+
+/// RelayState bitmap type
+pub type RelayState = u8;
+
+/// Constants for RelayState
+pub mod relaystate {
+    /// Heat Stage On
+    pub const HEAT: u8 = 0x01;
+    /// Cool Stage On
+    pub const COOL: u8 = 0x02;
+    /// Fan Stage On
+    pub const FAN: u8 = 0x04;
+    /// Heat 2nd Stage On
+    pub const HEAT_STAGE2: u8 = 0x08;
+    /// Cool 2nd Stage On
+    pub const COOL_STAGE2: u8 = 0x10;
+    /// Fan 2nd Stage On
+    pub const FAN_STAGE2: u8 = 0x20;
+    /// Fan 3rd Stage On
+    pub const FAN_STAGE3: u8 = 0x40;
+}
+
+/// RemoteSensing bitmap type
+pub type RemoteSensing = u8;
+
+/// Constants for RemoteSensing
+pub mod remotesensing {
+    /// Calculated Local Temperature is derived from a remote node
+    pub const LOCAL_TEMPERATURE: u8 = 0x01;
+    /// OutdoorTemperature is derived from a remote node
+    pub const OUTDOOR_TEMPERATURE: u8 = 0x02;
+    /// Occupancy is derived from a remote node
+    pub const OCCUPANCY: u8 = 0x04;
+}
+
+/// ScheduleDayOfWeek bitmap type
+pub type ScheduleDayOfWeek = u8;
+
+/// Constants for ScheduleDayOfWeek
+pub mod scheduledayofweek {
+    /// Sunday
+    pub const SUNDAY: u8 = 0x01;
+    /// Monday
+    pub const MONDAY: u8 = 0x02;
+    /// Tuesday
+    pub const TUESDAY: u8 = 0x04;
+    /// Wednesday
+    pub const WEDNESDAY: u8 = 0x08;
+    /// Thursday
+    pub const THURSDAY: u8 = 0x10;
+    /// Friday
+    pub const FRIDAY: u8 = 0x20;
+    /// Saturday
+    pub const SATURDAY: u8 = 0x40;
+    /// Away or Vacation
+    pub const AWAY: u8 = 0x80;
+}
+
+/// ScheduleMode bitmap type
+pub type ScheduleMode = u8;
+
+/// Constants for ScheduleMode
+pub mod schedulemode {
+    /// Adjust Heat Setpoint
+    pub const HEAT_SETPOINT_PRESENT: u8 = 0x01;
+    /// Adjust Cool Setpoint
+    pub const COOL_SETPOINT_PRESENT: u8 = 0x02;
+}
+
+/// ScheduleTypeFeatures bitmap type
+pub type ScheduleTypeFeatures = u8;
+
+/// Constants for ScheduleTypeFeatures
+pub mod scheduletypefeatures {
+    /// Supports presets
+    pub const SUPPORTS_PRESETS: u8 = 0x01;
+    /// Supports setpoints
+    pub const SUPPORTS_SETPOINTS: u8 = 0x02;
+    /// Supports user-provided names
+    pub const SUPPORTS_NAMES: u8 = 0x04;
+    /// Supports transitioning to SystemModeOff
+    pub const SUPPORTS_OFF: u8 = 0x08;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
 pub struct Preset {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub preset_handle: Option<Vec<u8>>,
     pub preset_scenario: Option<PresetScenario>,
     pub name: Option<String>,
@@ -518,14 +657,16 @@ pub struct Preset {
 pub struct PresetType {
     pub preset_scenario: Option<PresetScenario>,
     pub number_of_presets: Option<u8>,
-    pub preset_type_features: Option<u8>,
+    pub preset_type_features: Option<PresetTypeFeatures>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct Schedule {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub schedule_handle: Option<Vec<u8>>,
     pub system_mode: Option<SystemMode>,
     pub name: Option<String>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub preset_handle: Option<Vec<u8>>,
     pub transitions: Option<Vec<ScheduleTransition>>,
     pub built_in: Option<bool>,
@@ -533,8 +674,9 @@ pub struct Schedule {
 
 #[derive(Debug, serde::Serialize)]
 pub struct ScheduleTransition {
-    pub day_of_week: Option<u8>,
+    pub day_of_week: Option<ScheduleDayOfWeek>,
     pub transition_time: Option<u16>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub preset_handle: Option<Vec<u8>>,
     pub system_mode: Option<SystemMode>,
     pub cooling_setpoint: Option<i16>,
@@ -545,7 +687,7 @@ pub struct ScheduleTransition {
 pub struct ScheduleType {
     pub system_mode: Option<SystemMode>,
     pub number_of_schedules: Option<u8>,
-    pub schedule_type_features: Option<u8>,
+    pub schedule_type_features: Option<ScheduleTypeFeatures>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -564,38 +706,6 @@ pub fn encode_setpoint_raise_lower(mode: SetpointRaiseLowerMode, amount: i8) -> 
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt8(mode.to_u8())).into(),
         (1, tlv::TlvItemValueEnc::Int8(amount)).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode SetWeeklySchedule command (0x01)
-pub fn encode_set_weekly_schedule(number_of_transitions_for_sequence: u8, day_of_week_for_sequence: u8, mode_for_sequence: u8, transitions: Vec<WeeklyScheduleTransition>) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(number_of_transitions_for_sequence)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(day_of_week_for_sequence)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(mode_for_sequence)).into(),
-        (3, tlv::TlvItemValueEnc::StructAnon(transitions.into_iter().map(|v| {
-                    let mut fields = Vec::new();
-                    if let Some(x) = v.transition_time { fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
-                    if let Some(x) = v.heat_setpoint { fields.push((1, tlv::TlvItemValueEnc::Int16(x as i16)).into()); }
-                    if let Some(x) = v.cool_setpoint { fields.push((2, tlv::TlvItemValueEnc::Int16(x as i16)).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
-                }).collect())).into(),
-        ]),
-    };
-    Ok(tlv.encode()?)
-}
-
-/// Encode GetWeeklySchedule command (0x02)
-pub fn encode_get_weekly_schedule(days_to_return: u8, mode_to_return: u8) -> anyhow::Result<Vec<u8>> {
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(days_to_return)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(mode_to_return)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -644,11 +754,11 @@ pub fn decode_outdoor_temperature(inp: &tlv::TlvItemValue) -> anyhow::Result<Opt
 }
 
 /// Decode Occupancy attribute (0x0002)
-pub fn decode_occupancy(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_occupancy(inp: &tlv::TlvItemValue) -> anyhow::Result<Occupancy> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -806,11 +916,11 @@ pub fn decode_min_setpoint_dead_band(inp: &tlv::TlvItemValue) -> anyhow::Result<
 }
 
 /// Decode RemoteSensing attribute (0x001A)
-pub fn decode_remote_sensing(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_remote_sensing(inp: &tlv::TlvItemValue) -> anyhow::Result<RemoteSensing> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -841,33 +951,6 @@ pub fn decode_thermostat_running_mode(inp: &tlv::TlvItemValue) -> anyhow::Result
     }
 }
 
-/// Decode StartOfWeek attribute (0x0020)
-pub fn decode_start_of_week(inp: &tlv::TlvItemValue) -> anyhow::Result<StartOfWeek> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        StartOfWeek::from_u8(*v as u8).ok_or_else(|| anyhow::anyhow!("Invalid enum value"))
-    } else {
-        Err(anyhow::anyhow!("Expected Integer"))
-    }
-}
-
-/// Decode NumberOfWeeklyTransitions attribute (0x0021)
-pub fn decode_number_of_weekly_transitions(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
-/// Decode NumberOfDailyTransitions attribute (0x0022)
-pub fn decode_number_of_daily_transitions(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
-    if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
-    } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
-    }
-}
-
 /// Decode TemperatureSetpointHold attribute (0x0023)
 pub fn decode_temperature_setpoint_hold(inp: &tlv::TlvItemValue) -> anyhow::Result<TemperatureSetpointHold> {
     if let tlv::TlvItemValue::Int(v) = inp {
@@ -887,20 +970,20 @@ pub fn decode_temperature_setpoint_hold_duration(inp: &tlv::TlvItemValue) -> any
 }
 
 /// Decode ThermostatProgrammingOperationMode attribute (0x0025)
-pub fn decode_thermostat_programming_operation_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_thermostat_programming_operation_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<ProgrammingOperationMode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode ThermostatRunningState attribute (0x0029)
-pub fn decode_thermostat_running_state(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_thermostat_running_state(inp: &tlv::TlvItemValue) -> anyhow::Result<RelayState> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -932,56 +1015,56 @@ pub fn decode_setpoint_change_source_timestamp(inp: &tlv::TlvItemValue) -> anyho
 }
 
 /// Decode OccupiedSetback attribute (0x0034)
-pub fn decode_occupied_setback(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_occupied_setback(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(*v as u8)
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
 /// Decode OccupiedSetbackMin attribute (0x0035)
-pub fn decode_occupied_setback_min(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_occupied_setback_min(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(*v as u8)
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
 /// Decode OccupiedSetbackMax attribute (0x0036)
-pub fn decode_occupied_setback_max(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_occupied_setback_max(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(*v as u8)
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
 /// Decode UnoccupiedSetback attribute (0x0037)
-pub fn decode_unoccupied_setback(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_unoccupied_setback(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(*v as u8)
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
 /// Decode UnoccupiedSetbackMin attribute (0x0038)
-pub fn decode_unoccupied_setback_min(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_unoccupied_setback_min(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(*v as u8)
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
 /// Decode UnoccupiedSetbackMax attribute (0x0039)
-pub fn decode_unoccupied_setback_max(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_unoccupied_setback_max(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(*v as u8)
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
@@ -1031,11 +1114,11 @@ pub fn decode_ac_compressor_type(inp: &tlv::TlvItemValue) -> anyhow::Result<ACCo
 }
 
 /// Decode ACErrorCode attribute (0x0044)
-pub fn decode_ac_error_code(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_ac_error_code(inp: &tlv::TlvItemValue) -> anyhow::Result<ACErrorCode> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
@@ -1375,24 +1458,6 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
-        0x0020 => {
-            match decode_start_of_week(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0021 => {
-            match decode_number_of_weekly_transitions(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
-        0x0022 => {
-            match decode_number_of_daily_transitions(tlv_value) {
-                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
-                Err(e) => format!("{{\"error\": \"{}\"}}", e),
-            }
-        }
         0x0023 => {
             match decode_temperature_setpoint_hold(tlv_value) {
                 Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
@@ -1625,9 +1690,6 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x001B, "ControlSequenceOfOperation"),
         (0x001C, "SystemMode"),
         (0x001E, "ThermostatRunningMode"),
-        (0x0020, "StartOfWeek"),
-        (0x0021, "NumberOfWeeklyTransitions"),
-        (0x0022, "NumberOfDailyTransitions"),
         (0x0023, "TemperatureSetpointHold"),
         (0x0024, "TemperatureSetpointHoldDuration"),
         (0x0025, "ThermostatProgrammingOperationMode"),

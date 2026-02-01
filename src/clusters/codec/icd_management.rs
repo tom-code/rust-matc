@@ -72,6 +72,49 @@ impl From<OperatingMode> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// UserActiveModeTrigger bitmap type
+pub type UserActiveModeTrigger = u32;
+
+/// Constants for UserActiveModeTrigger
+pub mod useractivemodetrigger {
+    /// Power Cycle to transition the device to ActiveMode
+    pub const POWER_CYCLE: u32 = 0x01;
+    /// Settings menu on the device informs how to transition the device to ActiveMode
+    pub const SETTINGS_MENU: u32 = 0x02;
+    /// Custom Instruction on how to transition the device to ActiveMode
+    pub const CUSTOM_INSTRUCTION: u32 = 0x04;
+    /// Device Manual informs how to transition the device to ActiveMode
+    pub const DEVICE_MANUAL: u32 = 0x08;
+    /// Actuate Sensor to transition the device to ActiveMode
+    pub const ACTUATE_SENSOR: u32 = 0x10;
+    /// Actuate Sensor for N seconds to transition the device to ActiveMode
+    pub const ACTUATE_SENSOR_SECONDS: u32 = 0x20;
+    /// Actuate Sensor N times to transition the device to ActiveMode
+    pub const ACTUATE_SENSOR_TIMES: u32 = 0x40;
+    /// Actuate Sensor until light blinks to transition the device to ActiveMode
+    pub const ACTUATE_SENSOR_LIGHTS_BLINK: u32 = 0x80;
+    /// Press Reset Button to transition the device to ActiveMode
+    pub const RESET_BUTTON: u32 = 0x100;
+    /// Press Reset Button until light blinks to transition the device to ActiveMode
+    pub const RESET_BUTTON_LIGHTS_BLINK: u32 = 0x200;
+    /// Press Reset Button for N seconds to transition the device to ActiveMode
+    pub const RESET_BUTTON_SECONDS: u32 = 0x400;
+    /// Press Reset Button N times to transition the device to ActiveMode
+    pub const RESET_BUTTON_TIMES: u32 = 0x800;
+    /// Press Setup Button to transition the device to ActiveMode
+    pub const SETUP_BUTTON: u32 = 0x1000;
+    /// Press Setup Button for N seconds to transition the device to ActiveMode
+    pub const SETUP_BUTTON_SECONDS: u32 = 0x2000;
+    /// Press Setup Button until light blinks to transition the device to ActiveMode
+    pub const SETUP_BUTTON_LIGHTS_BLINK: u32 = 0x4000;
+    /// Press Setup Button N times to transition the device to ActiveMode
+    pub const SETUP_BUTTON_TIMES: u32 = 0x8000;
+    /// Press the N Button to transition the device to ActiveMode
+    pub const APP_DEFINED_BUTTON: u32 = 0x10000;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -186,11 +229,11 @@ pub fn decode_clients_supported_per_fabric(inp: &tlv::TlvItemValue) -> anyhow::R
 }
 
 /// Decode UserActiveModeTriggerHint attribute (0x0006)
-pub fn decode_user_active_mode_trigger_hint(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_user_active_mode_trigger_hint(inp: &tlv::TlvItemValue) -> anyhow::Result<UserActiveModeTrigger> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as u32)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

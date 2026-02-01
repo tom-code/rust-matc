@@ -48,7 +48,7 @@ impl From<Intent> for u8 {
 pub enum Status {
     /// Successful transfer of logs
     Success = 0,
-    /// All logs has been transferred
+    /// All logs have been transferred
     Exhausted = 1,
     /// No logs of the requested type available
     Nologs = 2,

@@ -8,6 +8,15 @@ use anyhow;
 use serde_json;
 
 
+// Struct definitions
+
+#[derive(Debug, serde::Serialize)]
+pub struct CircuitNode {
+    pub node: Option<u64>,
+    pub endpoint: Option<u16>,
+    pub label: Option<String>,
+}
+
 // Attribute decoders
 
 /// Decode AvailableEndpoints attribute (0x0000)

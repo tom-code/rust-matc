@@ -72,6 +72,27 @@ impl From<ValveState> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// ValveFault bitmap type
+pub type ValveFault = u8;
+
+/// Constants for ValveFault
+pub mod valvefault {
+    /// Unspecified fault detected
+    pub const GENERAL_FAULT: u8 = 0x01;
+    /// Valve is blocked
+    pub const BLOCKED: u8 = 0x02;
+    /// Valve has detected a leak
+    pub const LEAKING: u8 = 0x04;
+    /// No valve is connected to controller
+    pub const NOT_CONNECTED: u8 = 0x08;
+    /// Short circuit is detected
+    pub const SHORT_CIRCUIT: u8 = 0x10;
+    /// The available current has been exceeded
+    pub const CURRENT_EXCEEDED: u8 = 0x20;
+}
+
 // Command encoders
 
 /// Encode Open command (0x00)
@@ -170,11 +191,11 @@ pub fn decode_default_open_level(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> 
 }
 
 /// Decode ValveFault attribute (0x0009)
-pub fn decode_valve_fault(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_valve_fault(inp: &tlv::TlvItemValue) -> anyhow::Result<ValveFault> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

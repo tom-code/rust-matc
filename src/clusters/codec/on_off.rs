@@ -137,6 +137,17 @@ impl From<StartUpOnOff> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// OnOffControl bitmap type
+pub type OnOffControl = u8;
+
+/// Constants for OnOffControl
+pub mod onoffcontrol {
+    /// Indicates a command is only accepted when in On state.
+    pub const ACCEPT_ONLY_WHEN_ON: u8 = 0x01;
+}
+
 // Command encoders
 
 /// Encode OffWithEffect command (0x40)
@@ -152,7 +163,7 @@ pub fn encode_off_with_effect(effect_identifier: EffectIdentifier, effect_varian
 }
 
 /// Encode OnWithTimedOff command (0x42)
-pub fn encode_on_with_timed_off(on_off_control: u8, on_time: u16, off_wait_time: u16) -> anyhow::Result<Vec<u8>> {
+pub fn encode_on_with_timed_off(on_off_control: OnOffControl, on_time: u16, off_wait_time: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![

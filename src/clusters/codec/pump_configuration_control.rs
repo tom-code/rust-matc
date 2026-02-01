@@ -90,6 +90,33 @@ impl From<OperationMode> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// PumpStatus bitmap type
+pub type PumpStatus = u16;
+
+/// Constants for PumpStatus
+pub mod pumpstatus {
+    /// A fault related to the system or pump device is detected.
+    pub const DEVICE_FAULT: u16 = 0x01;
+    /// A fault related to the supply to the pump is detected.
+    pub const SUPPLY_FAULT: u16 = 0x02;
+    /// Setpoint is too low to achieve.
+    pub const SPEED_LOW: u16 = 0x04;
+    /// Setpoint is too high to achieve.
+    pub const SPEED_HIGH: u16 = 0x08;
+    /// Device control is overridden by hardware, such as an external STOP button or via a local HMI.
+    pub const LOCAL_OVERRIDE: u16 = 0x10;
+    /// Pump is currently running
+    pub const RUNNING: u16 = 0x20;
+    /// A remote pressure sensor is used as the sensor for the regulation of the pump.
+    pub const REMOTE_PRESSURE: u16 = 0x40;
+    /// A remote flow sensor is used as the sensor for the regulation of the pump.
+    pub const REMOTE_FLOW: u16 = 0x80;
+    /// A remote temperature sensor is used as the sensor for the regulation of the pump.
+    pub const REMOTE_TEMPERATURE: u16 = 0x100;
+}
+
 // Attribute decoders
 
 /// Decode MaxPressure attribute (0x0000)
@@ -210,11 +237,11 @@ pub fn decode_max_const_temp(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<i
 }
 
 /// Decode PumpStatus attribute (0x0010)
-pub fn decode_pump_status(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_pump_status(inp: &tlv::TlvItemValue) -> anyhow::Result<PumpStatus> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as u16)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

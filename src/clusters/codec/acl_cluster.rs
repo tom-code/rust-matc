@@ -8,6 +8,9 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -166,6 +169,7 @@ pub struct AccessControlEntry {
 
 #[derive(Debug, serde::Serialize)]
 pub struct AccessControlExtension {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub data: Option<Vec<u8>>,
 }
 
@@ -203,7 +207,7 @@ pub fn encode_review_fabric_restrictions(arl: Vec<CommissioningAccessRestriction
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(arl.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(arl.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.endpoint { fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.cluster { fields.push((1, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
@@ -212,11 +216,11 @@ pub fn encode_review_fabric_restrictions(arl: Vec<CommissioningAccessRestriction
                             let mut nested_fields = Vec::new();
                                 if let Some(x) = inner.type_ { nested_fields.push((0, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
                                 if let Some(x) = inner.id { nested_fields.push((1, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
-                            (0, tlv::TlvItemValueEnc::StructInvisible(nested_fields)).into()
+                            (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                         }).collect();
-                        fields.push((2, tlv::TlvItemValueEnc::StructAnon(inner_vec)).into());
+                        fields.push((2, tlv::TlvItemValueEnc::Array(inner_vec)).into());
                     }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };

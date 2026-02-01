@@ -41,6 +41,25 @@ impl From<BoostState> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// WaterHeaterHeatSource bitmap type
+pub type WaterHeaterHeatSource = u8;
+
+/// Constants for WaterHeaterHeatSource
+pub mod waterheaterheatsource {
+    /// Immersion Heating Element 1
+    pub const IMMERSION_ELEMENT1: u8 = 0x01;
+    /// Immersion Heating Element 2
+    pub const IMMERSION_ELEMENT2: u8 = 0x02;
+    /// Heat pump Heating
+    pub const HEAT_PUMP: u8 = 0x04;
+    /// Boiler Heating (e.g. Gas or Oil)
+    pub const BOILER: u8 = 0x08;
+    /// Other Heating
+    pub const OTHER: u8 = 0x10;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -77,20 +96,20 @@ pub fn encode_boost(boost_info: WaterHeaterBoostInfo) -> anyhow::Result<Vec<u8>>
 // Attribute decoders
 
 /// Decode HeaterTypes attribute (0x0000)
-pub fn decode_heater_types(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_heater_types(inp: &tlv::TlvItemValue) -> anyhow::Result<WaterHeaterHeatSource> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode HeatDemand attribute (0x0001)
-pub fn decode_heat_demand(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_heat_demand(inp: &tlv::TlvItemValue) -> anyhow::Result<WaterHeaterHeatSource> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

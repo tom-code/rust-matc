@@ -87,18 +87,28 @@ def convert_to_snake_case(name: str) -> str:
     return name.strip('_')
 
 
-def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, Optional[str]]], structs: Dict[str, 'MatterStruct'], enums: Dict[str, 'MatterEnum'], item_var: str) -> List[str]:
-    """Generate Rust field assignments for a struct from a TLV item."""
+def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, Optional[str]]], structs: Dict[str, 'MatterStruct'], enums: Dict[str, 'MatterEnum'], item_var: str, bitmaps: Dict[str, 'MatterBitmap'] = None) -> List[str]:
+    """Generate Rust field assignments for a struct from a TLV item.
+
+    Fields with undefined cross-cluster struct types are skipped to match
+    the struct definition generation logic.
+    """
     field_assignments = []
     for field_id, field_name, field_type, entry_type in struct_fields:
         rust_field_name = convert_to_snake_case(field_name)
         rust_field_name = escape_rust_keyword(rust_field_name)
 
+        # Skip fields with undefined cross-cluster struct types (consistent with struct generation)
+        if field_type.endswith('Struct') and structs and field_type not in structs:
+            continue  # Cross-cluster struct reference, skip
+        if field_type == 'list' and entry_type and entry_type.endswith('Struct') and structs and entry_type not in structs:
+            continue  # List of cross-cluster struct references, skip
+
         if field_type == 'list' and entry_type:
             if entry_type.endswith('Struct') and structs and entry_type in structs:
                 target_struct = structs[entry_type]
                 struct_rust_name = target_struct.get_rust_struct_name()
-                nested_assignments_str = "\n".join(_generate_struct_field_assignments(target_struct.fields, structs, enums, "list_item"))
+                nested_assignments_str = "\n".join(_generate_struct_field_assignments(target_struct.fields, structs, enums, "list_item", bitmaps))
                 field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(l)) = {item_var}.get(&[{field_id}]) {{
                         let mut items = Vec::new();
@@ -115,8 +125,8 @@ def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, 
             elif entry_type.endswith('Struct'):
                 field_assignments.append(f"                {rust_field_name}: None, // TODO: Implement {entry_type} list decoding")
             else:
-                rust_type = MatterType.get_rust_type(entry_type, enums=enums)
-                value_map = _generate_list_item_filter_expr(entry_type, enums=enums)
+                rust_type = MatterType.get_rust_type(entry_type, enums=enums, bitmaps=bitmaps)
+                value_map = _generate_list_item_filter_expr(entry_type, enums=enums, bitmaps=bitmaps)
 
                 field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(l)) = {item_var}.get(&[{field_id}]) {{
@@ -142,10 +152,20 @@ def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, 
             else:
                 # Fallback to u8 if enum not defined
                 field_assignments.append(f"                {rust_field_name}: {item_var}.get_int(&[{field_id}]).map(|v| v as u8),")
+        elif field_type.endswith('Bitmap'):
+            # Check if we have the bitmap definition
+            if bitmaps and field_type in bitmaps:
+                bitmap_obj = bitmaps[field_type]
+                bitmap_name = bitmap_obj.get_rust_bitmap_name()
+                base_type = bitmap_obj.get_base_type()
+                field_assignments.append(f"                {rust_field_name}: {item_var}.get_int(&[{field_id}]).map(|v| v as {base_type}),")
+            else:
+                # Fallback to u8 if bitmap not defined
+                field_assignments.append(f"                {rust_field_name}: {item_var}.get_int(&[{field_id}]).map(|v| v as u8),")
         elif field_type.endswith('Struct') and structs and field_type in structs:
             nested_struct = structs[field_type]
             nested_struct_name = nested_struct.get_rust_struct_name()
-            nested_assignments_str = "\n".join(_generate_struct_field_assignments(nested_struct.fields, structs, enums, "nested_item"))
+            nested_assignments_str = "\n".join(_generate_struct_field_assignments(nested_struct.fields, structs, enums, "nested_item", bitmaps))
             field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(nested_tlv) = {item_var}.get(&[{field_id}]) {{
                         if let tlv::TlvItemValue::List(_) = nested_tlv {{
@@ -190,30 +210,33 @@ def escape_rust_keyword(name: str) -> str:
     return name
 
 
-def _get_value_cast_expr(value_var: str, matter_type: str, enums: Dict[str, 'MatterEnum'] = None) -> str:
+def _get_value_cast_expr(value_var: str, matter_type: str, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
     """Generate appropriate cast expression for a value based on its Matter type.
 
     Args:
         value_var: The variable name to cast (e.g., 'v', 'x', '*i')
         matter_type: The Matter type string
         enums: Dictionary of enum definitions
+        bitmaps: Dictionary of bitmap definitions
 
     Returns:
         A string expression for casting the value
     """
     if matter_type.endswith('Enum') and enums and matter_type in enums:
         return f'{value_var}.to_u8()'
-    rust_type = MatterType.get_rust_type(matter_type, enums=enums)
+    if matter_type.endswith('Bitmap') and bitmaps and matter_type in bitmaps:
+        return value_var
+    rust_type = MatterType.get_rust_type(matter_type, enums=enums, bitmaps=bitmaps)
     return value_var if rust_type == 'u64' else f'{value_var} as {rust_type}'
 
 
-def _generate_list_item_filter_expr(entry_type: str, enums: Dict[str, 'MatterEnum'] = None) -> str:
+def _generate_list_item_filter_expr(entry_type: str, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
     """Generate the filter_map expression for decoding a list item.
 
     Returns a string like: 'if let tlv::TlvItemValue::String(s) = &e.value { Some(s.clone()) } else { None }'
     """
-    tlv_type = MatterType.get_tlv_type(entry_type)
-    rust_type = MatterType.get_rust_type(entry_type, enums=enums)
+    tlv_type = MatterType.get_tlv_type(entry_type, bitmaps=bitmaps)
+    rust_type = MatterType.get_rust_type(entry_type, enums=enums, bitmaps=bitmaps)
 
     if tlv_type == "String":
         return 'if let tlv::TlvItemValue::String(v) = &e.value { Some(v.clone()) } else { None }'
@@ -224,25 +247,30 @@ def _generate_list_item_filter_expr(entry_type: str, enums: Dict[str, 'MatterEnu
     elif tlv_type.startswith("UInt") or tlv_type.startswith("Int"):
         if entry_type.endswith('Enum') and enums and entry_type in enums:
             return f'if let tlv::TlvItemValue::Int(v) = &e.value {{ {rust_type}::from_u8(*v as u8) }} else {{ None }}'
+        elif entry_type.endswith('Bitmap') and bitmaps and entry_type in bitmaps:
+            bitmap_obj = bitmaps[entry_type]
+            base_type = bitmap_obj.get_base_type()
+            return f'if let tlv::TlvItemValue::Int(v) = &e.value {{ Some(*v as {base_type}) }} else {{ None }}'
         else:
-            cast_expr = _get_value_cast_expr('*v', entry_type, enums)
+            cast_expr = _get_value_cast_expr('*v', entry_type, enums, bitmaps)
             return f'if let tlv::TlvItemValue::Int(v) = &e.value {{ Some({cast_expr}) }} else {{ None }}'
     else:
         return 'None  // Unsupported type'
 
 
-def _generate_list_decoder(entry_type: str, enums: Dict[str, 'MatterEnum'] = None) -> str:
+def _generate_list_decoder(entry_type: str, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
     """Generate complete list decoder code for a given entry type.
 
     Args:
         entry_type: The type of items in the list
         enums: Dictionary of enum definitions
+        bitmaps: Dictionary of bitmap definitions
 
     Returns:
         String containing the complete decode_logic code block
     """
-    tlv_type = MatterType.get_tlv_type(entry_type)
-    rust_type = MatterType.get_rust_type(entry_type, enums=enums)
+    tlv_type = MatterType.get_tlv_type(entry_type, bitmaps=bitmaps)
+    rust_type = MatterType.get_rust_type(entry_type, enums=enums, bitmaps=bitmaps)
 
     if tlv_type == "String":
         return '''    let mut res = Vec::new();
@@ -288,8 +316,20 @@ def _generate_list_decoder(entry_type: str, enums: Dict[str, 'MatterEnum'] = Non
         }}
     }}
     Ok(res)'''
+        elif entry_type.endswith('Bitmap') and bitmaps and entry_type in bitmaps:
+            bitmap_obj = bitmaps[entry_type]
+            base_type = bitmap_obj.get_base_type()
+            return f'''    let mut res = Vec::new();
+    if let tlv::TlvItemValue::List(v) = inp {{
+        for item in v {{
+            if let tlv::TlvItemValue::Int(i) = &item.value {{
+                res.push(*i as {base_type});
+            }}
+        }}
+    }}
+    Ok(res)'''
         else:
-            cast_expr = _get_value_cast_expr('*i', entry_type, enums)
+            cast_expr = _get_value_cast_expr('*i', entry_type, enums, bitmaps)
             return f'''    let mut res = Vec::new();
     if let tlv::TlvItemValue::List(v) = inp {{
         for item in v {{
@@ -311,19 +351,20 @@ def _generate_list_decoder(entry_type: str, enums: Dict[str, 'MatterEnum'] = Non
     Ok(res)'''
 
 
-def _generate_single_value_decoder(attr_type: str, nullable: bool, enums: Dict[str, 'MatterEnum'] = None) -> str:
+def _generate_single_value_decoder(attr_type: str, nullable: bool, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
     """Generate decoder logic for a single value (nullable or not).
 
     Args:
         attr_type: The Matter type of the attribute
         nullable: Whether the value is nullable
         enums: Dictionary of enum definitions
+        bitmaps: Dictionary of bitmap definitions
 
     Returns:
         String containing the decode_logic code block
     """
-    tlv_type = MatterType.get_tlv_type(attr_type)
-    rust_type = MatterType.get_rust_type(attr_type, enums=enums)
+    tlv_type = MatterType.get_tlv_type(attr_type, bitmaps=bitmaps)
+    rust_type = MatterType.get_rust_type(attr_type, enums=enums, bitmaps=bitmaps)
 
     # Generate the value expression and match pattern for each type
     if tlv_type == "String":
@@ -354,9 +395,28 @@ def _generate_single_value_decoder(attr_type: str, nullable: bool, enums: Dict[s
     }} else {{
         Err(anyhow::anyhow!("Expected Integer"))
     }}'''
+        # Check if this is a bitmap type
+        elif attr_type.endswith('Bitmap') and bitmaps and attr_type in bitmaps:
+            bitmap_obj = bitmaps[attr_type]
+            bitmap_name = bitmap_obj.get_rust_bitmap_name()
+            base_type = bitmap_obj.get_base_type()
+            if nullable:
+                # For nullable bitmap, return Result<Option<Bitmap>>
+                return f'''    if let {match_pattern} = inp {{
+        Ok(Some(*v as {base_type}))
+    }} else {{
+        Ok(None)
+    }}'''
+            else:
+                # For non-nullable bitmap, return Result<Bitmap>
+                return f'''    if let {match_pattern} = inp {{
+        Ok(*v as {base_type})
+    }} else {{
+        Err(anyhow::anyhow!("Expected Integer"))
+    }}'''
         else:
             # Regular integer type
-            value_expr = _get_value_cast_expr('*v', attr_type, enums)
+            value_expr = _get_value_cast_expr('*v', attr_type, enums, bitmaps)
     else:
         # Unsupported type
         if nullable:
@@ -387,6 +447,7 @@ def _generate_single_field_encoding(
     value_path: str,
     structs: Dict[str, 'MatterStruct'],
     enums: Dict[str, 'MatterEnum'],
+    bitmaps: Dict[str, 'MatterBitmap'] = None,
     indent: str = "        ",
     fields_vec: str = "fields"
 ) -> List[str]:
@@ -400,6 +461,7 @@ def _generate_single_field_encoding(
         value_path: The path to the struct value (e.g., 'v', 'inner', 's')
         structs: Dictionary of struct definitions
         enums: Dictionary of enum definitions
+        bitmaps: Dictionary of bitmap definitions
         indent: Indentation string for generated code
         fields_vec: Name of the vector to push to (default: 'fields')
 
@@ -415,13 +477,13 @@ def _generate_single_field_encoding(
     elif field_type == 'bool':
         lines.append(f"{indent}if let Some(x) = {value_path}.{rust_field} {{ {fields_vec}.push(({field_id}, tlv::TlvItemValueEnc::Bool(x)).into()); }}")
     elif is_numeric_or_id_type(field_type) or field_type.endswith('Enum') or field_type.endswith('Bitmap'):
-        tlv_type = MatterType.get_tlv_type(field_type)
-        cast = _get_value_cast_expr('x', field_type, enums)
+        tlv_type = MatterType.get_tlv_type(field_type, bitmaps=bitmaps)
+        cast = _get_value_cast_expr('x', field_type, enums, bitmaps)
         lines.append(f"{indent}if let Some(x) = {value_path}.{rust_field} {{ {fields_vec}.push(({field_id}, tlv::TlvItemValueEnc::{tlv_type}({cast})).into()); }}")
     elif field_type == 'list' and field_entry:
         # Handle list fields
-        entry_tlv = MatterType.get_tlv_type(field_entry)
-        entry_rust = MatterType.get_rust_type(field_entry, enums=enums)
+        entry_tlv = MatterType.get_tlv_type(field_entry, bitmaps=bitmaps)
+        entry_rust = MatterType.get_rust_type(field_entry, enums=enums, bitmaps=bitmaps)
         if field_entry.endswith('Struct') and structs and field_entry in structs:
             # List of structs - more complex, keep TODO for now
             lines.append(f"{indent}// TODO: list of {field_entry} encoding not fully implemented")
@@ -432,7 +494,7 @@ def _generate_single_field_encoding(
         elif entry_tlv == 'Bool':
             lines.append(f"{indent}if let Some(listv) = {value_path}.{rust_field} {{ {fields_vec}.push(({field_id}, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::Bool(x)).into()).collect())).into()); }}")
         elif entry_tlv.startswith('UInt') or entry_tlv.startswith('Int'):
-            cast = _get_value_cast_expr('x', field_entry, enums)
+            cast = _get_value_cast_expr('x', field_entry, enums, bitmaps)
             lines.append(f"{indent}if let Some(listv) = {value_path}.{rust_field} {{ {fields_vec}.push(({field_id}, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::{entry_tlv}({cast})).into()).collect())).into()); }}")
         else:
             lines.append(f"{indent}// TODO: encoding for list field {rust_field} ({field_entry}) not implemented")
@@ -446,7 +508,7 @@ def _generate_single_field_encoding(
         for nf_id, nf_name, nf_type, nf_entry in nested.fields:
             nf_rust_field = escape_rust_keyword(convert_to_snake_case(nf_name))
             nested_lines = _generate_single_field_encoding(
-                nf_id, nf_rust_field, nf_type, nf_entry, 'inner', structs, enums, indent + "    ", nested_vec_name
+                nf_id, nf_rust_field, nf_type, nf_entry, 'inner', structs, enums, bitmaps, indent + "    ", nested_vec_name
             )
             lines.extend(nested_lines)
         lines.append(f'{indent}    {fields_vec}.push(({field_id}, tlv::TlvItemValueEnc::StructInvisible({nested_vec_name})).into());')
@@ -634,6 +696,118 @@ impl From<{enum_name}> for {value_type} {{
         return "\n".join(arms)
 
 
+def generate_bitmap_macro() -> str:
+    """Generate the macro that implements common bitmap methods.
+
+    NOTE: This function is deprecated but kept for backwards compatibility.
+    The new approach uses crate::clusters::bitmap::Bitmap<Tag, Base> which provides
+    all the same methods without needing a per-file macro.
+    """
+    return ''  # No longer needed - using shared bitmap type
+
+
+class MatterBitmap:
+    """Represents a Matter bitmap definition."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.bitfields: List[Tuple[int, str, str]] = []  # (bit_position, name, summary)
+        self._force_bitmap_suffix = False  # Set to True to keep "Bitmap" suffix
+
+    def add_bitfield(self, bit_pos: int, field_name: str, summary: str = ""):
+        """Add a bitfield to this bitmap."""
+        # Sanitize the bitfield name to be a valid Rust constant identifier
+        sanitized_name = self._sanitize_bitfield_name(field_name)
+        self.bitfields.append((bit_pos, sanitized_name, summary))
+
+    def _sanitize_bitfield_name(self, name: str) -> str:
+        """Sanitize bitfield name to be a valid Rust constant identifier (SCREAMING_SNAKE_CASE)."""
+        # Replace spaces with underscores
+        name = name.replace(' ', '_')
+
+        # Replace any other invalid characters (e.g., hyphens, special chars)
+        name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+
+        # Convert to SCREAMING_SNAKE_CASE
+        # Handle camelCase and PascalCase by inserting underscores before capitals
+        name = re.sub(r'([a-z])([A-Z])', r'\1_\2', name)
+        name = name.upper()
+
+        # Remove consecutive underscores
+        name = re.sub(r'_+', '_', name)
+
+        # If it starts with a digit, prefix with "BIT_"
+        if name and name[0].isdigit():
+            name = f"BIT_{name}"
+
+        return name if name else "UNKNOWN"
+
+    def get_rust_bitmap_name(self) -> str:
+        """Convert bitmap name to PascalCase Rust type name."""
+        # Keep "Bitmap" suffix if forced (to avoid name collisions)
+        if self._force_bitmap_suffix:
+            name = self.name
+        else:
+            # Remove "Bitmap" suffix if present for cleaner naming
+            name = self.name.replace('Bitmap', '')
+        # Split on capital letters and rejoin in PascalCase
+        words = re.findall(r'[A-Z][a-z]*', name)
+        return ''.join(words) if words else name
+
+    def get_base_type(self) -> str:
+        """Determine the base type (u8/u16/u32/u64) based on maximum bit position."""
+        if not self.bitfields:
+            return "u8"  # Default to u8 for empty bitmaps
+
+        max_bit = max(bit_pos for bit_pos, _, _ in self.bitfields)
+
+        if max_bit < 8:
+            return "u8"
+        elif max_bit < 16:
+            return "u16"
+        elif max_bit < 32:
+            return "u32"
+        else:
+            return "u64"
+
+    def generate_rust_bitmap(self) -> str:
+        """Generate Rust bitmap type definition as a simple type alias.
+
+        This generates:
+        1. A type alias to the base integer type (e.g., type OnOffControl = u8)
+        2. A module with the bitfield constants (e.g., mod on_off_control)
+        """
+        bitmap_name = self.get_rust_bitmap_name()
+        base_type = self.get_base_type()
+
+        # Generate bitfield constants
+        constants = []
+        for bit_pos, field_name, summary in self.bitfields:
+            bit_value = 1 << bit_pos
+            if summary:
+                constants.append(f"    /// {summary}")
+            constants.append(f"    pub const {field_name}: {base_type} = 0x{bit_value:02X};")
+
+        # Generate simple type alias
+        result = f'''/// {bitmap_name} bitmap type
+pub type {bitmap_name} = {base_type};'''
+
+        # Add module with constants if any
+        if constants:
+            module_name = bitmap_name.lower().replace('bitmap', '').strip('_')
+            if not module_name:
+                module_name = bitmap_name.lower()
+            constants_str = "\n".join(constants)
+            result += f'''
+
+/// Constants for {bitmap_name}
+pub mod {module_name} {{
+{constants_str}
+}}'''
+
+        return result
+
+
 class MatterStruct:
     """Represents a Matter struct definition."""
 
@@ -654,7 +828,7 @@ class MatterStruct:
         words = re.findall(r'[A-Z][a-z]*', name)
         return ''.join(words) if words else name
     
-    def generate_rust_struct(self, structs: Dict[str, 'MatterStruct'] = None, enums: Dict[str, MatterEnum] = None) -> str:
+    def generate_rust_struct(self, structs: Dict[str, 'MatterStruct'] = None, enums: Dict[str, MatterEnum] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Generate Rust struct definition."""
         struct_name = self.get_rust_struct_name()
 
@@ -675,7 +849,7 @@ class MatterStruct:
                     rust_type = f"Vec<{entry_rust_type}>"
                 else:
                     # Primitive type or known type
-                    entry_rust_type = MatterType.get_rust_type(entry_type, enums=enums)
+                    entry_rust_type = MatterType.get_rust_type(entry_type, enums=enums, bitmaps=bitmaps)
                     rust_type = f"Vec<{entry_rust_type}>"
             elif field_type.endswith('Struct'):
                 # Skip if struct not defined in this cluster (cross-cluster reference)
@@ -690,10 +864,19 @@ class MatterStruct:
                     rust_type = field_type.replace('Struct', '')
                     rust_type = ''.join(word.capitalize() for word in re.findall(r'[A-Z][a-z]*', rust_type))
             else:
-                rust_type = MatterType.get_rust_type(field_type, enums=enums)
+                rust_type = MatterType.get_rust_type(field_type, enums=enums, bitmaps=bitmaps)
 
             # Make all struct fields optional since they might not be present in TLV
-            field_definitions.append(f"    pub {rust_field_name}: Option<{rust_type}>,")
+            # Add custom serialization for octstr fields (to serialize as hex string)
+            if field_type == 'octstr':
+                field_definitions.append(f"    #[serde(serialize_with = \"serialize_opt_bytes_as_hex\")]")
+                field_definitions.append(f"    pub {rust_field_name}: Option<{rust_type}>,")
+            elif field_type == 'list' and entry_type == 'octstr':
+                # Handle list of octstr
+                field_definitions.append(f"    #[serde(serialize_with = \"serialize_opt_vec_bytes_as_hex\")]")
+                field_definitions.append(f"    pub {rust_field_name}: Option<{rust_type}>,")
+            else:
+                field_definitions.append(f"    pub {rust_field_name}: Option<{rust_type}>,")
 
         fields_str = "\n".join(field_definitions)
 
@@ -743,8 +926,27 @@ pub struct {struct_name} {{
                 else:
                     # Other primitive types in lists
                     rust_type = MatterType.get_rust_type(entry_type, enums=enums)
-                    cast_expr = _get_value_cast_expr('*v', entry_type, enums)
-                    field_assignments.append(f'''                {rust_field_name}: {{
+
+                    # Special handling for octstr
+                    if entry_type == 'octstr':
+                        field_assignments.append(f'''                {rust_field_name}: {{
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
+                        let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
+                            if let tlv::TlvItemValue::OctetString(v) = &e.value {{
+                                Some(v.clone())
+                            }} else {{
+                                None
+                            }}
+                        }}).collect();
+                        Some(items)
+                    }} else {{
+                        None
+                    }}
+                }},''')
+                    else:
+                        # Existing numeric handling
+                        cast_expr = _get_value_cast_expr('*v', entry_type, enums)
+                        field_assignments.append(f'''                {rust_field_name}: {{
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[{field_id}]) {{
                         let items: Vec<{rust_type}> = l.iter().filter_map(|e| {{
                             if let tlv::TlvItemValue::Int(v) = &e.value {{
@@ -837,18 +1039,30 @@ class MatterType:
     }
     
     @classmethod
-    def get_tlv_type(cls, matter_type: str) -> str:
+    def get_tlv_type(cls, matter_type: str, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Convert Matter type to TLV encoding type."""
         # Handle special cases
         if matter_type.endswith('Enum'):
             return 'UInt8'
         if matter_type.endswith('Bitmap'):
+            if bitmaps and matter_type in bitmaps:
+                base_type = bitmaps[matter_type].get_base_type()
+                # Convert u8 → UInt8, u16 → UInt16, etc.
+                type_suffix = base_type[1:].capitalize()
+                if base_type == 'u8':
+                    return 'UInt8'
+                elif base_type == 'u16':
+                    return 'UInt16'
+                elif base_type == 'u32':
+                    return 'UInt32'
+                elif base_type == 'u64':
+                    return 'UInt64'
             return 'UInt8'
-        
+
         return cls.TYPE_MAPPING.get(matter_type, 'UInt8')
     
     @classmethod
-    def get_rust_type(cls, matter_type: str, is_list: bool = False, enums: Dict[str, 'MatterEnum'] = None) -> str:
+    def get_rust_type(cls, matter_type: str, is_list: bool = False, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Get the corresponding Rust type for function parameters."""
         rust_mapping = {
             'uint8': 'u8',
@@ -887,7 +1101,12 @@ class MatterType:
             # Enum without definition - fall back to u8
             base_type = 'u8'
         elif matter_type.endswith('Bitmap'):
-            base_type = 'u8'
+            if bitmaps and matter_type in bitmaps:
+                bitmap_obj = bitmaps[matter_type]
+                base_type = bitmap_obj.get_rust_bitmap_name()
+            else:
+                # Bitmap without definition - fall back to base type
+                base_type = 'u8'
         else:
             base_type = rust_mapping.get(matter_type, 'u8')
 
@@ -915,7 +1134,7 @@ class AttributeField:
         """Convert attribute name to snake_case Rust function name."""
         return f"decode_{escape_rust_keyword(convert_to_snake_case(self.name))}"
     
-    def get_rust_return_type(self, structs: Dict[str, MatterStruct] = None, enums: Dict[str, 'MatterEnum'] = None) -> str:
+    def get_rust_return_type(self, structs: Dict[str, MatterStruct] = None, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Get the Rust return type for this attribute."""
         if self.is_list:
             if self.entry_type:
@@ -925,7 +1144,7 @@ class AttributeField:
                     return f"Vec<{struct_name}>"
                 else:
                     # Map entry types to Rust types
-                    entry_rust_type = MatterType.get_rust_type(self.entry_type, enums=enums)
+                    entry_rust_type = MatterType.get_rust_type(self.entry_type, enums=enums, bitmaps=bitmaps)
                     return f"Vec<{entry_rust_type}>"
             else:
                 # Default to Vec<String> for unknown list types
@@ -938,17 +1157,17 @@ class AttributeField:
                     return f"Option<{struct_name}>"
                 return struct_name
             else:
-                rust_type = MatterType.get_rust_type(self.attr_type, enums=enums)
+                rust_type = MatterType.get_rust_type(self.attr_type, enums=enums, bitmaps=bitmaps)
                 if self.nullable:
                     return f"Option<{rust_type}>"
                 return rust_type
     
-    def generate_decode_function(self, structs: Dict[str, MatterStruct] = None, enums: Dict[str, 'MatterEnum'] = None) -> str:
+    def generate_decode_function(self, structs: Dict[str, MatterStruct] = None, enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Generate Rust decode function for this attribute."""
         func_name = self.get_rust_function_name()
-        return_type = self.get_rust_return_type(structs, enums)
+        return_type = self.get_rust_return_type(structs, enums, bitmaps)
         clean_id = self.id
-        
+
         if self.is_list:
             if self.entry_type and structs and self.entry_type in structs:
                 # Use custom struct decoder
@@ -956,7 +1175,7 @@ class AttributeField:
                 struct_name = struct.get_rust_struct_name()
 
                 # Generate field assignments
-                field_assignments = _generate_struct_field_assignments(struct.fields, structs, enums, "item")
+                field_assignments = _generate_struct_field_assignments(struct.fields, structs, enums, "item", bitmaps)
                 assignments_str = "\n".join(field_assignments)
 
                 decode_logic = f'''    let mut res = Vec::new();
@@ -970,7 +1189,7 @@ class AttributeField:
     Ok(res)'''
             elif self.entry_type:
                 # Generate list decoder based on entry type
-                decode_logic = _generate_list_decoder(self.entry_type, enums)
+                decode_logic = _generate_list_decoder(self.entry_type, enums, bitmaps)
             else:
                 # Generic list decoder
                 decode_logic = '''    let mut res = Vec::new();
@@ -985,7 +1204,7 @@ class AttributeField:
         else:
             # Single value decoder
             # Initialize tlv_type for all paths
-            tlv_type = MatterType.get_tlv_type(self.attr_type)
+            tlv_type = MatterType.get_tlv_type(self.attr_type, bitmaps=bitmaps)
 
             # Check if this is a custom struct type
             if structs and self.attr_type in structs:
@@ -994,7 +1213,7 @@ class AttributeField:
                 struct_name = struct.get_rust_struct_name()
 
                 # Generate field assignments for the struct
-                field_assignments = _generate_struct_field_assignments(struct.fields, structs, enums, "item")
+                field_assignments = _generate_struct_field_assignments(struct.fields, structs, enums, "item", bitmaps)
                 assignments_str = "\n".join(field_assignments)
 
                 if self.nullable:
@@ -1025,7 +1244,7 @@ class AttributeField:
     }}'''
             else:
                 # For non-struct types, use unified decoder
-                decode_logic = _generate_single_value_decoder(self.attr_type, self.nullable, enums)
+                decode_logic = _generate_single_value_decoder(self.attr_type, self.nullable, enums, bitmaps)
         
         return f'''/// Decode {self.name} attribute ({clean_id})
 pub fn {func_name}(inp: &tlv::TlvItemValue) -> anyhow::Result<{return_type}> {{
@@ -1051,7 +1270,7 @@ class CommandField:
         """Convert field name to snake_case Rust parameter name."""
         return escape_rust_keyword(convert_to_snake_case(self.name))
     
-    def get_tlv_encoding(self, param_name: str, structs: Dict[str, 'MatterStruct'], enums: Dict[str, 'MatterEnum'] = None) -> str:
+    def get_tlv_encoding(self, param_name: str, structs: Dict[str, 'MatterStruct'], enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Generate TLV encoding line for this field.
 
         `structs` provides parsed struct definitions so that when this field is a
@@ -1079,7 +1298,7 @@ class CommandField:
                                 for nf_id, nf_name, nf_type, nf_entry in nested.fields:
                                     nf_rust_field = escape_rust_keyword(convert_to_snake_case(nf_name))
                                     field_lines = _generate_single_field_encoding(
-                                        nf_id, nf_rust_field, nf_type, nf_entry, 'inner', structs, enums,
+                                        nf_id, nf_rust_field, nf_type, nf_entry, 'inner', structs, enums, bitmaps,
                                         "                                ", 'nested_fields'
                                     )
                                     nested_lines.extend(field_lines)
@@ -1088,14 +1307,14 @@ class CommandField:
                                 inner_lines.append("                        let inner_vec: Vec<_> = listv.into_iter().map(|inner| {")
                                 inner_lines.append("                            let mut nested_fields = Vec::new();")
                                 inner_lines += nested_lines
-                                inner_lines.append(f"                            (0, tlv::TlvItemValueEnc::StructInvisible(nested_fields)).into()")
+                                inner_lines.append(f"                            (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()")
                                 inner_lines.append("                        }).collect();")
-                                inner_lines.append(f"                        fields.push(({f_id}, tlv::TlvItemValueEnc::StructAnon(inner_vec)).into());")
+                                inner_lines.append(f"                        fields.push(({f_id}, tlv::TlvItemValueEnc::Array(inner_vec)).into());")
                                 inner_lines.append("                    }")
                             else:
                                 # Primitive list inside struct
-                                entry_tlv = MatterType.get_tlv_type(f_entry)
-                                entry_rust = MatterType.get_rust_type(f_entry, enums=enums)
+                                entry_tlv = MatterType.get_tlv_type(f_entry, bitmaps=bitmaps)
+                                entry_rust = MatterType.get_rust_type(f_entry, enums=enums, bitmaps=bitmaps)
                                 if entry_tlv == 'String':
                                     inner_lines.append(f"                    if let Some(listv) = v.{rust_field} {{ fields.push(({f_id}, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::String(x.clone())).into()).collect())).into()); }}")
                                 elif entry_tlv == 'OctetString':
@@ -1103,14 +1322,14 @@ class CommandField:
                                 elif entry_tlv == 'Bool':
                                     inner_lines.append(f"                    if let Some(listv) = v.{rust_field} {{ fields.push(({f_id}, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::Bool(x)).into()).collect())).into()); }}")
                                 elif entry_tlv.startswith('UInt') or entry_tlv.startswith('Int'):
-                                    cast = _get_value_cast_expr('x', f_entry, enums)
+                                    cast = _get_value_cast_expr('x', f_entry, enums, bitmaps)
                                     inner_lines.append(f"                    if let Some(listv) = v.{rust_field} {{ fields.push(({f_id}, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::{entry_tlv}({cast})).into()).collect())).into()); }}")
                                 else:
                                     inner_lines.append(f"                    // TODO: encoding for list field {f_name} ({f_entry}) not implemented")
                         # Primitive and simple types
                         elif f_type in ('string', 'octstr', 'bool') or f_type.endswith('Enum') or f_type.endswith('Bitmap') or is_numeric_or_id_type(f_type):
                             field_lines = _generate_single_field_encoding(
-                                f_id, rust_field, f_type, f_entry, 'v', structs, enums, "                    "
+                                f_id, rust_field, f_type, f_entry, 'v', structs, enums, bitmaps, "                    "
                             )
                             inner_lines.extend(field_lines)
                         elif f_type.endswith('Struct') and structs and f_type in structs:
@@ -1120,7 +1339,7 @@ class CommandField:
                             for nf_id, nf_name, nf_type, nf_entry in nested.fields:
                                 nf_rust_field = escape_rust_keyword(convert_to_snake_case(nf_name))
                                 field_lines = _generate_single_field_encoding(
-                                    nf_id, nf_rust_field, nf_type, nf_entry, 'inner', structs, enums,
+                                    nf_id, nf_rust_field, nf_type, nf_entry, 'inner', structs, enums, bitmaps,
                                     "                            ", 'nested_fields'
                                 )
                                 nested_lines.extend(field_lines)
@@ -1136,15 +1355,15 @@ class CommandField:
                     inner_body = "\n".join(inner_lines)
                     # Generate the final map/collect expression with correct closure
                     # Note: the opening brace after |v| opens the closure body
-                    closure_start = f"        ({self.id}, tlv::TlvItemValueEnc::StructAnon({param_name}.into_iter().map(|v| " + "{\n"
+                    closure_start = f"        ({self.id}, tlv::TlvItemValueEnc::Array({param_name}.into_iter().map(|v| " + "{\n"
                     closure_end = "                }).collect())).into(),"
-                    return closure_start + "                    let mut fields = Vec::new();\n" + inner_body + "\n                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()\n" + closure_end
+                    return closure_start + "                    let mut fields = Vec::new();\n" + inner_body + "\n                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()\n" + closure_end
 
                 # Primitive entry types: map Matter TLV type to the correct
                 # TlvItemValueEnc variant and cast elements to the appropriate
                 # Rust type when needed.
-                entry_tlv = MatterType.get_tlv_type(self.entry_type)
-                entry_rust = MatterType.get_rust_type(self.entry_type, enums=enums)
+                entry_tlv = MatterType.get_tlv_type(self.entry_type, bitmaps=bitmaps)
+                entry_rust = MatterType.get_rust_type(self.entry_type, enums=enums, bitmaps=bitmaps)
 
                 if entry_tlv == 'String':
                     return f"        ({self.id}, tlv::TlvItemValueEnc::StructAnon({param_name}.into_iter().map(|v| (0, tlv::TlvItemValueEnc::String(v)).into()).collect())).into(),"
@@ -1154,7 +1373,7 @@ class CommandField:
                     return f"        ({self.id}, tlv::TlvItemValueEnc::StructAnon({param_name}.into_iter().map(|v| (0, tlv::TlvItemValueEnc::Bool(v)).into()).collect())).into(),"
                 if entry_tlv.startswith('UInt') or entry_tlv.startswith('Int'):
                     # Cast numeric items to the target Rust type when necessary
-                    cast = _get_value_cast_expr('v', self.entry_type, enums)
+                    cast = _get_value_cast_expr('v', self.entry_type, enums, bitmaps)
                     return f"        ({self.id}, tlv::TlvItemValueEnc::StructAnon({param_name}.into_iter().map(|v| (0, tlv::TlvItemValueEnc::{entry_tlv}({cast})).into()).collect())).into(),"
 
                 # Fallback: preserve previous behavior but use the element as-is
@@ -1162,8 +1381,8 @@ class CommandField:
             else:
                 # No entry type specified — keep previous default (UInt8)
                 return f"        ({self.id}, tlv::TlvItemValueEnc::StructAnon({param_name}.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into(),"
-        
-        tlv_type = MatterType.get_tlv_type(self.field_type)
+
+        tlv_type = MatterType.get_tlv_type(self.field_type, bitmaps=bitmaps)
         
         if self.nullable:
             # Handle nullable fields
@@ -1178,7 +1397,7 @@ class CommandField:
                 for f_id, f_name, f_type, f_entry in struct_def.fields:
                     rust_field = escape_rust_keyword(convert_to_snake_case(f_name))
                     field_lines = _generate_single_field_encoding(
-                        f_id, rust_field, f_type, f_entry, 's', structs, enums, "            "
+                        f_id, rust_field, f_type, f_entry, 's', structs, enums, bitmaps, "            "
                     )
                     lines.extend(field_lines)
                 
@@ -1210,6 +1429,23 @@ class CommandField:
                     else:
                         default_value = self._get_default_value()
                         param_expr = f"{param_name}.unwrap_or({default_value})"
+            # For Bitmap types, use proper conversion
+            elif self.field_type.endswith('Bitmap'):
+                # Check if we have the bitmap definition
+                if bitmaps and self.field_type in bitmaps:
+                    bitmap_name = bitmaps[self.field_type].get_rust_bitmap_name()
+                    if self.default and self.default.lower() in ['null', 'none']:
+                        param_expr = f"{param_name}.unwrap_or_default()"
+                    else:
+                        default_value = self._get_default_value()
+                        param_expr = f"{param_name}.unwrap_or({default_value})"
+                else:
+                    # Fallback to u8 if bitmap not defined
+                    if self.default and self.default.lower() in ['null', 'none']:
+                        param_expr = f"{param_name}.unwrap_or_default()"
+                    else:
+                        default_value = self._get_default_value()
+                        param_expr = f"{param_name}.unwrap_or({default_value})"
             else:
                 if self.default and self.default.lower() in ['null', 'none']:
                     param_expr = f"{param_name}.unwrap_or_default()"
@@ -1228,6 +1464,15 @@ class CommandField:
                     # Fallback: assume it's already u8
                     param_expr = param_name
                 return f"        ({self.id}, tlv::TlvItemValueEnc::{tlv_type}({param_expr})).into(),"
+            # For non-nullable Bitmap types, use proper conversion
+            elif self.field_type.endswith('Bitmap'):
+                # Check if we have the bitmap definition
+                if bitmaps and self.field_type in bitmaps:
+                    param_expr = param_name
+                else:
+                    # Fallback: assume it's already the base type
+                    param_expr = param_name
+                return f"        ({self.id}, tlv::TlvItemValueEnc::{tlv_type}({param_expr})).into(),"
             elif self.field_type.endswith('Struct') and structs and self.field_type in structs:
                 # Single struct parameter - need to encode its fields
                 struct_def = structs[self.field_type]
@@ -1241,7 +1486,7 @@ class CommandField:
                 for f_id, f_name, f_type, f_entry in struct_def.fields:
                     rust_field = escape_rust_keyword(convert_to_snake_case(f_name))
                     field_lines = _generate_single_field_encoding(
-                        f_id, rust_field, f_type, f_entry, param_name, structs, enums,
+                        f_id, rust_field, f_type, f_entry, param_name, structs, enums, bitmaps,
                         "        ", f"{param_name}_fields"
                     )
                     # Check if this field is actually encodable (not a TODO comment)
@@ -1317,7 +1562,7 @@ class MatterCommand:
         """Convert command name to snake_case Rust function name."""
         return f"encode_{escape_rust_keyword(convert_to_snake_case(self.name))}"
     
-    def generate_rust_function(self, structs: Dict[str, MatterStruct], enums: Dict[str, 'MatterEnum'] = None) -> str:
+    def generate_rust_function(self, structs: Dict[str, MatterStruct], enums: Dict[str, 'MatterEnum'] = None, bitmaps: Dict[str, 'MatterBitmap'] = None) -> str:
         """Generate complete Rust function for encoding this command."""
         func_name = self.get_rust_function_name()
 
@@ -1329,6 +1574,9 @@ class MatterCommand:
             if field.is_list and field.entry_type and structs and field.entry_type in structs:
                 item_struct = structs[field.entry_type]
                 rust_type = f"Vec<{item_struct.get_rust_struct_name()}>"
+            elif field.is_list and field.entry_type and field.entry_type.endswith('Struct') and (not structs or field.entry_type not in structs):
+                # Skip list fields that reference undefined structs from other clusters
+                continue
             elif not field.is_list and field.field_type.endswith('Struct') and structs and field.field_type in structs:
                 # Single struct field
                 struct_def = structs[field.field_type]
@@ -1343,9 +1591,16 @@ class MatterCommand:
                 else:
                     # Fallback to u8 if enum not defined
                     rust_type = 'u8'
+            elif not field.is_list and field.field_type.endswith('Bitmap'):
+                # Check if we have the bitmap definition
+                if bitmaps and field.field_type in bitmaps:
+                    rust_type = bitmaps[field.field_type].get_rust_bitmap_name()
+                else:
+                    # Fallback to u8 if bitmap not defined
+                    rust_type = 'u8'
             else:
                 # Use MatterType mapping (handles primitive lists when is_list=True)
-                rust_type = MatterType.get_rust_type(field.entry_type if field.is_list and field.entry_type else field.field_type, field.is_list, enums=enums)
+                rust_type = MatterType.get_rust_type(field.entry_type if field.is_list and field.entry_type else field.field_type, field.is_list, enums=enums, bitmaps=bitmaps)
 
             if field.nullable:
                 rust_type = f"Option<{rust_type}>"
@@ -1359,9 +1614,19 @@ class MatterCommand:
         tlv_fields = []  # Field encodings that go inside vec![]
 
         for field in self.fields:
+            # Skip fields with undefined cross-cluster struct types (consistent with param generation)
+            if not field.is_list and field.field_type.endswith('Struct') and (not structs or field.field_type not in structs):
+                continue
+            if field.is_list and field.entry_type and field.entry_type.endswith('Struct') and (not structs or field.entry_type not in structs):
+                continue
+
             param_name = field.get_rust_param_name()
-            encoding_result = field.get_tlv_encoding(param_name, structs, enums)
-            
+            encoding_result = field.get_tlv_encoding(param_name, structs, enums, bitmaps)
+
+            # Skip empty encoding results (from cross-cluster struct skipping)
+            if not encoding_result:
+                continue
+
             # Check if this is a multi-line struct encoding that needs pre-statements
             if '\n' in encoding_result and field.field_type.endswith('Struct'):
                 # Split into pre-statements and the final field line
@@ -1558,6 +1823,45 @@ class ClusterParser:
 
         return enums
 
+    def parse_bitmaps(self) -> Dict[str, MatterBitmap]:
+        """Parse all bitmap definitions from the XML."""
+        bitmaps = {}
+
+        data_types_elem = self.root.find('dataTypes')
+        if data_types_elem is None:
+            return bitmaps
+
+        for bitmap_elem in data_types_elem.findall('bitmap'):
+            bitmap_name = bitmap_elem.get('name', 'Unknown')
+            bitmap = MatterBitmap(bitmap_name)
+
+            # Parse bitfield items
+            for bitfield_elem in bitmap_elem.findall('bitfield'):
+                # Get bit position (ignore bit ranges with from/to for now)
+                bit_str = bitfield_elem.get('bit')
+                if bit_str is None:
+                    # Skip bit ranges (from/to attributes) for initial implementation
+                    continue
+
+                field_name = bitfield_elem.get('name', 'Unknown')
+                summary = bitfield_elem.get('summary', '')
+
+                # Parse the bit position (can be decimal or hex)
+                try:
+                    if bit_str.startswith('0x') or bit_str.startswith('0X'):
+                        bit_pos = int(bit_str, 16)
+                    else:
+                        bit_pos = int(bit_str)
+                except (ValueError, AttributeError):
+                    # Skip invalid bit positions
+                    continue
+
+                bitmap.add_bitfield(bit_pos, field_name, summary)
+
+            bitmaps[bitmap_name] = bitmap
+
+        return bitmaps
+
 
 def generate_json_dispatcher_function(cluster_id: str, attributes: List[AttributeField], structs: Dict[str, MatterStruct]) -> str:
     """Generate a JSON dispatcher function that routes attribute decoding based on attribute ID."""
@@ -1578,8 +1882,27 @@ def generate_json_dispatcher_function(cluster_id: str, attributes: List[Attribut
         seen_ids.add(clean_attr_id)
         
         func_name = attribute.get_rust_function_name()
-        
-        match_arm = f'''        {clean_attr_id} => {{
+
+        # Check if this is a list of octstr attribute
+        if attribute.is_list and attribute.entry_type == 'octstr':
+            # Use custom serialization for list of octstr
+            match_arm = f'''        {clean_attr_id} => {{
+            match {func_name}(tlv_value) {{
+                Ok(value) => {{
+                    // Serialize Vec<Vec<u8>> as array of hex strings
+                    let hex_array: Vec<String> = value.iter()
+                        .map(|bytes| bytes.iter()
+                            .map(|byte| format!("{{:02x}}", byte))
+                            .collect::<String>())
+                        .collect();
+                    serde_json::to_string(&hex_array).unwrap_or_else(|_| "null".to_string())
+                }},
+                Err(e) => format!("{{{{\\\"error\\\": \\\"{{}}\\\"}}}}", e),
+            }}
+        }}'''
+        else:
+            # Existing logic for other types
+            match_arm = f'''        {clean_attr_id} => {{
             match {func_name}(tlv_value) {{
                 Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
                 Err(e) => format!("{{{{\\\"error\\\": \\\"{{}}\\\"}}}}", e),
@@ -1661,24 +1984,37 @@ def generate_rust_code(xml_file: str) -> str:
     attributes = parser.parse_attributes()
     structs = parser.parse_structs()
     enums = parser.parse_enums()
+    bitmaps = parser.parse_bitmaps()
 
-    # Detect name collisions between enums and structs
-    # If an enum has the same name as a struct, rename the enum by NOT removing the "Enum" suffix
+    # Detect name collisions between enums, structs, and bitmaps
+    # If an enum/bitmap has the same name as a struct, rename by NOT removing the "Enum"/"Bitmap" suffix
     enum_names = {enum.get_rust_enum_name() for enum in enums.values()}
     struct_names = {struct.get_rust_struct_name() for struct in structs.values()}
+    bitmap_names = {bitmap.get_rust_bitmap_name() for bitmap in bitmaps.values()}
 
-    # Find collisions and keep track of which enums to preserve "Enum" suffix
-    collisions = enum_names & struct_names
+    # Find collisions and keep track of which enums/bitmaps to preserve suffix
+    enum_collisions = enum_names & struct_names
+    bitmap_collisions = bitmap_names & (struct_names | enum_names)
 
-    # Create a new enums dict with adjusted names
-    if collisions:
+    # Create new enums dict with adjusted names
+    if enum_collisions:
         adjusted_enums = {}
         for enum_key, enum_obj in enums.items():
-            if enum_obj.get_rust_enum_name() in collisions:
+            if enum_obj.get_rust_enum_name() in enum_collisions:
                 # Keep the original name with "Enum" suffix
                 enum_obj._force_enum_suffix = True
             adjusted_enums[enum_key] = enum_obj
         enums = adjusted_enums
+
+    # Create new bitmaps dict with adjusted names
+    if bitmap_collisions:
+        adjusted_bitmaps = {}
+        for bitmap_key, bitmap_obj in bitmaps.items():
+            if bitmap_obj.get_rust_bitmap_name() in bitmap_collisions:
+                # Keep the original name with "Bitmap" suffix
+                bitmap_obj._force_bitmap_suffix = True
+            adjusted_bitmaps[bitmap_key] = bitmap_obj
+        bitmaps = adjusted_bitmaps
 
     # Handle duplicate enum variants (like "Reservedforfutureuse" appearing twice)
     for enum_obj in enums.values():
@@ -1726,12 +2062,27 @@ def generate_rust_code(xml_file: str) -> str:
     imports = ""
     # Check if we have commands with fields (not field-less commands)
     commands_with_fields = [cmd for cmd in commands if cmd.fields]
-    if commands_with_fields or attributes or structs or enums:
+    # tlv is only needed for commands, attributes, and structs (not enums)
+    if commands_with_fields or attributes or structs:
         imports += "use crate::tlv;\n"
     if commands_with_fields or attributes:
         imports += "use anyhow;\n"
     if attributes:
         imports += "use serde_json;\n"
+
+    # Check which specific serialization helpers are needed
+    needs_opt_bytes_hex = False
+    needs_opt_vec_bytes_hex = False
+
+    if structs:
+        for struct in structs.values():
+            for field_id, field_name, field_type, entry_type in struct.fields:
+                # Single octstr field needs serialize_opt_bytes_as_hex
+                if field_type == 'octstr':
+                    needs_opt_bytes_hex = True
+                # List of octstr field needs serialize_opt_vec_bytes_as_hex
+                elif field_type == 'list' and entry_type == 'octstr':
+                    needs_opt_vec_bytes_hex = True
 
     code = f'''//! Generated Matter TLV encoders and decoders for {parser.cluster_name}
 //! Cluster ID: {parser.cluster_id}
@@ -1742,17 +2093,38 @@ def generate_rust_code(xml_file: str) -> str:
 
 '''
 
+    # Import only the specific serialization helpers that are needed
+    if needs_opt_bytes_hex or needs_opt_vec_bytes_hex:
+        helpers_to_import = []
+        if needs_opt_bytes_hex:
+            helpers_to_import.append('serialize_opt_bytes_as_hex')
+        if needs_opt_vec_bytes_hex:
+            helpers_to_import.append('serialize_opt_vec_bytes_as_hex')
+
+        helpers_import = ', '.join(helpers_to_import)
+        code += f'''// Import serialization helpers for octet strings
+use crate::clusters::helpers::{{{helpers_import}}};
+
+'''
+
     # Generate enum definitions (before structs as structs may use enums)
     if enums:
         code += "// Enum definitions\n\n"
         for enum in enums.values():
             code += enum.generate_rust_enum() + "\n\n"
 
+    # Generate bitmap definitions (after enums, before structs)
+    # Uses shared crate::clusters::bitmap::Bitmap<Tag, Base> type
+    if bitmaps:
+        code += "// Bitmap definitions\n\n"
+        for bitmap in bitmaps.values():
+            code += bitmap.generate_rust_bitmap() + "\n\n"
+
     # Generate struct definitions
     if structs:
         code += "// Struct definitions\n\n"
         for struct in structs.values():
-            code += struct.generate_rust_struct(structs, enums) + "\n\n"
+            code += struct.generate_rust_struct(structs, enums, bitmaps) + "\n\n"
 
     # Generate command encoders
     if commands:
@@ -1765,7 +2137,7 @@ def generate_rust_code(xml_file: str) -> str:
 
             func_name = command.get_rust_function_name()
             if func_name not in generated_functions:
-                code += command.generate_rust_function(structs, enums) + "\n\n"
+                code += command.generate_rust_function(structs, enums, bitmaps) + "\n\n"
                 generated_functions.add(func_name)
 
     # Generate attribute decoders
@@ -1775,7 +2147,7 @@ def generate_rust_code(xml_file: str) -> str:
         for attribute in attributes:
             func_name = attribute.get_rust_function_name()
             if func_name not in generated_functions:
-                code += attribute.generate_decode_function(structs, enums) + "\n\n"
+                code += attribute.generate_decode_function(structs, enums, bitmaps) + "\n\n"
                 generated_functions.add(func_name)
 
         # Generate JSON dispatcher function

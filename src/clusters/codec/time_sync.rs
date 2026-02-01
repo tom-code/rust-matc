@@ -257,12 +257,12 @@ pub fn encode_set_time_zone(time_zone: Vec<TimeZone>) -> anyhow::Result<Vec<u8>>
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(time_zone.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(time_zone.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.offset { fields.push((0, tlv::TlvItemValueEnc::Int32(x as i32)).into()); }
                     if let Some(x) = v.valid_at { fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
                     if let Some(x) = v.name { fields.push((2, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };
@@ -274,12 +274,12 @@ pub fn encode_set_dst_offset(dst_offset: Vec<DSTOffset>) -> anyhow::Result<Vec<u
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(dst_offset.into_iter().map(|v| {
+        (0, tlv::TlvItemValueEnc::Array(dst_offset.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.offset { fields.push((0, tlv::TlvItemValueEnc::Int32(x as i32)).into()); }
                     if let Some(x) = v.valid_starting { fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
                     if let Some(x) = v.valid_until { fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };

@@ -61,6 +61,40 @@ impl From<CommissioningError> for u8 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+pub enum NetworkRecoveryReason {
+    /// Unspecified / unknown reason of network failure
+    Unspecified = 0,
+    /// Credentials for the configured operational network are not valid
+    Auth = 1,
+    /// Configured network cannot be found (e.g. the device cannot see the configured Wi-Fi SSID, Thread end-node is unable to find a parent router on the PAN)
+    Visibility = 2,
+}
+
+impl NetworkRecoveryReason {
+    /// Convert from u8 value
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(NetworkRecoveryReason::Unspecified),
+            1 => Some(NetworkRecoveryReason::Auth),
+            2 => Some(NetworkRecoveryReason::Visibility),
+            _ => None,
+        }
+    }
+
+    /// Convert to u8 value
+    pub fn to_u8(self) -> u8 {
+        self as u8
+    }
+}
+
+impl From<NetworkRecoveryReason> for u8 {
+    fn from(val: NetworkRecoveryReason) -> Self {
+        val as u8
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(u8)]
 pub enum RegulatoryLocationType {
     /// Indoor only
     Indoor = 0,
@@ -237,6 +271,33 @@ pub fn decode_tc_update_deadline(inp: &tlv::TlvItemValue) -> anyhow::Result<Opti
     }
 }
 
+/// Decode RecoveryIdentifier attribute (0x000A)
+pub fn decode_recovery_identifier(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<u8>> {
+    if let tlv::TlvItemValue::OctetString(v) = inp {
+        Ok(v.clone())
+    } else {
+        Err(anyhow::anyhow!("Expected OctetString"))
+    }
+}
+
+/// Decode NetworkRecoveryReason attribute (0x000B)
+pub fn decode_network_recovery_reason(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<NetworkRecoveryReason>> {
+    if let tlv::TlvItemValue::Int(v) = inp {
+        Ok(NetworkRecoveryReason::from_u8(*v as u8))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Decode IsCommissioningWithoutPower attribute (0x000C)
+pub fn decode_is_commissioning_without_power(inp: &tlv::TlvItemValue) -> anyhow::Result<bool> {
+    if let tlv::TlvItemValue::Bool(v) = inp {
+        Ok(*v)
+    } else {
+        Err(anyhow::anyhow!("Expected Bool"))
+    }
+}
+
 
 // JSON dispatcher function
 
@@ -316,6 +377,24 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x000A => {
+            match decode_recovery_identifier(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x000B => {
+            match decode_network_recovery_reason(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x000C => {
+            match decode_is_commissioning_without_power(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -336,6 +415,9 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x0007, "TCAcknowledgements"),
         (0x0008, "TCAcknowledgementsRequired"),
         (0x0009, "TCUpdateDeadline"),
+        (0x000A, "RecoveryIdentifier"),
+        (0x000B, "NetworkRecoveryReason"),
+        (0x000C, "IsCommissioningWithoutPower"),
     ]
 }
 

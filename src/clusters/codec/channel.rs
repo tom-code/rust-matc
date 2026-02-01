@@ -109,6 +109,21 @@ impl From<Status> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// RecordingFlag bitmap type
+pub type RecordingFlag = u8;
+
+/// Constants for RecordingFlag
+pub mod recordingflag {
+    /// The program is scheduled for recording.
+    pub const SCHEDULED: u8 = 0x01;
+    /// The program series is scheduled for recording.
+    pub const RECORD_SERIES: u8 = 0x02;
+    /// The program is recorded and available to be played.
+    pub const RECORDED: u8 = 0x04;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -171,7 +186,7 @@ pub struct Program {
     pub dvbi_url: Option<String>,
     pub release_date: Option<String>,
     pub parental_guidance_text: Option<String>,
-    pub recording_flag: Option<u8>,
+    pub recording_flag: Option<RecordingFlag>,
     pub series_info: Option<SeriesInfo>,
     pub category_list: Option<Vec<ProgramCategory>>,
     pub cast_list: Option<Vec<ProgramCast>>,
@@ -220,7 +235,7 @@ pub fn encode_skip_channel(count: i16) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode GetProgramGuide command (0x04)
-pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Vec<ChannelInfo>, page_token: Option<PageToken>, recording_flag: Option<u8>, external_id_list: Vec<u8>, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Vec<ChannelInfo>, page_token: Option<PageToken>, recording_flag: Option<RecordingFlag>, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
             // Encode optional struct PageTokenStruct
             let page_token_enc = if let Some(s) = page_token {
                 let mut fields = Vec::new();
@@ -236,7 +251,7 @@ pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Ve
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt64(start_time)).into(),
         (1, tlv::TlvItemValueEnc::UInt64(end_time)).into(),
-        (2, tlv::TlvItemValueEnc::StructAnon(channel_list.into_iter().map(|v| {
+        (2, tlv::TlvItemValueEnc::Array(channel_list.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.major_number { fields.push((0, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
                     if let Some(x) = v.minor_number { fields.push((1, tlv::TlvItemValueEnc::UInt16(x as u16)).into()); }
@@ -245,11 +260,10 @@ pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Ve
                     if let Some(x) = v.affiliate_call_sign { fields.push((4, tlv::TlvItemValueEnc::String(x.clone())).into()); }
                     if let Some(x) = v.identifier { fields.push((5, tlv::TlvItemValueEnc::String(x.clone())).into()); }
                     if let Some(x) = v.type_ { fields.push((6, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         (3, page_token_enc).into(),
         (5, tlv::TlvItemValueEnc::UInt8(recording_flag.unwrap_or_default())).into(),
-        (6, tlv::TlvItemValueEnc::StructAnon(external_id_list.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v as u8)).into()).collect())).into(),
         (7, tlv::TlvItemValueEnc::OctetString(data)).into(),
         ]),
     };
@@ -257,13 +271,12 @@ pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Ve
 }
 
 /// Encode RecordProgram command (0x06)
-pub fn encode_record_program(program_identifier: String, should_record_series: bool, external_id_list: Vec<u8>, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_record_program(program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::String(program_identifier)).into(),
         (1, tlv::TlvItemValueEnc::Bool(should_record_series)).into(),
-        (2, tlv::TlvItemValueEnc::StructAnon(external_id_list.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v as u8)).into()).collect())).into(),
         (3, tlv::TlvItemValueEnc::OctetString(data)).into(),
         ]),
     };
@@ -271,13 +284,12 @@ pub fn encode_record_program(program_identifier: String, should_record_series: b
 }
 
 /// Encode CancelRecordProgram command (0x07)
-pub fn encode_cancel_record_program(program_identifier: String, should_record_series: bool, external_id_list: Vec<u8>, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_cancel_record_program(program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::String(program_identifier)).into(),
         (1, tlv::TlvItemValueEnc::Bool(should_record_series)).into(),
-        (2, tlv::TlvItemValueEnc::StructAnon(external_id_list.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v as u8)).into()).collect())).into(),
         (3, tlv::TlvItemValueEnc::OctetString(data)).into(),
         ]),
     };

@@ -8,6 +8,9 @@ use anyhow;
 use serde_json;
 
 
+// Import serialization helpers for octet strings
+use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
+
 // Enum definitions
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -117,10 +120,47 @@ impl From<WiFiBand> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// ThreadCapabilities bitmap type
+pub type ThreadCapabilities = u8;
+
+/// Constants for ThreadCapabilities
+pub mod threadcapabilities {
+    /// Thread Border Router functionality is present
+    pub const IS_BORDER_ROUTER_CAPABLE: u8 = 0x01;
+    /// Router mode is supported (interface could be in router or REED mode)
+    pub const IS_ROUTER_CAPABLE: u8 = 0x02;
+    /// Sleepy end-device mode is supported
+    pub const IS_SLEEPY_END_DEVICE_CAPABLE: u8 = 0x04;
+    /// Device is a full Thread device (opposite of Minimal Thread Device)
+    pub const IS_FULL_THREAD_DEVICE: u8 = 0x08;
+    /// Synchronized sleepy end-device mode is supported
+    pub const IS_SYNCHRONIZED_SLEEPY_END_DEVICE_CAPABLE: u8 = 0x10;
+}
+
+/// WiFiSecurity bitmap type
+pub type WiFiSecurity = u8;
+
+/// Constants for WiFiSecurity
+pub mod wifisecurity {
+    /// Supports unencrypted Wi-Fi
+    pub const UNENCRYPTED: u8 = 0x01;
+    /// Supports Wi-Fi using WEP security
+    pub const WEP: u8 = 0x02;
+    /// Supports Wi-Fi using WPA-Personal security
+    pub const WPA_PERSONAL: u8 = 0x04;
+    /// Supports Wi-Fi using WPA2-Personal security
+    pub const WPA2_PERSONAL: u8 = 0x08;
+    /// Supports Wi-Fi using WPA3-Personal security
+    pub const WPA3_PERSONAL: u8 = 0x10;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
 pub struct NetworkInfo {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub network_id: Option<Vec<u8>>,
     pub connected: Option<bool>,
 }
@@ -139,8 +179,10 @@ pub struct ThreadInterfaceScanResult {
 
 #[derive(Debug, serde::Serialize)]
 pub struct WiFiInterfaceScanResult {
-    pub security: Option<u8>,
+    pub security: Option<WiFiSecurity>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub ssid: Option<Vec<u8>>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub bssid: Option<Vec<u8>>,
     pub channel: Option<u16>,
     pub wifi_band: Option<WiFiBand>,
@@ -318,11 +360,11 @@ pub fn decode_supported_wifi_bands(inp: &tlv::TlvItemValue) -> anyhow::Result<Ve
 }
 
 /// Decode SupportedThreadFeatures attribute (0x0009)
-pub fn decode_supported_thread_features(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_supported_thread_features(inp: &tlv::TlvItemValue) -> anyhow::Result<ThreadCapabilities> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

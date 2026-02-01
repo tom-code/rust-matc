@@ -33,6 +33,9 @@ pub enum ModeTag {
     Warming = 16391,
     Proofing = 16392,
     Steam = 16393,
+    AirFry = 16394,
+    AirSousVide = 16395,
+    FrozenFood = 16396,
 }
 
 impl ModeTag {
@@ -64,6 +67,9 @@ impl ModeTag {
             16391 => Some(ModeTag::Warming),
             16392 => Some(ModeTag::Proofing),
             16393 => Some(ModeTag::Steam),
+            16394 => Some(ModeTag::AirFry),
+            16395 => Some(ModeTag::AirSousVide),
+            16396 => Some(ModeTag::FrozenFood),
             _ => None,
         }
     }

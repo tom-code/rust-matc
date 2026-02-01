@@ -87,6 +87,25 @@ impl From<MessagePriority> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// MessageControl bitmap type
+pub type MessageControl = u8;
+
+/// Constants for MessageControl
+pub mod messagecontrol {
+    /// Message requires confirmation from user
+    pub const CONFIRMATION_REQUIRED: u8 = 0x01;
+    /// Message requires response from user
+    pub const RESPONSE_REQUIRED: u8 = 0x02;
+    /// Message supports reply message from user
+    pub const REPLY_MESSAGE: u8 = 0x04;
+    /// Message has already been confirmed
+    pub const MESSAGE_CONFIRMED: u8 = 0x08;
+    /// Message required PIN/password protection
+    pub const MESSAGE_PROTECTED: u8 = 0x10;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -99,7 +118,7 @@ pub struct MessageResponseOption {
 pub struct Message {
     pub message_id: Option<u8>,
     pub priority: Option<MessagePriority>,
-    pub message_control: Option<u8>,
+    pub message_control: Option<MessageControl>,
     pub start_time: Option<u64>,
     pub duration: Option<u64>,
     pub message_text: Option<String>,
@@ -109,7 +128,7 @@ pub struct Message {
 // Command encoders
 
 /// Encode PresentMessagesRequest command (0x00)
-pub fn encode_present_messages_request(message_id: u8, priority: MessagePriority, message_control: u8, start_time: Option<u64>, duration: Option<u64>, message_text: String, responses: Vec<MessageResponseOption>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_present_messages_request(message_id: u8, priority: MessagePriority, message_control: MessageControl, start_time: Option<u64>, duration: Option<u64>, message_text: String, responses: Vec<MessageResponseOption>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
@@ -119,11 +138,11 @@ pub fn encode_present_messages_request(message_id: u8, priority: MessagePriority
         (3, tlv::TlvItemValueEnc::UInt64(start_time.unwrap_or(0))).into(),
         (4, tlv::TlvItemValueEnc::UInt64(duration.unwrap_or(0))).into(),
         (5, tlv::TlvItemValueEnc::String(message_text)).into(),
-        (6, tlv::TlvItemValueEnc::StructAnon(responses.into_iter().map(|v| {
+        (6, tlv::TlvItemValueEnc::Array(responses.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.message_response_id { fields.push((0, tlv::TlvItemValueEnc::UInt32(x as u32)).into()); }
                     if let Some(x) = v.label { fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                    (0, tlv::TlvItemValueEnc::StructInvisible(fields)).into()
+                    (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
                 }).collect())).into(),
         ]),
     };

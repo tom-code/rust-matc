@@ -160,6 +160,32 @@ impl From<StepDirection> for u8 {
     }
 }
 
+// Bitmap definitions
+
+/// Rock bitmap type
+pub type Rock = u8;
+
+/// Constants for Rock
+pub mod rock {
+    /// Indicate rock left to right
+    pub const ROCK_LEFT_RIGHT: u8 = 0x01;
+    /// Indicate rock up and down
+    pub const ROCK_UP_DOWN: u8 = 0x02;
+    /// Indicate rock around
+    pub const ROCK_ROUND: u8 = 0x04;
+}
+
+/// Wind bitmap type
+pub type Wind = u8;
+
+/// Constants for Wind
+pub mod wind {
+    /// Indicate sleep wind
+    pub const SLEEP_WIND: u8 = 0x01;
+    /// Indicate natural wind
+    pub const NATURAL_WIND: u8 = 0x02;
+}
+
 // Command encoders
 
 /// Encode Step command (0x00)
@@ -241,38 +267,38 @@ pub fn decode_speed_current(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
 }
 
 /// Decode RockSupport attribute (0x0007)
-pub fn decode_rock_support(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_rock_support(inp: &tlv::TlvItemValue) -> anyhow::Result<Rock> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode RockSetting attribute (0x0008)
-pub fn decode_rock_setting(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_rock_setting(inp: &tlv::TlvItemValue) -> anyhow::Result<Rock> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode WindSupport attribute (0x0009)
-pub fn decode_wind_support(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_wind_support(inp: &tlv::TlvItemValue) -> anyhow::Result<Wind> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 
 /// Decode WindSetting attribute (0x000A)
-pub fn decode_wind_setting(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_wind_setting(inp: &tlv::TlvItemValue) -> anyhow::Result<Wind> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Integer"))
     }
 }
 

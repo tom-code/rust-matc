@@ -12,6 +12,81 @@ use serde_json;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+pub enum MeasurementType {
+    Unspecified = 0,
+    /// Voltage in millivolts (mV)
+    Voltage = 1,
+    /// Active current in milliamps (mA)
+    Activecurrent = 2,
+    /// Reactive current in milliamps (mA)
+    Reactivecurrent = 3,
+    /// Apparent current in milliamps (mA)
+    Apparentcurrent = 4,
+    /// Active power in milliwatts (mW)
+    Activepower = 5,
+    /// Reactive power in millivolt-amps reactive (mVAR)
+    Reactivepower = 6,
+    /// Apparent power in millivolt-amps (mVA)
+    Apparentpower = 7,
+    /// Root mean squared voltage in millivolts (mV)
+    Rmsvoltage = 8,
+    /// Root mean squared current in milliamps (mA)
+    Rmscurrent = 9,
+    /// Root mean squared power in milliwatts (mW)
+    Rmspower = 10,
+    /// AC frequency in millihertz (mHz)
+    Frequency = 11,
+    /// Power Factor ratio in +/- 1/100ths of a percent.
+    Powerfactor = 12,
+    /// AC neutral current in milliamps (mA)
+    Neutralcurrent = 13,
+    /// Electrical energy in milliwatt-hours (mWh)
+    Electricalenergy = 14,
+    /// Reactive power in millivolt-amp-hours reactive (mVARh)
+    Reactiveenergy = 15,
+    /// Apparent power in millivolt-amp-hours (mVAh)
+    Apparentenergy = 16,
+}
+
+impl MeasurementType {
+    /// Convert from u8 value
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(MeasurementType::Unspecified),
+            1 => Some(MeasurementType::Voltage),
+            2 => Some(MeasurementType::Activecurrent),
+            3 => Some(MeasurementType::Reactivecurrent),
+            4 => Some(MeasurementType::Apparentcurrent),
+            5 => Some(MeasurementType::Activepower),
+            6 => Some(MeasurementType::Reactivepower),
+            7 => Some(MeasurementType::Apparentpower),
+            8 => Some(MeasurementType::Rmsvoltage),
+            9 => Some(MeasurementType::Rmscurrent),
+            10 => Some(MeasurementType::Rmspower),
+            11 => Some(MeasurementType::Frequency),
+            12 => Some(MeasurementType::Powerfactor),
+            13 => Some(MeasurementType::Neutralcurrent),
+            14 => Some(MeasurementType::Electricalenergy),
+            15 => Some(MeasurementType::Reactiveenergy),
+            16 => Some(MeasurementType::Apparentenergy),
+            _ => None,
+        }
+    }
+
+    /// Convert to u8 value
+    pub fn to_u8(self) -> u8 {
+        self as u8
+    }
+}
+
+impl From<MeasurementType> for u8 {
+    fn from(val: MeasurementType) -> Self {
+        val as u8
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(u8)]
 pub enum PowerMode {
     Unknown = 0,
     /// Direct current
@@ -52,8 +127,29 @@ pub struct HarmonicMeasurement {
 }
 
 #[derive(Debug, serde::Serialize)]
+pub struct MeasurementAccuracyRange {
+    pub range_min: Option<i64>,
+    pub range_max: Option<i64>,
+    pub percent_max: Option<u8>,
+    pub percent_min: Option<u8>,
+    pub percent_typical: Option<u8>,
+    pub fixed_max: Option<u64>,
+    pub fixed_min: Option<u64>,
+    pub fixed_typical: Option<u64>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct MeasurementAccuracy {
+    pub measurement_type: Option<MeasurementType>,
+    pub measured: Option<bool>,
+    pub min_measured_value: Option<i64>,
+    pub max_measured_value: Option<i64>,
+    pub accuracy_ranges: Option<Vec<MeasurementAccuracyRange>>,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct MeasurementRange {
-    pub measurement_type: Option<u8>,
+    pub measurement_type: Option<MeasurementType>,
     pub min: Option<i64>,
     pub max: Option<i64>,
     pub start_timestamp: Option<u64>,
@@ -87,13 +183,36 @@ pub fn decode_number_of_measurement_types(inp: &tlv::TlvItemValue) -> anyhow::Re
 }
 
 /// Decode Accuracy attribute (0x0002)
-pub fn decode_accuracy(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<String>> {
+pub fn decode_accuracy(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<MeasurementAccuracy>> {
     let mut res = Vec::new();
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
-            if let tlv::TlvItemValue::String(s) = &item.value {
-                res.push(s.clone());
-            }
+            res.push(MeasurementAccuracy {
+                measurement_type: item.get_int(&[0]).and_then(|v| MeasurementType::from_u8(v as u8)),
+                measured: item.get_bool(&[1]),
+                min_measured_value: item.get_int(&[2]).map(|v| v as i64),
+                max_measured_value: item.get_int(&[3]).map(|v| v as i64),
+                accuracy_ranges: {
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[4]) {
+                        let mut items = Vec::new();
+                        for list_item in l {
+                            items.push(MeasurementAccuracyRange {
+                range_min: list_item.get_int(&[0]).map(|v| v as i64),
+                range_max: list_item.get_int(&[1]).map(|v| v as i64),
+                percent_max: list_item.get_int(&[2]).map(|v| v as u8),
+                percent_min: list_item.get_int(&[3]).map(|v| v as u8),
+                percent_typical: list_item.get_int(&[4]).map(|v| v as u8),
+                fixed_max: list_item.get_int(&[5]),
+                fixed_min: list_item.get_int(&[6]),
+                fixed_typical: list_item.get_int(&[7]),
+                            });
+                        }
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+            });
         }
     }
     Ok(res)
@@ -105,7 +224,7 @@ pub fn decode_ranges(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<MeasurementR
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(MeasurementRange {
-                measurement_type: item.get_int(&[0]).map(|v| v as u8),
+                measurement_type: item.get_int(&[0]).and_then(|v| MeasurementType::from_u8(v as u8)),
                 min: item.get_int(&[1]).map(|v| v as i64),
                 max: item.get_int(&[2]).map(|v| v as i64),
                 start_timestamp: item.get_int(&[3]),

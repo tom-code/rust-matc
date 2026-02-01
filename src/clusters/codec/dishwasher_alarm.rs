@@ -5,3 +5,24 @@
 
 
 
+// Bitmap definitions
+
+/// Alarm bitmap type
+pub type Alarm = u8;
+
+/// Constants for Alarm
+pub mod alarm {
+    /// Water inflow is abnormal
+    pub const INFLOW_ERROR: u8 = 0x01;
+    /// Water draining is abnormal
+    pub const DRAIN_ERROR: u8 = 0x02;
+    /// Door or door lock is abnormal
+    pub const DOOR_ERROR: u8 = 0x04;
+    /// Unable to reach normal temperature
+    pub const TEMP_TOO_LOW: u8 = 0x08;
+    /// Temperature is too high
+    pub const TEMP_TOO_HIGH: u8 = 0x10;
+    /// Water level is abnormal
+    pub const WATER_LEVEL_ERROR: u8 = 0x20;
+}
+
