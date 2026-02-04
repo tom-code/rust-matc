@@ -42,7 +42,12 @@ fn create_query(label: &str, qtype: u16) -> Result<Vec<u8>> {
 
 fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
     let mut out = Vec::new();
+    let mut depth = 0;
     loop {
+        depth += 1;
+        if depth > 32 {
+            anyhow::bail!("too many label indirections");
+        }
         let n = cursor.read_u8()?;
         if n == 0 {
             break;
@@ -51,6 +56,9 @@ fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
                 let off = n & 0x3f;
                 ((off as usize) << 8) | (cursor.read_u8()? as u16) as usize
             };
+            if off >= data.len() {
+                anyhow::bail!("invalid compression pointer offset");
+            }
             let frag = read_label(data, &mut Cursor::new(&data[off..]))?;
             out.extend_from_slice(frag.as_bytes());
             break;
@@ -218,15 +226,21 @@ async fn discoverv4(
     let query = create_query(label, qtype)?;
     socket.send_to(&query, "224.0.0.251:5353").await?;
     loop {
-        let mut buf = vec![0; 1024];
-        //let (n, addr) = socket.recv_from(&mut buf).await?;
+        let mut buf = vec![0; 2048];
         let (n, addr) = tokio::select! {
             v = socket.recv_from(&mut buf) => v?,
             _ = cancel.cancelled() => return Ok(())
         };
 
         buf.resize(n, 0);
-        let dns = parse_dns(&buf, addr)?;
+        let dns = parse_dns(&buf, addr);
+        let dns = match dns {
+            Ok(v) => v,
+            Err(e) => {
+                log::debug!("failed to parse mdns message: {}", e);
+                continue;
+            }
+        };
         if dns.flags == 0 {
             // ignore requests
             continue;
@@ -256,14 +270,21 @@ async fn discoverv6(
     let query = create_query(label, qtype)?;
     socket.send_to(&query, "[ff02::fb]:5353").await?;
     loop {
-        let mut buf = vec![0; 1024];
+        let mut buf = vec![0; 2048];
         //let (n, addr) = socket.recv_from(&mut buf).await?;
         let (n, addr) = tokio::select! {
             v = socket.recv_from(&mut buf) => v?,
             _ = cancel.cancelled() => return Ok(())
         };
         buf.resize(n, 0);
-        let dns = parse_dns(&buf, addr)?;
+        let dns = parse_dns(&buf, addr);
+        let dns = match dns {
+            Ok(v) => v,
+            Err(e) => {
+                log::debug!("failed to parse mdns message: {}", e);
+                continue;
+            }
+        };
         if dns.flags == 0 {
             // ignore requests
             continue;
