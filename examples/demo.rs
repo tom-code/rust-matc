@@ -625,12 +625,35 @@ fn command_cmd(
                 }
             },
             CommandCommand::Test{} => {
-                println!("test command executed");
+                let res = connection.im_subscribe_request(1, 0x101, 1).await.unwrap();
+                print!("{:?} exchange: {}", res, res.protocol_header.exchange_id);
+                res.tlv.dump(1);
+                if res.protocol_header.opcode != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
+                    log::warn!("unexpected response opcode 0x{:x}", res.protocol_header.opcode);
+                }
+                connection.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await.unwrap();
+                loop {
+                    let ev = connection.recv_event().await.unwrap();
+                    println!("message received:");
+                    print!("{:?} exchange: {}", ev, ev.protocol_header.exchange_id);
+                    ev.tlv.dump(1);
+                    match ev.protocol_header.opcode {
+                        messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
+                            println!("this is Event/Report Data {}", ev.protocol_header.exchange_id);
+                            connection.im_status_response(ev.protocol_header.exchange_id, 2, ev.message_header.message_counter).await.unwrap();
+                            println!("sent status response");
+                        }
+                        _ => {
+                            println!("unhandled event opcode 0x{:x}", ev.protocol_header.opcode);
+                        }
+                    }
+                }
+                /*println!("test command executed");
                 for _ in 0..1000 {
                     let res = connection.invoke_request(endpoint, 0x6, 0, &[]).await.unwrap();
                     res.tlv.dump(1);
                     tokio::time::sleep(Duration::from_millis(100)).await;
-                }
+                }*/
             }
         }
         }

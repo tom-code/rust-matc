@@ -164,17 +164,17 @@ impl ActiveConnection {
         }
 
         // Wait for response
-        rx.await.context("request timed out - no response received")
+        rx.await.context("channel closed while waiting for response")
     }
 
-    /*
+
     /// Send without registering for response (fire-and-forget with retransmit).
     pub async fn send(&self, data: &[u8]) -> Result<()> {
         let encoded = self.session.encode_message(data)?;
         self.track_sent(&encoded, None).await;
         self.transport_conn.send(&encoded).await?;
         Ok(())
-    }*/
+    }
 
     /// Receive next event. Returns None when connection is closed.
     pub async fn recv_event(&self) -> Option<Message> {
@@ -243,7 +243,6 @@ async fn connection_read_loop(
                         }
                     }
                     Err(_) => {
-                        log::debug!("receive timeout");
                         // Timeout - check for retransmit
                         check_retransmit(&transport_conn, &unacked, &pending_exchanges).await;
                     }

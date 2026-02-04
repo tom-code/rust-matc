@@ -172,6 +172,34 @@ impl Connection {
         Ok(o.clone())
     }
 
+    pub async fn im_subscribe_request(
+        &self,
+        endpoint: u16,
+        cluster: u32,
+        event: u32,
+    ) -> Result<Message> {
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "im_subscribe_request exch:{} endpoint:{} cluster:{} event:{}",
+            exchange,
+            endpoint,
+            cluster,
+            event
+        );
+        let msg = messages::im_subscribe_request(endpoint, cluster, exchange, event)?;
+        self.active.request(exchange, &msg).await
+    }
+
+    pub async fn im_status_response(
+        &self,
+        exchange: u16,
+        flags: u8,
+        ack: u32
+    ) -> Result<()> {
+        let msg = messages::im_status_response(exchange, flags, ack)?;
+        self.active.send(&msg).await
+    }
+
     /// Invoke command with timed interaction
     pub async fn invoke_request_timed(
         &self,
@@ -240,7 +268,8 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
     let exchange = rand::random();
     log::debug!("start auth_spake");
     let mut session = session::Session::new();
-    let mut retrctx = retransmit::RetrContext::new(connection, &mut session);
+    session.my_session_id = 1;
+    let mut retrctx = retransmit::RetrContext::new(connection, &session);
     // send pbkdf
     log::debug!("send pbkdf request");
     let pbkdf_req_protocol_message = messages::pbkdf_req(exchange)?;

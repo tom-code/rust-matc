@@ -132,12 +132,13 @@ impl ProtocolMessageHeader {
     pub const OPCODE_CASE_SIGMA3: u8 = 0x32;
     pub const OPCODE_STATUS: u8 = 0x40;
 
-    pub const INTERACTION_OPCODE_STATUS_RESP: u8 = 0x1;
-    pub const INTERACTION_OPCODE_READ_REQ: u8 = 0x2;
-    pub const INTERACTION_OPCODE_REPORT_DATA: u8 = 0x5;
-    pub const INTERACTION_OPCODE_INVOKE_REQ: u8 = 0x8;
-    pub const INTERACTION_OPCODE_INVOKE_RESP: u8 = 0x9;
-    pub const INTERACTION_OPCODE_TIMED_REQ: u8 = 0xa;
+    pub const INTERACTION_OPCODE_STATUS_RESP:   u8 = 0x1;
+    pub const INTERACTION_OPCODE_READ_REQ:      u8 = 0x2;
+    pub const INTERACTION_OPCODE_SUBSCRIBE_REQ: u8 = 0x3;
+    pub const INTERACTION_OPCODE_REPORT_DATA:   u8 = 0x5;
+    pub const INTERACTION_OPCODE_INVOKE_REQ:    u8 = 0x8;
+    pub const INTERACTION_OPCODE_INVOKE_RESP:   u8 = 0x9;
+    pub const INTERACTION_OPCODE_TIMED_REQ:     u8 = 0xa;
 
     pub const PROTOCOL_ID_SECURE_CHANNEL: u16 = 0;
     pub const PROTOCOL_ID_INTERACTION: u16 = 1;
@@ -579,6 +580,56 @@ pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16) ->
     tlv.write_struct_end()?;
     tlv.write_bool(3, true)?;
     tlv.write_uint8(0xff, 10)?;
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
+pub fn im_subscribe_request(endpoint: u16, cluster: u32, exchange: u16, event: u32) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 5,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: 0,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_bool(0, false)?; // keep subscriptions
+    tlv.write_uint16(1, 10)?; // min interval
+    tlv.write_uint16(2, 30)?; // max interval
+    tlv.write_array(4)?;
+
+
+    tlv.write_anon_list()?;
+    tlv.write_uint16(1, endpoint)?;
+    tlv.write_uint32(2, cluster)?;
+    tlv.write_uint32(3, event)?;
+    tlv.write_bool(4, true)?; // urgent
+
+    tlv.write_struct_end()?;
+    tlv.write_struct_end()?;
+
+    tlv.write_bool(7, false)?;  // fabric filtered
+    tlv.write_uint8(0xff, 10)?;
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
+pub fn im_status_response(exchange: u16, flags: u8, ack: u32) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 4 | flags,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: ack,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_uint8(0, 0)?;
     tlv.write_struct_end()?;
     Ok(tlv.data)
 }
