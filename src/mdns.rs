@@ -207,6 +207,8 @@ async fn discoverv4(
 ) -> Result<()> {
     let stdsocket = socket2::Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     stdsocket.set_reuse_address(true)?;
+    #[cfg(not(target_os = "windows"))]
+    stdsocket.set_reuse_port(true)?;
     let addr: std::net::SocketAddrV4 = "0.0.0.0:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
     let maddr: std::net::Ipv4Addr = "224.0.0.251".parse()?;
@@ -242,6 +244,8 @@ async fn discoverv6(
 ) -> Result<()> {
     let stdsocket = socket2::Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
     stdsocket.set_reuse_address(true)?;
+    #[cfg(not(target_os = "windows"))]
+    stdsocket.set_reuse_port(true)?;
     let addr: std::net::SocketAddrV6 = "[::]:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
     let maddr: std::net::Ipv6Addr = "ff02::fb".parse()?;
@@ -285,7 +289,10 @@ pub async fn discover(
                 let sender2 = sender.clone();
                 let label = label.to_owned();
                 tokio::spawn(async move {
-                    _ = discoverv6(&label, qtype, index, sender2, stop_child).await;
+                    let e = discoverv6(&label, qtype, index, sender2, stop_child).await;
+                    if let Err(e) = e {
+                        log::warn!("mdns discover error: {}", e);
+                    }
                 });
             }
         }
@@ -294,7 +301,10 @@ pub async fn discover(
     let stop_child = stop.child_token();
     let label = label.to_owned();
     tokio::spawn(async move {
-        _ = discoverv4(&label, qtype, sender, stop_child).await;
+        let e = discoverv4(&label, qtype, sender, stop_child).await;
+        if let Err(e) = e {
+            log::warn!("mdns discover error: {}", e);
+        }
     });
 
     Ok(())

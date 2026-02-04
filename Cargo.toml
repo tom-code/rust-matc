@@ -34,7 +34,7 @@ tokio-util = {version="0.7.*"}
 log = "0.4"
 env_logger = "0.11"
 
-socket2 = "0.5.8"
+socket2 = { version="0.5.8", features = ["all"] }
 if-addrs = { version = "0.13", features = ["link-local"] }
 
 # used by generated code
