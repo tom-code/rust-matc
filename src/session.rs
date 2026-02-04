@@ -63,13 +63,13 @@ impl Session {
             return Ok(data.to_vec());
         }
         let (header, rest) = messages::MessageHeader::decode(data)?;
-        if header.session_id != self.my_session_id {
+        /*if header.session_id != self.my_session_id {
             anyhow::bail!(
                 "session id mismatch. expected:{} got:{}",
                 self.my_session_id,
                 header.session_id
             );
-        }
+        }*/
         log::trace!("decode msg header:{:?} session:{}", header, self.session_id);
         let nonce = Self::make_nonce3_extern(header.message_counter, self.remote_node.as_deref())?;
         let add = &data[..data.len() - rest.len()];
