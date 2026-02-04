@@ -155,6 +155,7 @@ enum CommandCommand {
         #[arg(default_value_t = 200)]
         timeout: u16,
     },
+    Test{}
 }
 #[derive(Subcommand, Debug)]
 enum DiscoverCommand {
@@ -198,7 +199,7 @@ fn commission(
         let transport = transport::Transport::new(local_address).await.unwrap();
         let controller = controller::Controller::new(&cm, &transport, cm.get_fabric_id()).unwrap();
         let connection = transport.create_connection(device_address).await;
-        let mut con = controller
+        let con = controller
             .commission(&connection, pin, device_id, controller_id)
             .await
             .unwrap();
@@ -445,6 +446,7 @@ fn command_cmd(
         .unwrap();
 
     runtime.block_on(async {
+        {
         let mut connection =
             create_connection(local_address, device_address, device_id, controller_id, cert_path)
                 .await
@@ -622,6 +624,15 @@ fn command_cmd(
                     _ => log::info!("start commissioning status: {}", status),
                 }
             },
+            CommandCommand::Test{} => {
+                println!("test command executed");
+                for _ in 0..1000 {
+                    let res = connection.invoke_request(endpoint, 0x6, 0, &[]).await.unwrap();
+                    res.tlv.dump(1);
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            }
+        }
         }
     });
 }
@@ -685,7 +696,7 @@ fn main() {
                 .unwrap();
 
             runtime.block_on(async {
-                let mut connection = create_connection(
+                let connection = create_connection(
                     &local_address,
                     &device_address,
                     device_id,

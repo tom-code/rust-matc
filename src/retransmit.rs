@@ -3,6 +3,9 @@ use std::{collections::HashMap, time::Duration};
 
 use crate::{messages, session, transport};
 
+const RECEIVE_TIMEOUT: Duration = Duration::from_secs(3);
+const MAX_RETRANSMIT_TIME: Duration = Duration::from_secs(10);
+
 pub struct RetrContext<'a> {
     /// ids of already received messages to detect duplicates
     received: HashMap<u32, bool>,
@@ -11,13 +14,13 @@ pub struct RetrContext<'a> {
     /// exchange-ids use is interested in. empty for all
     subscribed_exchanges: HashMap<u16, bool>,
     connection: &'a transport::Connection,
-    session: &'a mut session::Session,
+    session: &'a session::Session,
 }
 
 impl<'b> RetrContext<'b> {
     pub fn new<'a: 'b>(
         connection: &'a transport::Connection,
-        session: &'a mut session::Session,
+        session: &'a session::Session,
     ) -> Self {
         Self {
             received: HashMap::new(),
@@ -58,9 +61,13 @@ impl<'b> RetrContext<'b> {
         self.subscribed_exchanges.insert(e, true);
     }
     pub async fn get_next_message(&mut self) -> Result<messages::Message> {
+        let start_time = tokio::time::Instant::now();
         loop {
+            if start_time.elapsed() > MAX_RETRANSMIT_TIME {
+                anyhow::bail!("retransmit timeout exceeded");
+            }
             // try to receive
-            let resp = self.connection.receive(Duration::from_secs(3)).await;
+            let resp = self.connection.receive(RECEIVE_TIMEOUT).await;
             let resp = match resp {
                 Ok(v) => v,
                 Err(_) => {

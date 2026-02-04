@@ -115,6 +115,7 @@
 //!
 #![doc = include_str!("../readme.md")]
 
+mod active_connection;
 pub mod cert_matter;
 pub mod cert_x509;
 pub mod certmanager;

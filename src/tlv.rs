@@ -36,6 +36,7 @@ const TYPE_BOOL_TRUE: u8 = 9;
 const TYPE_UTF8_L1: u8 = 0xC;
 const TYPE_OCTET_STRING_L1: u8 = 0x10;
 const TYPE_OCTET_STRING_L2: u8 = 0x11;
+const TYPE_OCTET_STRING_L4: u8 = 0x12;
 
 const TYPE_STRUCT: u8 = 0x15;
 const TYPE_ARRAY: u8 = 0x16;
@@ -494,6 +495,17 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             TYPE_OCTET_STRING_L2 => {
                 // octet string large
                 let size = cursor.read_u16::<LittleEndian>()?;
+                let mut value = vec![0; size as usize];
+                cursor.read_exact(&mut value)?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::OctetString(value),
+                };
+                container.push(item);
+            }
+            TYPE_OCTET_STRING_L4 => {
+                // octet string very large
+                let size = cursor.read_u32::<LittleEndian>()?;
                 let mut value = vec![0; size as usize];
                 cursor.read_exact(&mut value)?;
                 let item = TlvItem {

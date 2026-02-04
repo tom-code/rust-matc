@@ -109,7 +109,7 @@ enum SecChannelOpcode {
 
 #[derive(Debug)]
 pub struct ProtocolMessageHeader {
-    exchange_flags: u8,
+    pub exchange_flags: u8,
     pub opcode: u8,
     pub exchange_id: u16,
     pub protocol_id: u16,
@@ -489,13 +489,13 @@ pub fn sigma1(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
     Ok(b)
 }
 
-pub fn sigma3(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
+pub fn sigma3(exchange: u16, payload: &[u8], ack: u32) -> Result<Vec<u8>> {
     let mut b = ProtocolMessageHeader {
-        exchange_flags: 5,
+        exchange_flags: 5 | ProtocolMessageHeader::FLAG_ACK,
         opcode: ProtocolMessageHeader::OPCODE_CASE_SIGMA3,
         exchange_id: exchange,
         protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
-        ack_counter: 0,
+        ack_counter: ack,
     }
     .encode()?;
     b.write_all(payload)?;

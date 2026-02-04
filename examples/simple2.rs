@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     let controller = controller::Controller::new(&cm, &transport, fabric_id)?;
     let connection = transport.create_connection("192.168.5.70:5540").await;
 
-    let mut connection = controller
+    let connection = controller
         .auth_sigma(&connection, device_id, controller_id)
         .await?;
 

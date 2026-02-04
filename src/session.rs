@@ -4,10 +4,12 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use crate::{messages, util::cryptoutil};
 use anyhow::Result;
 use std::io::Write;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 pub struct Session {
     pub session_id: u16,
-    pub counter: u32,
+    pub my_session_id: u16,
+    counter: AtomicU32,
     pub local_node: Option<Vec<u8>>,
     pub remote_node: Option<Vec<u8>>,
     pub encrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
@@ -18,7 +20,8 @@ impl Session {
     pub fn new() -> Self {
         Self {
             session_id: 0,
-            counter: rand::random(),
+            my_session_id: 0,
+            counter: AtomicU32::new(rand::random()),
             local_node: Some([0, 0, 0, 0, 0, 0, 0, 0].to_vec()),
             remote_node: None,
             encrypt_key: None,
@@ -32,34 +35,42 @@ impl Session {
         self.decrypt_key = Some(*crypto_common::Key::<Aes128Ccm>::from_slice(k))
     }
 
-    pub fn encode_message(&mut self, data: &[u8]) -> Result<Vec<u8>> {
+    pub fn encode_message(&self, data: &[u8]) -> Result<Vec<u8>> {
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
         let mg = messages::MessageHeader {
             flags: 0,
             security_flags: 0,
             session_id: self.session_id,
-            message_counter: self.counter,
+            message_counter: counter,
             source_node_id: self.local_node.clone(),
             destination_node_id: self.remote_node.clone(),
         };
         let mut b = mg.encode()?;
         match self.encrypt_key {
             Some(key) => {
-                let nonce = self.make_nonce3()?;
+                let nonce = self.make_nonce3(counter)?;
                 let enc = cryptoutil::aes128_ccm_encrypt(&key, &nonce, &b, data)?;
                 b.extend_from_slice(&enc);
             }
             None => b.extend_from_slice(data),
         };
 
-        self.counter += 1;
         Ok(b)
     }
 
-    pub fn decode_message(&mut self, data: &[u8]) -> Result<Vec<u8>> {
+    pub fn decode_message(&self, data: &[u8]) -> Result<Vec<u8>> {
         if self.decrypt_key.is_none() {
             return Ok(data.to_vec());
         }
         let (header, rest) = messages::MessageHeader::decode(data)?;
+        if header.session_id != self.my_session_id {
+            anyhow::bail!(
+                "session id mismatch. expected:{} got:{}",
+                self.my_session_id,
+                header.session_id
+            );
+        }
+        log::trace!("decode msg header:{:?} session:{}", header, self.session_id);
         let nonce = Self::make_nonce3_extern(header.message_counter, self.remote_node.as_deref())?;
         let add = &data[..data.len() - rest.len()];
         let decoded = cryptoutil::aes128_ccm_decrypt(
@@ -74,8 +85,8 @@ impl Session {
         Ok(out)
     }
 
-    fn make_nonce3(&self) -> Result<Vec<u8>> {
-        Self::make_nonce3_extern(self.counter, self.local_node.as_deref())
+    fn make_nonce3(&self, counter: u32) -> Result<Vec<u8>> {
+        Self::make_nonce3_extern(counter, self.local_node.as_deref())
     }
 
     fn make_nonce3_extern(counter: u32, node: Option<&[u8]>) -> Result<Vec<u8>> {

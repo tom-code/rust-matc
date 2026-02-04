@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    active_connection::ActiveConnection,
     cert_matter, certmanager, commission, fabric,
     messages::{self, Message},
     retransmit, session, sigma, spake2p,
@@ -13,13 +14,13 @@ use byteorder::{LittleEndian, WriteBytesExt};
 
 pub struct Controller {
     certmanager: Arc<dyn certmanager::CertManager>,
+    #[allow(dead_code)]
     transport: Arc<transport::Transport>,
     fabric: fabric::Fabric,
 }
 
 pub struct Connection {
-    connection: Arc<transport::Connection>,
-    session: session::Session,
+    active: ActiveConnection,
 }
 //trait IsSync: Sync {}
 //impl IsSync for Controller {}
@@ -64,8 +65,7 @@ impl Controller {
         )
         .await?;
         Ok(Connection {
-            connection: connection.clone(),
-            session,
+            active: ActiveConnection::new(connection.clone(), session),
         })
     }
 
@@ -85,33 +85,33 @@ impl Controller {
         )
         .await?;
         Ok(Connection {
-            connection: connection.clone(),
-            session,
+            active: ActiveConnection::new(connection.clone(), session),
         })
     }
 }
 
-/// Authenticated virtual connection can bse used to send commands to device.
+/// Authenticated virtual connection can be used to send commands to device.
 impl Connection {
     /// Read attribute from device and return parsed matter protocol response.
     pub async fn read_request(
-        &mut self,
+        &self,
         endpoint: u16,
         cluster: u32,
         attr: u32,
     ) -> Result<Message> {
-        read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await
+        let exchange: u16 = rand::random();
+        let msg = messages::im_read_request(endpoint, cluster, attr, exchange)?;
+        self.active.request(exchange, &msg).await
     }
 
     /// Read attribute from device and return tlv with attribute value.
     pub async fn read_request2(
-        &mut self,
+        &self,
         endpoint: u16,
         cluster: u32,
         attr: u32,
     ) -> Result<TlvItemValue> {
-        let res =
-            read_request(&self.connection, &mut self.session, endpoint, cluster, attr).await?;
+        let res = self.read_request(endpoint, cluster, attr).await?;
         if (res.protocol_header.protocol_id
             != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION)
             || (res.protocol_header.opcode
@@ -141,88 +141,94 @@ impl Connection {
 
     /// Invoke command
     pub async fn invoke_request(
-        &mut self,
+        &self,
         endpoint: u16,
         cluster: u32,
         command: u32,
         payload: &[u8],
     ) -> Result<Message> {
-        invoke_request(
-            &self.connection,
-            &mut self.session,
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
+            exchange,
             endpoint,
             cluster,
-            command,
-            payload,
-        )
-        .await
+            command
+        );
+        let msg = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
+        self.active.request(exchange, &msg).await
     }
 
-    /// Invoke command
+    /// Invoke command and return result TLV
     pub async fn invoke_request2(
-        &mut self,
+        &self,
         endpoint: u16,
         cluster: u32,
         command: u32,
         payload: &[u8],
     ) -> Result<TlvItemValue> {
-        let res = invoke_request(
-            &self.connection,
-            &mut self.session,
-            endpoint,
-            cluster,
-            command,
-            payload,
-        )
-        .await?;
+        let res = self.invoke_request(endpoint, cluster, command, payload).await?;
         let o = res.tlv.get(&[1, 0, 1, 1]).context("result not found")?;
         Ok(o.clone())
     }
 
+    /// Invoke command with timed interaction
     pub async fn invoke_request_timed(
-        &mut self,
+        &self,
         endpoint: u16,
         cluster: u32,
         command: u32,
         payload: &[u8],
         timeout: u16,
     ) -> Result<Message> {
-        invoke_request_timed(
-            &self.connection,
-            &mut self.session,
+        let exchange: u16 = rand::random();
+
+        // Send timed request first
+        let tr = messages::im_timed_request(exchange, timeout)?;
+        let result = self.active.request(exchange, &tr).await?;
+
+        if result.protocol_header.protocol_id
+            != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+            || result.protocol_header.opcode
+                != messages::ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
+        {
+            return Err(anyhow::anyhow!(
+                "invoke_request_timed: unexpected response {:?}",
+                result
+            ));
+        }
+        let status = result
+            .tlv
+            .get_int(&[0])
+            .context("invoke_request_timed: status not found")?;
+        if status != 0 {
+            return Err(anyhow::anyhow!(
+                "invoke_request_timed: unexpected status {}",
+                status
+            ));
+        }
+
+        log::debug!(
+            "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
+            exchange,
             endpoint,
             cluster,
-            command,
-            payload,
-            timeout,
-        )
-        .await
+            command
+        );
+        let msg = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, true)?;
+        self.active.request(exchange, &msg).await
+    }
+
+    /// Receive next event (for subscriptions). Returns None when connection is closed.
+    pub async fn recv_event(&self) -> Option<Message> {
+        self.active.recv_event().await
+    }
+
+    /// Try receive event without blocking.
+    pub fn try_recv_event(&self) -> Option<Message> {
+        self.active.try_recv_event()
     }
 }
-
-/*async fn get_next_message(
-    connection: &transport::Connection,
-    session: &mut session::Session,
-) -> Result<messages::Message> {
-    loop {
-        let resp = connection.receive(Duration::from_secs(3)).await?;
-        let resp = session.decode_message(&resp)?;
-        let decoded = messages::Message::decode(&resp)?;
-        if decoded.protocol_header.protocol_id
-            == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
-            && decoded.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_ACK
-        {
-            continue;
-        }
-        let ack = messages::ack(
-            decoded.protocol_header.exchange_id,
-            decoded.message_header.message_counter as i64,
-        )?;
-        let out = session.encode_message(&ack)?;
-        connection.send(&out).await?;
-        return Ok(decoded);
-    }
-}*/
 
 pub fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
     let mut out = Vec::new();
@@ -365,14 +371,14 @@ pub(crate) async fn auth_sigma(
         cert_matter::convert_x509_bytes_to_matter(&controller_x509, &ca_pubkey)?;
 
     // send sigma3
-    log::debug!("send sigma3 {}", exchange);
+    log::debug!("send sigma3 {} with piggyback ack for {}", exchange, sigma2.message_header.message_counter);
     sigma::sigma3(
         fabric,
         &mut ctx,
         &controller_private.to_sec1_der()?,
         &controller_matter_cert,
     )?;
-    let sigma3 = messages::sigma3(exchange, &ctx.sigma3_payload)?;
+    let sigma3 = messages::sigma3(exchange, &ctx.sigma3_payload, sigma2.message_header.message_counter)?;
     retrctx.send(&sigma3).await?;
 
     log::debug!("receive result {}", exchange);
@@ -406,6 +412,7 @@ pub(crate) async fn auth_sigma(
     )?;
     let mut ses = session::Session::new();
     ses.session_id = ctx.responder_session;
+    ses.my_session_id = ctx.session_id;
     ses.set_decrypt_key(&keypack[16..32]);
     ses.set_encrypt_key(&keypack[..16]);
 
@@ -420,90 +427,3 @@ pub(crate) async fn auth_sigma(
     Ok(ses)
 }
 
-async fn read_request(
-    connection: &transport::Connection,
-    session: &mut session::Session,
-    endpoint: u16,
-    cluster: u32,
-    attr: u32,
-) -> Result<Message> {
-    let exchange = rand::random();
-    let mut retrctx = retransmit::RetrContext::new(connection, session);
-    retrctx.subscribe_exchange(exchange);
-    let testm = messages::im_read_request(endpoint, cluster, attr, exchange)?;
-    retrctx.send(&testm).await?;
-    let result = retrctx.get_next_message().await?;
-    Ok(result)
-}
-
-async fn invoke_request(
-    connection: &transport::Connection,
-    session: &mut session::Session,
-    endpoint: u16,
-    cluster: u32,
-    command: u32,
-    payload: &[u8],
-) -> Result<Message> {
-    let exchange = rand::random();
-    let mut retrctx = retransmit::RetrContext::new(connection, session);
-    retrctx.subscribe_exchange(exchange);
-    log::debug!(
-        "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
-        exchange,
-        endpoint,
-        cluster,
-        command
-    );
-    let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
-    retrctx.send(&testm).await?;
-    let result = retrctx.get_next_message().await?;
-    Ok(result)
-}
-
-async fn invoke_request_timed(
-    connection: &transport::Connection,
-    session: &mut session::Session,
-    endpoint: u16,
-    cluster: u32,
-    command: u32,
-    payload: &[u8],
-    timeout: u16,
-) -> Result<Message> {
-    let exchange = rand::random();
-    let mut retrctx = retransmit::RetrContext::new(connection, session);
-    retrctx.subscribe_exchange(exchange);
-    let tr = messages::im_timed_request(exchange, timeout)?;
-    retrctx.send(&tr).await?;
-    let result = retrctx.get_next_message().await?;
-    if result.protocol_header.protocol_id
-        != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
-        || result.protocol_header.opcode
-            != messages::ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
-    {
-        return Err(anyhow::anyhow!(
-            "invoke_request_timed: unexpected response {:?}",
-            result
-        ));
-    }
-    let status = result
-        .tlv
-        .get_int(&[0])
-        .context("invoke_request_timed: status not found")?;
-    if status != 0 {
-        return Err(anyhow::anyhow!(
-            "invoke_request_timed: unexpected status {}",
-            status
-        ));
-    }
-    log::debug!(
-        "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
-        exchange,
-        endpoint,
-        cluster,
-        command
-    );
-    let testm = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, true)?;
-    retrctx.send(&testm).await?;
-    let result = retrctx.get_next_message().await?;
-    Ok(result)
-}
