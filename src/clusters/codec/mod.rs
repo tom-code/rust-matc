@@ -129,14 +129,14 @@ pub mod zone_management;
 
 
 /// Main dispatcher function for decoding attributes to JSON
-/// 
+///
 /// This function routes to the appropriate cluster-specific decoder based on cluster ID.
-/// 
+///
 /// # Parameters
 /// * `cluster_id` - The cluster identifier
-/// * `attribute_id` - The attribute identifier  
+/// * `attribute_id` - The attribute identifier
 /// * `tlv_value` - The TLV value to decode
-/// 
+///
 /// # Returns
 /// JSON string representation of the decoded value or error message
 pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
@@ -256,12 +256,12 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
 
 
 /// Main dispatcher function for getting attribute lists
-/// 
+///
 /// This function routes to the appropriate cluster-specific attribute list based on cluster ID.
-/// 
+///
 /// # Parameters
 /// * `cluster_id` - The cluster identifier
-/// 
+///
 /// # Returns
 /// Vector of tuples containing (attribute_id, attribute_name) or empty vector if unsupported
 pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
