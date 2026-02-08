@@ -7,7 +7,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
     certmanager::{self, FileCertManager},
-    clusters, controller, discover, messages, onboarding, tlv, transport,
+    clusters::{self, defs::{CLUSTER_DOOR_LOCK_CMD_ID_GETUSER, CLUSTER_ID_DOOR_LOCK}},
+    controller, discover, messages, onboarding, tlv::{self, TlvItem}, transport,
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -155,7 +156,8 @@ enum CommandCommand {
         #[arg(default_value_t = 200)]
         timeout: u16,
     },
-    Test{}
+    MonitorDoorState{},
+    Test2{},
 }
 #[derive(Subcommand, Debug)]
 enum DiscoverCommand {
@@ -624,36 +626,54 @@ fn command_cmd(
                     _ => log::info!("start commissioning status: {}", status),
                 }
             },
-            CommandCommand::Test{} => {
+            CommandCommand::MonitorDoorState{} => {
+                fn decode_door_change_state_event(tlv: TlvItem) {
+                    let tlv_stat = tlv.get(&[2]);
+                    if let Some(tlv_stat) =  tlv_stat {
+                        if let tlv::TlvItemValue::List(lst) = tlv_stat {
+                            for item in lst {
+                                let par = item.get(&[1, 7]);
+                                if let Some(par) = par {
+                                    println!("status: {:?}", clusters::codec::door_lock::decode_door_state_change_event(par));
+                                }
+                            }
+                        } else {
+                            println!("no events in report data");
+                        }
+                    }
+                }
                 let res = connection.im_subscribe_request(1, 0x101, 1).await.unwrap();
-                print!("{:?} exchange: {}", res, res.protocol_header.exchange_id);
-                res.tlv.dump(1);
                 if res.protocol_header.opcode != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
                     log::warn!("unexpected response opcode 0x{:x}", res.protocol_header.opcode);
+                } else {
+                    decode_door_change_state_event(res.tlv.clone());
                 }
                 connection.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await.unwrap();
                 loop {
                     let ev = connection.recv_event().await.unwrap();
-                    println!("message received:");
-                    print!("{:?} exchange: {}", ev, ev.protocol_header.exchange_id);
-                    ev.tlv.dump(1);
                     match ev.protocol_header.opcode {
                         messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
                             println!("this is Event/Report Data {}", ev.protocol_header.exchange_id);
+                            decode_door_change_state_event(ev.tlv.clone());
                             connection.im_status_response(ev.protocol_header.exchange_id, 2, ev.message_header.message_counter).await.unwrap();
                             println!("sent status response");
+                        }
+                        messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP => {
+                            println!("this is Subscribe Response {}", ev.protocol_header.exchange_id);
                         }
                         _ => {
                             println!("unhandled event opcode 0x{:x}", ev.protocol_header.opcode);
                         }
                     }
                 }
-                /*println!("test command executed");
-                for _ in 0..1000 {
-                    let res = connection.invoke_request(endpoint, 0x6, 0, &[]).await.unwrap();
-                    res.tlv.dump(1);
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                }*/
+            }
+            CommandCommand::Test2{} => {
+                let tlv = clusters::codec::door_lock::encode_get_user(1).unwrap();
+                let res = connection.invoke_request(1, CLUSTER_ID_DOOR_LOCK, CLUSTER_DOOR_LOCK_CMD_ID_GETUSER, &tlv).await.unwrap();
+                let tlv = res.tlv.get(&[1, 0, 0, 1]).unwrap();
+                let dec = clusters::codec::door_lock::decode_get_user_response(tlv).unwrap();
+                println!("decoded get user response: {:?}", dec);
+
             }
         }
         }

@@ -159,7 +159,7 @@ async fn commissioning_complete(
     controller_id: u64,
     fabric: &Fabric,
 ) -> Result<session::Session> {
-    let mut ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
+    let ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
     let t1 = messages::im_invoke_request(
         0,
         CLUSTER_GENERAL_COMMISSIONING,
@@ -168,7 +168,7 @@ async fn commissioning_complete(
         &[],
         false,
     )?;
-    let mut retrctx = retransmit::RetrContext::new(connection, &mut ses);
+    let mut retrctx = retransmit::RetrContext::new(connection, &ses);
 
     retrctx.send(&t1).await?;
     let resp = retrctx.get_next_message().await?;

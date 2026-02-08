@@ -60,7 +60,7 @@ fn remove_string_suffix(string: &str, suffix: &str) -> String {
     }
 }
 
-fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
+pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     let mut device = None;
     let mut service = None;
     let mut ips = BTreeMap::new();
