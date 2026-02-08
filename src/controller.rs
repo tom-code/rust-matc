@@ -319,11 +319,16 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
         .context("pake2 pb tlv missing")?;
     ctx.y = p256::EncodedPoint::from_bytes(pake2_pb)?;
 
+    let pake2_cb = pake2
+        .tlv
+        .get_octet_string(&[2])
+        .context("pake2 cb tlv missing")?;
+
     // send pake3
     let mut hash_seed = "CHIP PAKE V1 Commissioning".as_bytes().to_vec();
     hash_seed.extend_from_slice(&pbkdf_req_protocol_message[6..]);
     hash_seed.extend_from_slice(&pbkdf_response.payload);
-    engine.finish(&mut ctx, &hash_seed)?;
+    engine.finish(&mut ctx, &hash_seed, pake2_cb)?;
     let pake3_protocol_message = messages::pake3(
         exchange,
         &ctx.ca.context("ca value not present in context")?,
@@ -363,8 +368,8 @@ pub(crate) async fn auth_sigma(
 ) -> Result<session::Session> {
     log::debug!("auth_sigma");
     let exchange = rand::random();
-    let mut session = session::Session::new();
-    let mut retrctx = retransmit::RetrContext::new(connection, &mut session);
+    let session = session::Session::new();
+    let mut retrctx = retransmit::RetrContext::new(connection, &session);
     retrctx.subscribe_exchange(exchange);
     let mut ctx = sigma::SigmaContext::new(node_id);
     let ca_pubkey = cm.get_ca_key()?.public_key().to_sec1_bytes();
