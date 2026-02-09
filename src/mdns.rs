@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, io::{Cursor, Read, Write}};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use socket2::{Domain, Protocol, Type};
@@ -94,6 +94,7 @@ pub struct RR {
     pub class: u16,
     pub ttl: u32,
     pub rdata: Vec<u8>,
+    pub target: Option<String>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -189,6 +190,10 @@ fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR> {
     let dlen = cursor.read_u16::<BigEndian>()?;
     let mut rdata = vec![0; dlen as usize];
     cursor.read_exact(&mut rdata)?;
+    let mut target = None;
+    if typ == TYPE_SRV && rdata.len() >= 6 {
+        target = Some(read_label(data, &mut Cursor::new(&rdata[6..])).context("can't parse target from SRV")?);
+    }
 
     Ok(RR {
         name,
@@ -196,6 +201,7 @@ fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR> {
         class,
         ttl,
         rdata,
+        target,
     })
 }
 
@@ -207,7 +213,7 @@ fn parse_q(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<Query> {
     Ok(Query { name, typ, class })
 }
 
-fn parse_dns(data: &[u8], source: std::net::SocketAddr) -> Result<DnsMessage> {
+pub fn parse_dns(data: &[u8], source: std::net::SocketAddr) -> Result<DnsMessage> {
     let mut cursor = Cursor::new(data);
     let transaction = cursor.read_u16::<BigEndian>()?;
     let flags = cursor.read_u16::<BigEndian>()?;

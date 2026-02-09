@@ -163,6 +163,7 @@ enum CommandCommand {
 enum DiscoverCommand {
     Commissionable {},
     Commissioned {},
+    Commissioned2 {},
 }
 
 async fn create_connection(
@@ -247,6 +248,13 @@ fn discover_cmd(discover: DiscoverCommand, timeout: u64) {
         DiscoverCommand::Commissioned {} => runtime.block_on(async {
             progress(time).await;
             let infos = discover::discover_commissioned(time).await.unwrap();
+            for info in infos {
+                println!("{:#?}", info);
+            }
+        }),
+        DiscoverCommand::Commissioned2 {} => runtime.block_on(async {
+            progress(time).await;
+            let infos = discover::discover_commissioned2(time).await.unwrap();
             for info in infos {
                 println!("{:#?}", info);
             }

@@ -14,14 +14,14 @@ use std::{
 };
 use tokio_util::bytes::Buf;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CommissioningMode {
     No,
     Yes,
     WithPasscode,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MatterDeviceInfo {
     pub service: String,
     pub device: String,
@@ -35,6 +35,7 @@ pub struct MatterDeviceInfo {
     pub source_ip: String,
     pub port: Option<u16>,
 }
+
 
 fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
     let mut cursor = Cursor::new(data);
@@ -58,6 +59,82 @@ fn remove_string_suffix(string: &str, suffix: &str) -> String {
     } else {
         string.to_owned()
     }
+}
+
+pub fn to_matter_info2(msg: &DnsMessage, svc: &str) -> Result<Vec<MatterDeviceInfo>> {
+    let mut out = Vec::new();
+    let mut matter_service = false;
+    let svcname = ".".to_owned() + svc + ".";
+    for answer in &msg.answers {
+        if answer.name == svcname[1..] {
+            matter_service = true
+        }
+    }
+    if !matter_service {
+        return Err(anyhow::anyhow!("not matter service"));
+    }
+    let mut services = HashMap::new();
+    let mut targets = HashMap::new();
+    for additional in &msg.additional {
+        if additional.typ == mdns::TYPE_A {
+            let arr: [u8; 4] = match additional.rdata.clone().try_into() {
+                Ok(v) => v,
+                Err(_e) => return Err(anyhow::anyhow!("A record is not correct")),
+            };
+            let val = IpAddr::V4(Ipv4Addr::from_bits(u32::from_be_bytes(arr)));
+            if !targets.contains_key(&additional.name) {
+                targets.insert(additional.name.clone(), Vec::new());
+            }
+            targets.get_mut(&additional.name).unwrap().push(val);
+        }
+        if additional.typ == mdns::TYPE_AAAA {
+            let arr: [u8; 16] = match additional.rdata.clone().try_into() {
+                Ok(v) => v,
+                Err(_e) => return Err(anyhow::anyhow!("AAAA record is not correct")),
+            };
+            let val = IpAddr::V6(Ipv6Addr::from_bits(u128::from_be_bytes(arr)));
+            if !targets.contains_key(&additional.name) {
+                targets.insert(additional.name.clone(), Vec::new());
+            }
+            targets.get_mut(&additional.name).unwrap().push(val);
+        }
+    }
+    for additional in &msg.additional {
+        if additional.typ == mdns::TYPE_SRV {
+            let service_name = remove_string_suffix(&additional.name, &svcname);
+            if additional.rdata.len() < 6 {
+                continue;
+            }
+            let port = ((additional.rdata[4] as u16) << 8) | (additional.rdata[5] as u16);
+            let target_name = {
+                if let Some(at) = additional.target.as_ref() {
+                    at
+                } else {
+                    continue;
+                }
+            };
+            let target_ip = targets.get(target_name).cloned().unwrap_or_default();
+            let mi = MatterDeviceInfo {
+                service: service_name.clone(),
+                device: remove_string_suffix(target_name, ".local.").to_owned(),
+                ips: target_ip,
+                name: None,
+                discriminator: None,
+                commissioning_mode: None,
+                pairing_hint: None,
+                source_ip: msg.source.to_string(),
+                vendor_id: None,
+                product_id: None,
+                port: Some(port),
+            };
+            services.insert(service_name, mi);
+        }
+    }
+    for s in services.values() {
+        out.push(s.clone());
+    }
+
+    Ok(out)
 }
 
 pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
@@ -179,4 +256,46 @@ pub async fn discover_commissionable(timeout: Duration) -> Result<Vec<MatterDevi
 /// Discover commissioned devices using mdns
 pub async fn discover_commissioned(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
     discover_common(timeout, "_matter._tcp.local").await
+}
+
+
+async fn discover_common2(timeout: Duration, svc_type: &str) -> Result<Vec<MatterDeviceInfo>> {
+    let stop = tokio_util::sync::CancellationToken::new();
+    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<DnsMessage>();
+
+    mdns::discover(svc_type, mdns::QTYPE_ANY, sender, stop.child_token()).await?;
+
+    tokio::spawn(async move {
+        tokio::time::sleep(timeout).await;
+        stop.cancel();
+    });
+    let mut cache = HashMap::new();
+    let mut out: Vec<MatterDeviceInfo> = Vec::new();
+    while let Some(dns) = receiver.recv().await {
+        if cache.contains_key(&dns) {
+            continue;
+        }
+        let info = match to_matter_info2(&dns, svc_type) {
+            Ok(info) => info,
+            Err(e) => {
+                log::trace!("failed to parse mdns message from {}: {:?}", dns.source, e);
+                continue;
+            },
+        };
+        for i in &info {
+            out.push(i.clone());
+        }
+        cache.insert(dns, true);
+    }
+    Ok(out)
+}
+
+/// Discover commissionable devices using mdns
+pub async fn discover_commissionable2(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
+    discover_common2(timeout, "_matterc._udp.local").await
+}
+
+/// Discover commissioned devices using mdns
+pub async fn discover_commissioned2(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
+    discover_common2(timeout, "_matter._tcp.local").await
 }
