@@ -43,6 +43,8 @@ Use of demo application:
   `./demo discover commissionable --timeout 3`
 * discover all commissioned devices using mdns:\
   `./demo discover commissioned --timeout 3`
+* discover specific device commissioned by us. query will filter based on device-id and "our" fabric:\
+  `./demo discover commissioned2 --timeout 3 --device-id 300`
 * if you have manual pairing code you can extract passcode from it using following command:\
   `demo decode-manual-pairing-code 1577-384-0075`
 * commission device (device ip address is 192.168.5.70, commissioning passcode is 123456, device id will be 300, device admin has id 100):\
@@ -65,3 +67,4 @@ Other demo application flags:
 * --local-address - specify local bind address for matter protocol. Format is ip:port. This is
   ip/port which is used as source address for matter UDP requests.
   Default is 0.0.0.0:5555. When IPV6 is used this must be changed for example to --local-address "[\:\:]:5555"
+* --cert-path - change directory where pem files with keys and certificates are stored

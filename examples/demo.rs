@@ -163,7 +163,10 @@ enum CommandCommand {
 enum DiscoverCommand {
     Commissionable {},
     Commissioned {},
-    Commissioned2 {},
+    Commissioned2 {
+        #[arg(long)]
+        device_id: Option<u64>,
+    },
 }
 
 async fn create_connection(
@@ -231,7 +234,7 @@ async fn progress(duration: Duration) {
     });
 }
 
-fn discover_cmd(discover: DiscoverCommand, timeout: u64) {
+fn discover_cmd(discover: DiscoverCommand, timeout: u64, cert_path: String) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -247,14 +250,23 @@ fn discover_cmd(discover: DiscoverCommand, timeout: u64) {
         }),
         DiscoverCommand::Commissioned {} => runtime.block_on(async {
             progress(time).await;
-            let infos = discover::discover_commissioned(time).await.unwrap();
+            let infos = discover::discover_commissioned2(time, &None).await.unwrap();
             for info in infos {
                 println!("{:#?}", info);
             }
         }),
-        DiscoverCommand::Commissioned2 {} => runtime.block_on(async {
+        DiscoverCommand::Commissioned2 { device_id } => runtime.block_on(async {
+            let device_str = if let Some(device_id) = device_id {
+                let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(&cert_path).unwrap();
+                let fabric = matc::fabric::Fabric::new(cm.get_fabric_id(), 1, &cm.get_ca_public_key().unwrap());
+                let c = fabric.compressed().unwrap();
+                Some(format!("{}-{:016X}", hex::encode(c).to_uppercase(), device_id))
+            } else {
+                None
+            };
+            println!("discovering commissioned devices with device id filter: {:?}", device_str);
             progress(time).await;
-            let infos = discover::discover_commissioned2(time).await.unwrap();
+            let infos = discover::discover_commissioned2(time, &device_str).await.unwrap();
             for info in infos {
                 println!("{:#?}", info);
             }
@@ -817,7 +829,7 @@ fn main() {
             );
         }
         Commands::Discover { discover, timeout } => {
-            discover_cmd(discover, timeout);
+            discover_cmd(discover, timeout, cert_path);
         }
         Commands::DecodeManualPairingCode { code } => {
             let res = onboarding::decode_manual_pairing_code(&code).unwrap();

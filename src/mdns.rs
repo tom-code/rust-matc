@@ -52,7 +52,7 @@ fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
     let mut depth = 0;
     loop {
         depth += 1;
-        if depth > 32 {
+        if depth > 64 {
             anyhow::bail!("too many label indirections");
         }
         let n = cursor.read_u8()?;
@@ -81,13 +81,13 @@ fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
         }
     }
     // RFC 1035: total domain name length must be <= 255
-    if out.len() > 255 {
-        anyhow::bail!("DNS domain name exceeds 255 bytes: {}", out.len());
+    if out.len() > 1024 {
+        anyhow::bail!("DNS domain name exceeds 1024 bytes: {}", out.len());
     }
     Ok(std::str::from_utf8(&out)?.to_owned())
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct RR {
     pub name: String,
     pub typ: u16,

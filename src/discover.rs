@@ -23,7 +23,7 @@ pub enum CommissioningMode {
 
 #[derive(Debug, Clone)]
 pub struct MatterDeviceInfo {
-    pub service: String,
+    pub instance: String,
     pub device: String,
     pub ips: Vec<IpAddr>,
     pub name: Option<String>,
@@ -99,7 +99,9 @@ pub fn to_matter_info2(msg: &DnsMessage, svc: &str) -> Result<Vec<MatterDeviceIn
             targets.get_mut(&additional.name).unwrap().push(val);
         }
     }
-    for additional in &msg.additional {
+    let mut all = msg.additional.to_vec();
+    all.append(&mut msg.answers.to_vec());
+    for additional in &all {
         if additional.typ == mdns::TYPE_SRV {
             let service_name = remove_string_suffix(&additional.name, &svcname);
             if additional.rdata.len() < 6 {
@@ -115,7 +117,7 @@ pub fn to_matter_info2(msg: &DnsMessage, svc: &str) -> Result<Vec<MatterDeviceIn
             };
             let target_ip = targets.get(target_name).cloned().unwrap_or_default();
             let mi = MatterDeviceInfo {
-                service: service_name.clone(),
+                instance: service_name.clone(),
                 device: remove_string_suffix(target_name, ".local.").to_owned(),
                 ips: target_ip,
                 name: None,
@@ -208,7 +210,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     }
 
     Ok(MatterDeviceInfo {
-        service: service.context("service name not detected")?,
+        instance: service.context("service name not detected")?,
         device: device.context("device name not detected")?,
         ips: ips.into_keys().collect(),
         name,
@@ -296,6 +298,12 @@ pub async fn discover_commissionable2(timeout: Duration) -> Result<Vec<MatterDev
 }
 
 /// Discover commissioned devices using mdns
-pub async fn discover_commissioned2(timeout: Duration) -> Result<Vec<MatterDeviceInfo>> {
-    discover_common2(timeout, "_matter._tcp.local").await
+pub async fn discover_commissioned2(timeout: Duration, device: &Option<String>) -> Result<Vec<MatterDeviceInfo>> {
+    let query = {
+        match device {
+            None => "_matter._tcp.local".to_owned(),
+            Some(d) => format!("{}._matter._tcp.local", d),
+        }
+    };
+    discover_common2(timeout, &query).await
 }

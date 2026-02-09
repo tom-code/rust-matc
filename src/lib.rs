@@ -123,7 +123,7 @@ pub mod clusters;
 mod commission;
 pub mod controller;
 pub mod discover;
-mod fabric;
+pub mod fabric;
 pub mod mdns;
 pub mod messages;
 pub mod onboarding;
