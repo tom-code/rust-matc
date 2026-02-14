@@ -1,4 +1,4 @@
-// do not edit - this file is generated
+//! Convert cluster IDs to names
 
 pub fn get_cluster_name(id: u32) -> Option<&'static str> {
     match id {

@@ -60,7 +60,7 @@ def gen_cluster(fname, file, file_names):
 
 
 outfile = open('defs.rs', 'w')
-outfile.write('// do not edit - this file is generated\n\n\n')
+outfile.write('//! Matter cluster, attributes and commands identifiers\n\n\n')
 #outfile.write('#![allow(non_snake_case)]\n')
 #outfile.write('#![allow(non_camel_case_types)]\n')
 #outfile.write('#![allow(dead_code)]\n')
@@ -70,7 +70,7 @@ outfile.write('// do not edit - this file is generated\n\n\n')
 
 
 outfile_names = open('names.rs', 'w')
-outfile_names.write('// do not edit - this file is generated\n\n\n')
+outfile_names.write('//! Convert cluster IDs to names\n\n\n')
 outfile_names.write('pub fn get_cluster_name(id: u32) -> Option<&\'static str> {\n')
 outfile_names.write('  match id {\n')
 

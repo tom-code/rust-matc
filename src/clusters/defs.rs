@@ -1,4 +1,4 @@
-// do not edit - this file is generated
+//! Matter cluster, attributes and commands identifiers
 
 // --- AccountLogin ---
 pub const CLUSTER_ID_ACCOUNT_LOGIN: u32 = 0x050E;
