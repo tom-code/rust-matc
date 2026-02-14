@@ -51,6 +51,10 @@ For simplicity this example uses hardcoded values.
 - Device implements On/Off and Level Control clusters
 
 
+### ['discover.rs](discover.rs) - Continous discovery of matter devices
+
+Utility which discovers all matter devices using mdns and prints basic info.
+
 ## Running Examples
 
 ```bash

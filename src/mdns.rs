@@ -1,6 +1,6 @@
 //! Very simple mdns client library
 
-use std::{borrow::Cow, io::{Cursor, Read, Write}};
+use std::{borrow::Cow, collections::HashMap, io::{Cursor, Read, Write}};
 
 use anyhow::{Context, Result};
 
@@ -16,8 +16,11 @@ pub const TYPE_SRV: u16 = 33;
 pub const TYPE_NAPTR: u16 = 35;
 pub const QTYPE_ANY: u16 = 0xff;
 
-fn encode_label(label: &str, out: &mut Vec<u8>) -> Result<()> {
+pub fn encode_label(label: &str, out: &mut Vec<u8>) -> Result<()> {
     for seg in label.split(".") {
+        if seg.is_empty() {
+            continue;
+        }
         let bytes = seg.as_bytes();
         if bytes.len() > 63 {
             anyhow::bail!("DNS label segment exceeds 63 bytes: {} bytes", bytes.len());
@@ -29,11 +32,41 @@ fn encode_label(label: &str, out: &mut Vec<u8>) -> Result<()> {
     Ok(())
 }
 
+pub fn encode_label_compressed(
+    label: &str,
+    out: &mut Vec<u8>,
+    name_offsets: &mut HashMap<String, usize>,
+) -> Result<()> {
+    let segments: Vec<&str> = label.split('.').filter(|s| !s.is_empty()).collect();
 
+    for i in 0..segments.len() {
+        let suffix = segments[i..].join(".");
+        if let Some(&offset) = name_offsets.get(&suffix) {
+            if offset < 0x3FFF {
+                // Write 2-byte compression pointer to the previously-written suffix
+                out.write_u8(0xC0 | ((offset >> 8) as u8))?;
+                out.write_u8((offset & 0xFF) as u8)?;
+                return Ok(());
+            }
+        }
+        // Record where this suffix starts, then write this segment
+        name_offsets.insert(suffix, out.len());
+        let bytes = segments[i].as_bytes();
+        if bytes.len() > 63 {
+            anyhow::bail!("DNS label segment exceeds 63 bytes: {} bytes", bytes.len());
+        }
+        out.write_u8(bytes.len() as u8)?;
+        out.write_all(bytes)?;
+    }
 
-fn create_query(label: &str, qtype: u16) -> Result<Vec<u8>> {
+    // No suffix matched — terminate with null
+    out.write_u8(0)?;
+    Ok(())
+}
+
+pub(crate) fn create_query(label: &str, qtype: u16) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(512);
-    out.write_u16::<BigEndian>(0)?; // transaction id
+    out.write_u16::<BigEndian>(rand::random::<u16>())?; // transaction id
     out.write_u16::<BigEndian>(0)?; // flags
     out.write_u16::<BigEndian>(1)?; // questions
     out.write_u16::<BigEndian>(0)?; // answers
@@ -87,6 +120,17 @@ fn read_label(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<String> {
     Ok(std::str::from_utf8(&out)?.to_owned())
 }
 
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub enum RRData {
+    A(std::net::Ipv4Addr),
+    AAAA(std::net::Ipv6Addr),
+    PTR(String),
+    TXT(Vec<String>),
+    SRV { priority: u16, weight: u16, port: u16, target: String },
+    Unknown(Vec<u8>),
+}
+
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct RR {
     pub name: String,
@@ -95,6 +139,7 @@ pub struct RR {
     pub ttl: u32,
     pub rdata: Vec<u8>,
     pub target: Option<String>,
+    pub data: RRData,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -194,6 +239,21 @@ fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR> {
     if typ == TYPE_SRV && rdata.len() >= 6 {
         target = Some(read_label(data, &mut Cursor::new(&rdata[6..])).context("can't parse target from SRV")?);
     }
+    let rrdata = match typ {
+        TYPE_A if rdata.len() == 4 => RRData::A(std::net::Ipv4Addr::from_octets(rdata[0..4].try_into().context("invalid A rdata length")?)),
+        TYPE_AAAA if rdata.len() == 16 => RRData::AAAA(std::net::Ipv6Addr::from_octets(rdata[0..16].try_into().context("invalid AAAA rdata length")?)),
+        TYPE_PTR => RRData::PTR(read_label(data, &mut Cursor::new(&rdata)).context("can't parse PTR rdata")?),
+        TYPE_TXT => RRData::TXT(rdata.split(|b| *b == 0).filter_map(|s| std::str::from_utf8(s).ok().map(|s| s.to_owned())).collect()),
+        TYPE_SRV if rdata.len() >= 6 => {
+            let mut cursor = Cursor::new(rdata.as_slice());
+            let priority = cursor.read_u16::<BigEndian>()?;
+            let weight = cursor.read_u16::<BigEndian>()?;
+            let port = cursor.read_u16::<BigEndian>()?;
+            let target = read_label(data, &mut cursor).context("can't parse target from SRV")?;
+            RRData::SRV { priority, weight, port, target }
+        }
+        _ => RRData::Unknown(rdata.clone()),
+    };
 
     Ok(RR {
         name,
@@ -202,6 +262,7 @@ fn parse_rr(data: &[u8], cursor: &mut Cursor<&[u8]>) -> Result<RR> {
         ttl,
         rdata,
         target,
+        data: rrdata,
     })
 }
 
@@ -373,4 +434,66 @@ pub async fn discover(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn compressed_single_label_matches_uncompressed() {
+        let label = "foo._tcp.local";
+        let mut plain = Vec::new();
+        encode_label(label, &mut plain).unwrap();
+
+        let mut compressed = Vec::new();
+        let mut offsets = HashMap::new();
+        encode_label_compressed(label, &mut compressed, &mut offsets).unwrap();
+
+        assert_eq!(plain, compressed);
+    }
+
+    #[test]
+    fn compressed_reuses_shared_suffix() {
+        let mut out = Vec::new();
+        let mut offsets = HashMap::new();
+
+        encode_label_compressed("foo._tcp.local", &mut out, &mut offsets).unwrap();
+        let first_len = out.len();
+
+        encode_label_compressed("bar._tcp.local", &mut out, &mut offsets).unwrap();
+        let second_len = out.len() - first_len;
+
+        // "bar" (1+3) + pointer (2) = 6 bytes, much less than full uncompressed
+        assert_eq!(second_len, 6);
+
+        // The last two bytes should be a compression pointer to "_tcp.local" in the first label
+        let ptr_hi = out[first_len + 4];
+        let ptr_lo = out[first_len + 5];
+        assert_eq!(ptr_hi & 0xC0, 0xC0, "top 2 bits must be set for pointer");
+
+        let ptr_offset = (((ptr_hi & 0x3F) as usize) << 8) | (ptr_lo as usize);
+        // "_tcp.local" starts at offset 4 in the first label (after \x03foo)
+        assert_eq!(ptr_offset, 4);
+    }
+
+    #[test]
+    fn compressed_output_decodable_by_read_label() {
+        // Build a small packet with two labels sharing a suffix
+        let mut pkt = Vec::new();
+        let mut offsets = HashMap::new();
+
+        encode_label_compressed("foo._tcp.local", &mut pkt, &mut offsets).unwrap();
+        let second_start = pkt.len();
+        encode_label_compressed("bar._tcp.local", &mut pkt, &mut offsets).unwrap();
+
+        // Decode first label
+        let label1 = read_label(&pkt, &mut Cursor::new(&pkt[..])).unwrap();
+        assert_eq!(label1, "foo._tcp.local.");
+
+        // Decode second label (uses compression pointer)
+        let label2 = read_label(&pkt, &mut Cursor::new(&pkt[second_start..])).unwrap();
+        assert_eq!(label2, "bar._tcp.local.");
+    }
 }

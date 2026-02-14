@@ -36,8 +36,43 @@ pub struct MatterDeviceInfo {
     pub port: Option<u16>,
 }
 
+impl MatterDeviceInfo {
+    pub fn print_compact(&self) {
+        let mut info = format!("{} ({})", self.instance, self.device);
+        if let Some(name) = &self.name {
+            info += &format!(", name: {}", name);
+        }
+        if let Some(vendor_id) = &self.vendor_id {
+            info += &format!(", vendor_id: {}", vendor_id);
+        }
+        if let Some(product_id) = &self.product_id {
+            info += &format!(", product_id: {}", product_id);
+        }
+        if let Some(discriminator) = &self.discriminator {
+            info += &format!(", discriminator: {}", discriminator);
+        }
+        if let Some(cm) = &self.commissioning_mode {
+            info += &format!(", commissioning_mode: {:?}", cm);
+        }
+        if let Some(pairing_hint) = &self.pairing_hint {
+            info += &format!(", pairing_hint: {}", pairing_hint);
+        }
+        if let Some(port) = &self.port {
+            info += &format!(", port: {}", port);
+        }
+        println!("{}", info);
+        if !self.ips.is_empty() {
+            println!("  ips:");
+            for ip in &self.ips {
+                println!("      {}", ip);
+            }
+        }
 
-fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
+    }
+}
+
+
+pub fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
     let mut cursor = Cursor::new(data);
     let mut out = HashMap::new();
     while cursor.remaining() > 0 {

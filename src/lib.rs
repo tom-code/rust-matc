@@ -125,6 +125,7 @@ pub mod controller;
 pub mod discover;
 pub mod fabric;
 pub mod mdns;
+pub mod mdns2;
 pub mod messages;
 pub mod onboarding;
 mod retransmit;

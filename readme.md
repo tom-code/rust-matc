@@ -14,7 +14,7 @@ It supports controller side of:
 * PASE - passcode authenticated session establishment
   * variant of [spake 2+](https://datatracker.ietf.org/doc/rfc9383/)
 * CASE - certificate authenticated session establishment
-  * variant of [SIGMA](https://www.iacr.org/cryptodb/archive/2003/CRYPTO/1495/1495.pdf)
+  * variant of [SIGMA](https://scispace.com/pdf/sigma-the-sign-and-mac-approach-to-authenticated-diffie-103fql3b25.pdf)
 * Commisioning procedure
   * sign and push certificates to device
 * Basic interactions
