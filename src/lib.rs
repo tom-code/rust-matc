@@ -15,9 +15,79 @@
 //! - [tlv](tlv) - Module with simple matter tlv encoders and decoders which can be used to encode command parameters
 //!                and decode complex responses.
 //! - [discover](discover) - simple mdns based discovery of matter devices on local network
+//! - [devman](devman) - High level device manager which uses all above components to provide simpler api.
+//!                      It stores device information and certificates in specified directory and allows
+//!                      to commission new devices and connect to already commissioned devices by name
+//!                      without worrying about certificates and transport details.
+//! - [clusters](clusters) - matter cluster definitions and encoders/decoders for cluster attributes and commands.
 //!
 //!
 //! Examples directory contains simple demo application and simple standalone examples on how to use APIs.
+//!
+//! Library can be used through high level device manager api or through lower level controller and transport apis.
+//! Device manager api is simpler to use, but does not provide same flexibility like lower level apis.
+//! For example how to use device manager see simple-devman.rs and devman_demo.rs examples in examples directory.
+//!
+//! Example how to initialize device manager
+//! ```no_run
+//! # use matc::devman::DeviceManager;
+//! # use anyhow::Result;
+//! # use matc::devman::ManagerConfig;
+//! # #[tokio::main]
+//! # async fn main() -> Result<()> {
+//! const FABRIC_ID: u64 = 100;
+//! const CONTROLLER_ID: u64 = 200;
+//! const LOCAL_ADDRESS: &str = "0.0.0.0:5555";
+//! const DATA_DIR: &str = "./matter-data";
+//! let config = ManagerConfig {
+//!             fabric_id: FABRIC_ID,
+//!             controller_id: CONTROLLER_ID,
+//!             local_address: LOCAL_ADDRESS.to_string(),
+//! };
+//! let devman = DeviceManager::create(DATA_DIR, config).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Example how to load existing device manager configuration and commission device using it:
+//! ```no_run
+//! # use matc::devman::DeviceManager;
+//! # use anyhow::Result;
+//! # use matc::devman::ManagerConfig;
+//! # use matc::clusters;
+//! # #[tokio::main]
+//! # async fn main() -> Result<()> {
+//! const CONTROLLER_ID: u64 = 200;
+//! const NODE_ID: u64 = 300;
+//! const NAME: &str = "My Device";
+//! const DATA_DIR: &str = "./matter-data";
+//! const PIN: u32 = 123456;
+//! let devman = DeviceManager::load(DATA_DIR).await?;
+//! let device = devman.commission("1.1.1.1:5540", PIN, NODE_ID, NAME).await?;
+//! // now we can use device connection to send commands and read attributes
+//! device.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Example how to connect to already commissioned device by name and send command to it:
+//! ```no_run
+//! # use matc::devman::DeviceManager;
+//! # use anyhow::Result;
+//! # use matc::devman::ManagerConfig;
+//! # use matc::clusters;
+//! # #[tokio::main]
+//! # async fn main() -> Result<()> {
+//! const DATA_DIR: &str = "./matter-data";
+//! const NAME: &str = "My Device";
+//! let devman = DeviceManager::load(DATA_DIR).await?;
+//! let device = devman.connect_by_name(NAME).await?;
+//! device.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Following are examples how to use lower level APIs without device manager.
 //!
 //! Example how to initialize certificate authority and create controller user - stores certificates in pem directory:
 //! ```no_run
@@ -122,6 +192,7 @@ pub mod certmanager;
 pub mod clusters;
 mod commission;
 pub mod controller;
+pub mod devman;
 pub mod discover;
 pub mod fabric;
 pub mod mdns;

@@ -16,72 +16,6 @@ struct Cli {
 }
 
 
-
-async fn extract_matter_info(target: &str, mdns: &matc::mdns2::MdnsService) -> Result<matc::discover::MatterDeviceInfo> {
-
-    let txt_records = mdns.lookup(target, matc::mdns::TYPE_TXT).await;
-    let mut txt_info = HashMap::new();
-    for txt_rr in txt_records {
-        txt_info.extend(matc::discover::parse_txt_records(&txt_rr.rdata)?);
-    }
-    let srv_records = mdns.lookup(target, matc::mdns::TYPE_SRV).await;
-    let srv_rr = srv_records.first().ok_or_else(|| anyhow::anyhow!("No SRV record found for {}", target))?;
-    let (srv_target, port) = match srv_rr.data {
-        matc::mdns::RRData::SRV { ref target, port, .. } => (target.clone(), port),
-        _ => return Err(anyhow::anyhow!("Invalid SRV record for {}", target)),
-    };
-    let mut ips = Vec::new();
-    let a_records = mdns.lookup(&srv_target, matc::mdns::TYPE_A).await;
-    for a_rr in a_records {
-        if let matc::mdns::RRData::A(ip) = a_rr.data {
-            ips.push(ip.into());
-        }
-    }
-    let aaaa_records = mdns.lookup(&srv_target, matc::mdns::TYPE_AAAA).await;
-    for aaaa_rr in aaaa_records {
-        if let matc::mdns::RRData::AAAA(ip) = aaaa_rr.data {
-            ips.push(ip.into());
-        }
-    }
-    let (vendor_id, product_id) = {
-        let vp = txt_info.get("VP");
-        if let Some(vp) = vp {
-            let mut parts = vp.split('+');
-            let vendor_id = parts.next();
-            let product_id = parts.next();
-            (vendor_id.map(|v| v.to_owned()), product_id.map(|p| p.to_owned()))
-        } else {
-            (None, None)
-        }
-    };
-    let discriminator = txt_info.get("D").cloned();
-    let name = txt_info.get("DN").cloned();
-    let commissioning_mode = match txt_info.get("CM") {
-                Some(v) => match v.as_str() {
-                    "0" => Some(matc::discover::CommissioningMode::No),
-                    "1" => Some(matc::discover::CommissioningMode::Yes),
-                    "2" => Some(matc::discover::CommissioningMode::WithPasscode),
-                    _ => None,
-                },
-                None => None,
-            };
-    let pairing_hint = txt_info.get("PH").cloned();
-    Ok(matc::discover::MatterDeviceInfo {
-        name,
-        instance: target.trim_end_matches('.').to_owned(),
-        device: srv_target.trim_end_matches('.').to_owned(),
-        ips,
-        vendor_id,
-        product_id,
-        discriminator,
-        commissioning_mode,
-        pairing_hint,
-        source_ip: "".to_owned(),
-        port: Some(port),
-    })
-}
-
-
 async fn print_service(target: &str, mdns: &matc::mdns2::MdnsService) -> Result<()> {
     log::debug!("PTR record: {}", target);
     let txt_recors = mdns.lookup(target, matc::mdns::TYPE_TXT).await;
@@ -111,7 +45,7 @@ async fn print_service(target: &str, mdns: &matc::mdns2::MdnsService) -> Result<
             };
             log::debug!(".. AAAA record: {}", ip);
         }
-        let mi = extract_matter_info(target, mdns).await?;
+        let mi = matc::discover::extract_matter_info(target, mdns).await?;
         println!("{:#?}", mi);
     }
     Ok(())
@@ -174,8 +108,7 @@ async fn main() {
                 if name != "_matter._tcp.local." && name != "_matterc._udp.local." {
                     continue;
                 }
-                //request_missing_info(&target, &mdns).await;
-                let matter_info = match extract_matter_info(&target, &mdns) .await {
+                let matter_info = match matc::discover::extract_matter_info(&target, &mdns) .await {
                     Ok(info) => info,
                     Err(e) => {
                         log::warn!("Error extracting Matter info for service {}: {:?}", name, e);
