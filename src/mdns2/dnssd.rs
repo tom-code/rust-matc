@@ -16,6 +16,7 @@ pub struct ServiceRegistration {
     pub hostname: String,
     pub txt_records: Vec<(String, String)>,
     pub ttl: u32,
+    pub subtypes: Vec<String>,
 }
 
 /// Events emitted by the mDNS service to the user.
@@ -62,6 +63,24 @@ pub(super) fn build_service_records(
         target: None,
         data: mdns::RRData::PTR(instance_full.clone()),
     });
+
+    // Subtype PTR records: _<subtype>._sub.<service_type> -> instance_full
+    for sub in &reg.subtypes {
+        let subtype_name = format!("{}._sub.{}", sub, reg.service_type);
+        records.push(mdns::RR {
+            name: format!("{}.", subtype_name),
+            typ: mdns::TYPE_PTR,
+            class: 1,
+            ttl: reg.ttl,
+            rdata: {
+                let mut buf = Vec::new();
+                let _ = mdns::encode_label(&instance_full, &mut buf);
+                buf
+            },
+            target: None,
+            data: mdns::RRData::PTR(instance_full.clone()),
+        });
+    }
 
     // SRV
     let mut srv_rdata = Vec::new();
@@ -159,13 +178,21 @@ pub(super) fn find_matching_services(
         let all_records = build_service_records(reg, ips_v4, ips_v6);
         let is_any = query_type == mdns::QTYPE_ANY;
 
-        // Query for service type - return PTR as answer, rest as additional
-        if qname == svc_type {
+        // Check if query matches a subtype
+        let is_subtype_match = reg.subtypes.iter().any(|sub| {
+            let subtype_name = format!("{}._sub.{}", sub.to_lowercase(), svc_type);
+            qname == subtype_name
+        });
+
+        // Query for service type or subtype - return PTR as answer, rest as additional
+        if qname == svc_type || is_subtype_match {
             for r in &all_records {
                 let rname = r.name.trim_end_matches('.').to_lowercase();
-                if rname == svc_type && (is_any || r.typ == mdns::TYPE_PTR || r.typ == query_type) {
+                let name_matches = rname == qname || (rname == svc_type && !is_subtype_match);
+                if name_matches && (is_any || r.typ == mdns::TYPE_PTR || r.typ == query_type) {
                     answers.push(r.clone());
-                } else {
+                } else if r.typ != mdns::TYPE_PTR {
+                    // Include non-PTR records as additional (SRV, TXT, A, AAAA)
                     additional.push(r.clone());
                 }
             }

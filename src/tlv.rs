@@ -135,6 +135,10 @@ impl TlvBuffer {
         self.data.write_u8(TYPE_UINT_1)?;
         self.data.write_u8(value)
     }
+    pub fn write_uint16_notag(&mut self, value: u16) -> Result<()> {
+        self.data.write_u8(TYPE_UINT_2)?;
+        self.data.write_u16::<LittleEndian>(value)
+    }
     pub fn write_uint16(&mut self, tag: u8, value: u16) -> Result<()> {
         self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_2)?;
         self.data.write_u8(tag)?;

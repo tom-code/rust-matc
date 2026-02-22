@@ -272,6 +272,9 @@ impl Encoder {
     pub fn write_bool(&mut self, val: bool) -> Result<()> {
         write_bool(&mut self.buffer, val)
     }
+    pub fn write_raw(&mut self, data: &[u8]) {
+        self.buffer.extend_from_slice(data);
+    }
     pub fn write_oid(&mut self, val: &str) -> Result<()> {
         match const_oid::ObjectIdentifier::new(val) {
             Ok(o) => self.write_octet_string_with_tag(0x6, o.as_bytes()),

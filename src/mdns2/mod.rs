@@ -11,6 +11,7 @@ mod protocol;
 pub use dnssd::{MdnsEvent, ServiceRegistration};
 pub use protocol::{CachedRecord, RecordCache};
 
+use std::collections::HashSet;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -27,6 +28,11 @@ use protocol::{
     MDNS_ADDR_V4, MDNS_ADDR_V6, McastSocket, SendCommand, build_response,
     create_multicast_socket_v4, create_multicast_socket_v6, get_local_ips, send_loop,
 };
+
+fn dedup_records(records: &mut Vec<mdns::RR>) {
+    let mut seen = HashSet::new();
+    records.retain(|r| seen.insert(r.clone()));
+}
 
 struct MdnsServiceInner {
     cache: RecordCache,
@@ -91,7 +97,6 @@ async fn recv_loop(
                 state.cache.ingest(rr);
                 if rr.typ == mdns::TYPE_PTR {
                     if let mdns::RRData::PTR(ref target) = rr.data {
-                        log::debug!("New PTR record: {} -> {}", rr.name, target);
                         new_ptr_records.push((rr.name.clone(), target.clone()));
                     }
                 }
@@ -123,6 +128,12 @@ async fn recv_loop(
                 all_additional.extend(add);
             }
             drop(state);
+
+            // Deduplicate records that matched multiple queries
+            dedup_records(&mut all_answers);
+            dedup_records(&mut all_additional);
+            // Don't repeat answer records in additional
+            all_additional.retain(|r| !all_answers.contains(r));
 
             if !all_answers.is_empty() {
                 if let Ok(packet) = build_response(&all_answers, &all_additional) {

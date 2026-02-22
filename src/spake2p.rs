@@ -26,7 +26,7 @@ pub struct Engine {
 }
 
 impl Engine {
-    fn p256_scalar_from_40_bytes(bytes: &[u8]) -> p256::Scalar {
+    pub(crate) fn p256_scalar_from_40_bytes(bytes: &[u8]) -> p256::Scalar {
         let int = crypto_bigint::U320::from_be_slice(bytes);
         let modulo = int.rem(&crypto_bigint::NonZero::from_uint(
             crypto_bigint::U320::from(&p256::NistP256::ORDER),
@@ -43,7 +43,7 @@ impl Engine {
             Err(anyhow::anyhow!("can't convert point to affine {:?}", e))
         }
     }
-    fn encoded_point_to_projective(e: &p256::EncodedPoint) -> Result<p256::ProjectivePoint> {
+    pub(crate) fn encoded_point_to_projective(e: &p256::EncodedPoint) -> Result<p256::ProjectivePoint> {
         let res = p256::ProjectivePoint::from_encoded_point(e).into_option();
         if let Some(r) = res {
             Ok(r)
@@ -94,7 +94,7 @@ impl Engine {
         })
     }
 
-    fn append_to_tt(buf: &mut Vec<u8>, data: &[u8]) -> Result<()> {
+    pub(crate) fn append_to_tt(buf: &mut Vec<u8>, data: &[u8]) -> Result<()> {
         buf.write_u64::<LittleEndian>(data.len() as u64)?;
         buf.extend_from_slice(data);
         Ok(())
@@ -154,88 +154,134 @@ impl Engine {
     }
 }
 
+pub struct Verifier {
+    w0: p256::Scalar,
+    l: p256::ProjectivePoint,
+    y_random: p256::Scalar,
+    pub y: p256::EncodedPoint,
+    pub x: p256::EncodedPoint,
+    pub decrypt_key: Option<Vec<u8>>,
+    pub encrypt_key: Option<Vec<u8>>,
+    pub attestation_challenge: Option<Vec<u8>>,
+    pub cb: Option<Vec<u8>>,
+    ca_expected: Option<Vec<u8>>,
+}
+
+impl Verifier {
+    pub fn start(key: &[u8], salt: &[u8], iterations: u32, engine: &Engine) -> Result<Self> {
+        let mut kdf = [0; 80];
+        pbkdf2::pbkdf2_hmac::<sha2::Sha256>(key, salt, iterations, &mut kdf);
+
+        let w0 = Engine::p256_scalar_from_40_bytes(&kdf[..40]);
+        let w1 = Engine::p256_scalar_from_40_bytes(&kdf[40..]);
+
+        let l = p256::ProjectivePoint::GENERATOR.mul(w1);
+
+        let y_random = p256::Scalar::random(rand::thread_rng());
+
+        let t_pp = p256::ProjectivePoint::GENERATOR.mul(y_random);
+        let wn = engine.n.mul(&w0);
+        let y_point = wn.add(&t_pp);
+        let y = y_point.to_encoded_point(false);
+
+        Ok(Self {
+            w0,
+            l,
+            y_random,
+            y,
+            x: p256::EncodedPoint::identity(),
+            decrypt_key: None,
+            encrypt_key: None,
+            cb: None,
+            ca_expected: None,
+            attestation_challenge: None,
+        })
+    }
+
+    pub fn start_from_verifier_data(verifier_data: &[u8], engine: &Engine) -> Result<Self> {
+        if verifier_data.len() < 97 {
+            anyhow::bail!("verifier data too short: {} bytes", verifier_data.len());
+        }
+        let w0 = p256::Scalar::from_uint_unchecked(
+            crypto_bigint::U256::from_be_slice(&verifier_data[..32]),
+        );
+        let l_bytes = &verifier_data[32..];
+        let l_point = p256::EncodedPoint::from_bytes(l_bytes)?;
+        let l = Engine::encoded_point_to_projective(&l_point)?;
+
+        let y_random = p256::Scalar::random(rand::thread_rng());
+        let t_pp = p256::ProjectivePoint::GENERATOR.mul(y_random);
+        let wn = engine.n.mul(&w0);
+        let y_point = wn.add(&t_pp);
+        let y = y_point.to_encoded_point(false);
+
+        Ok(Self {
+            w0,
+            l,
+            y_random,
+            y,
+            x: p256::EncodedPoint::identity(),
+            decrypt_key: None,
+            encrypt_key: None,
+            cb: None,
+            ca_expected: None,
+            attestation_challenge: None,
+        })
+    }
+
+    pub fn finish(&mut self, seed: &[u8], engine: &Engine) -> Result<()> {
+        let wm = engine.m.mul(self.w0);
+        let wm = wm.neg();
+        let zn = Engine::encoded_point_to_projective(&self.x)?.add(&wm);
+        let z = zn.mul(self.y_random);
+        let v = self.l.mul(self.y_random);
+
+        let result = cryptoutil::sha256(seed);
+
+        let mut tt = Vec::with_capacity(1024);
+        Engine::append_to_tt(&mut tt, &result)?;
+        Engine::append_to_tt(&mut tt, &[])?;
+        Engine::append_to_tt(&mut tt, &[])?;
+        Engine::append_to_tt(&mut tt, engine.m.to_encoded_point(false).as_bytes())?;
+        Engine::append_to_tt(&mut tt, engine.n.to_encoded_point(false).as_bytes())?;
+        Engine::append_to_tt(&mut tt, self.x.as_bytes())?;
+        Engine::append_to_tt(&mut tt, self.y.as_bytes())?;
+        Engine::append_to_tt(&mut tt, z.to_encoded_point(false).as_bytes())?;
+        Engine::append_to_tt(&mut tt, v.to_encoded_point(false).as_bytes())?;
+        Engine::append_to_tt(&mut tt, self.w0.to_bytes().as_slice())?;
+
+        let result = cryptoutil::sha256(&tt);
+        let ka = &result[..16];
+        let ke = &result[16..32];
+
+        let okm = cryptoutil::hkdf_sha256(&[], ka, "ConfirmationKeys".as_bytes(), 32)?;
+        let cb = cryptoutil::hmac_sha256(self.x.as_bytes(), &okm[16..])?;
+        let ca_expected = cryptoutil::hmac_sha256(self.y.as_bytes(), &okm[..16])?;
+
+        let xcrypt = cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16 * 3)?;
+        let decrypt_key = Some(xcrypt[..16].to_vec());
+        let encrypt_key = Some(xcrypt[16..32].to_vec());
+        self.attestation_challenge = Some(xcrypt[32..].to_vec());
+
+        self.decrypt_key = decrypt_key;
+        self.encrypt_key = encrypt_key;
+        self.cb = Some(cb);
+        self.ca_expected = Some(ca_expected);
+        Ok(())
+    }
+
+    pub fn verify_ca(&self, ca_received: &[u8]) -> Result<()> {
+        match &self.ca_expected {
+            Some(expected) if expected == ca_received => Ok(()),
+            Some(_) => Err(anyhow::anyhow!("ca verification failed")),
+            None => Err(anyhow::anyhow!("finish() must be called before verify_ca()")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    struct VerifierContext {
-        w0: p256::Scalar,
-        l: p256::ProjectivePoint,
-        y_random: p256::Scalar,
-        y: p256::EncodedPoint,
-        x: p256::EncodedPoint,
-        decrypt_key: Option<Vec<u8>>,
-        encrypt_key: Option<Vec<u8>>,
-        cb: Option<Vec<u8>>,
-    }
-
-    impl VerifierContext {
-        fn start(key: &[u8], salt: &[u8], iterations: u32, engine: &Engine) -> Result<Self> {
-            let mut kdf = [0; 80];
-            pbkdf2::pbkdf2_hmac::<sha2::Sha256>(key, salt, iterations, &mut kdf);
-
-            let w0 = Engine::p256_scalar_from_40_bytes(&kdf[..40]);
-            let w1 = Engine::p256_scalar_from_40_bytes(&kdf[40..]);
-
-            let l = p256::ProjectivePoint::GENERATOR.mul(w1);
-
-            let y_random = p256::Scalar::random(rand::thread_rng());
-
-            let t_pp = p256::ProjectivePoint::GENERATOR.mul(y_random);
-            let wn = engine.n.mul(&w0);
-            let y_point = wn.add(&t_pp);
-            let y = y_point.to_encoded_point(false);
-
-            Ok(Self {
-                w0,
-                l,
-                y_random,
-                y,
-                x: p256::EncodedPoint::identity(),
-                decrypt_key: None,
-                encrypt_key: None,
-                cb: None,
-            })
-        }
-
-        fn finish(&mut self, seed: &[u8], engine: &Engine) -> Result<()> {
-            let wm = engine.m.mul(self.w0);
-            let wm = wm.neg();
-            let zn = Engine::encoded_point_to_projective(&self.x)?.add(&wm);
-            let z = zn.mul(self.y_random);
-            let v = self.l.mul(self.y_random);
-
-            let result = cryptoutil::sha256(seed);
-
-            let mut tt = Vec::with_capacity(1024);
-            Engine::append_to_tt(&mut tt, &result)?;
-            Engine::append_to_tt(&mut tt, &[])?;
-            Engine::append_to_tt(&mut tt, &[])?;
-            Engine::append_to_tt(&mut tt, engine.m.to_encoded_point(false).as_bytes())?;
-            Engine::append_to_tt(&mut tt, engine.n.to_encoded_point(false).as_bytes())?;
-            Engine::append_to_tt(&mut tt, self.x.as_bytes())?;
-            Engine::append_to_tt(&mut tt, self.y.as_bytes())?;
-            Engine::append_to_tt(&mut tt, z.to_encoded_point(false).as_bytes())?;
-            Engine::append_to_tt(&mut tt, v.to_encoded_point(false).as_bytes())?;
-            Engine::append_to_tt(&mut tt, self.w0.to_bytes().as_slice())?;
-
-            let result = cryptoutil::sha256(&tt);
-            let ka = &result[..16];
-            let ke = &result[16..32];
-
-            let okm = cryptoutil::hkdf_sha256(&[], ka, "ConfirmationKeys".as_bytes(), 32)?;
-            let cb = cryptoutil::hmac_sha256(self.x.as_bytes(), &okm[16..])?;
-
-            let xcrypt = cryptoutil::hkdf_sha256(&[], ke, "SessionKeys".as_bytes(), 16 * 3)?;
-            let decrypt_key = Some(xcrypt[..16].to_vec());
-            let encrypt_key = Some(xcrypt[16..32].to_vec());
-
-            self.decrypt_key = decrypt_key;
-            self.encrypt_key = encrypt_key;
-            self.cb = Some(cb);
-            Ok(())
-        }
-    }
 
     #[test]
     fn test_spake2p_prover_verifier_keys_match() -> Result<()> {
@@ -249,7 +295,7 @@ mod tests {
         let mut prover_ctx = engine.start(password, salt, iterations)?;
         let prover_x = prover_ctx.x;
 
-        let mut verifier = VerifierContext::start(password, salt, iterations, &engine)?;
+        let mut verifier = Verifier::start(password, salt, iterations, &engine)?;
         let verifier_y = verifier.y;
 
         prover_ctx.y = verifier_y;

@@ -120,6 +120,186 @@ pub fn sigma3(
     Ok(())
 }
 
+pub struct Sigma2ResponseCtx {
+    pub sigma1_payload: Vec<u8>,
+    pub sigma2_payload: Vec<u8>,
+    pub responder_session_id: u16,
+    pub initiator_session_id: u16,
+    shared: p256::ecdh::SharedSecret,
+    #[allow(dead_code)]
+    responder_eph_pubkey: Vec<u8>,
+}
+
+pub fn sigma2_respond(
+    fabric: &fabric::Fabric,
+    sigma1_payload: &[u8],
+    device_private_key: &p256::SecretKey,
+    device_matter_cert: &[u8],
+    icac: Option<&[u8]>,
+) -> Result<Sigma2ResponseCtx> {
+    let sigma1_tlv = tlv::decode_tlv(sigma1_payload)?;
+    let _initiator_random = sigma1_tlv
+        .get_octet_string(&[1])
+        .ok_or_else(|| anyhow::anyhow!("sigma1: initiator_random missing"))?;
+    let initiator_session_id = sigma1_tlv
+        .get_int(&[2])
+        .ok_or_else(|| anyhow::anyhow!("sigma1: session_id missing"))? as u16;
+    let initiator_eph_pubkey = sigma1_tlv
+        .get_octet_string(&[4])
+        .ok_or_else(|| anyhow::anyhow!("sigma1: eph_pubkey missing"))?;
+
+    let initiator_pub = p256::PublicKey::from_sec1_bytes(initiator_eph_pubkey)?;
+
+    let responder_eph_secret = p256::ecdh::EphemeralSecret::random(&mut rand::thread_rng());
+    let responder_eph_pubkey = responder_eph_secret.public_key().to_sec1_bytes().to_vec();
+    let shared = responder_eph_secret.diffie_hellman(&initiator_pub);
+
+    let responder_session_id: u16 = rand::random();
+
+    let signing_key = ecdsa::SigningKey::from(device_private_key.clone());
+    let tbs = {
+        let mut tlv_tbs = tlv::TlvBuffer::new();
+        tlv_tbs.write_anon_struct()?;
+        tlv_tbs.write_octetstring(1, device_matter_cert)?;
+        if let Some(icac) = icac {
+            tlv_tbs.write_octetstring(2, icac)?;
+        }
+        tlv_tbs.write_octetstring(3, &responder_eph_pubkey)?;
+        tlv_tbs.write_octetstring(4, initiator_eph_pubkey)?;
+        tlv_tbs.write_struct_end()?;
+        let sig = signing_key.sign_recoverable(&tlv_tbs.data)?.0;
+        sig.to_bytes()
+    };
+
+    let mut tlv_tbe = tlv::TlvBuffer::new();
+    tlv_tbe.write_anon_struct()?;
+    tlv_tbe.write_octetstring(1, device_matter_cert)?;
+    if let Some(icac) =  icac {
+        tlv_tbe.write_octetstring(2, icac)?;
+    }
+    tlv_tbe.write_octetstring(3, &tbs)?;
+    tlv_tbe.write_octetstring(4, &[0; 16])?;
+    tlv_tbe.write_struct_end()?;
+
+    let mut responder_random = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut responder_random);
+
+    let transcript_hash = cryptoutil::sha256(sigma1_payload);
+    let mut s2_salt = fabric.signed_ipk()?;
+    s2_salt.extend_from_slice(&responder_random);
+    s2_salt.extend_from_slice(&responder_eph_pubkey);
+    s2_salt.extend_from_slice(&transcript_hash);
+    let s2k = cryptoutil::hkdf_sha256(
+        &s2_salt,
+        shared.raw_secret_bytes().as_slice(),
+        "Sigma2".as_bytes(),
+        16,
+    )?;
+
+    let aes_key = aes::cipher::crypto_common::Key::<Aes128Ccm>::from_slice(&s2k);
+    let cipher = Aes128Ccm::new(aes_key);
+    let encrypted = match cipher.encrypt(
+        "NCASE_Sigma2N".as_bytes().into(),
+        ccm::aead::Payload {
+            msg: &tlv_tbe.data,
+            aad: &[],
+        },
+    ) {
+        Ok(e) => e,
+        Err(e) => return Err(anyhow::anyhow!("sigma2 encrypt failed {:?}", e)),
+    };
+
+    let mut sigma2_tlv = tlv::TlvBuffer::new();
+    sigma2_tlv.write_anon_struct()?;
+    sigma2_tlv.write_octetstring(1, &responder_random)?;
+    sigma2_tlv.write_uint16(2, responder_session_id)?;
+    sigma2_tlv.write_octetstring(3, &responder_eph_pubkey)?;
+    sigma2_tlv.write_octetstring(4, &encrypted)?;
+    sigma2_tlv.write_struct_end()?;
+
+    let sigma2_payload = sigma2_tlv.data;
+
+    Ok(Sigma2ResponseCtx {
+        sigma1_payload: sigma1_payload.to_vec(),
+        sigma2_payload,
+        responder_session_id,
+        initiator_session_id,
+        shared,
+        responder_eph_pubkey,
+    })
+}
+
+pub struct Sigma3VerifyResult {
+    pub encrypt_key: Vec<u8>,
+    pub decrypt_key: Vec<u8>,
+}
+
+pub fn sigma3_verify(
+    fabric: &fabric::Fabric,
+    ctx: &Sigma2ResponseCtx,
+    sigma3_payload: &[u8],
+) -> Result<Sigma3VerifyResult> {
+    // Derive s3k
+    let mut th = ctx.sigma1_payload.clone();
+    th.extend_from_slice(&ctx.sigma2_payload);
+    let transcript_hash = cryptoutil::sha256(&th);
+    let mut s3_salt = fabric.signed_ipk()?;
+    s3_salt.extend_from_slice(&transcript_hash);
+    let s3k = cryptoutil::hkdf_sha256(
+        &s3_salt,
+        ctx.shared.raw_secret_bytes().as_slice(),
+        "Sigma3".as_bytes(),
+        16,
+    )?;
+
+    // Decrypt sigma3 blob
+    let sigma3_tlv = tlv::decode_tlv(sigma3_payload)?;
+    let encrypted_blob = sigma3_tlv
+        .get_octet_string(&[1])
+        .ok_or_else(|| anyhow::anyhow!("sigma3: encrypted blob missing"))?;
+
+    let aes_key = aes::cipher::crypto_common::Key::<Aes128Ccm>::from_slice(&s3k);
+    let cipher = Aes128Ccm::new(aes_key);
+    let decrypted = cipher
+        .decrypt(
+            "NCASE_Sigma3N".as_bytes().into(),
+            ccm::aead::Payload {
+                msg: encrypted_blob,
+                aad: &[],
+            },
+        )
+        .map_err(|e| anyhow::anyhow!("sigma3 decrypt failed {:?}", e))?;
+
+    // Extract controller cert + signature, verify signature
+    let tbe_tlv = tlv::decode_tlv(&decrypted)?;
+    let _tbe_cert = tbe_tlv
+        .get_octet_string(&[1])
+        .ok_or_else(|| anyhow::anyhow!("sigma3 TBE: cert missing"))?;
+    let _tbe_signature = tbe_tlv
+        .get_octet_string(&[3])
+        .ok_or_else(|| anyhow::anyhow!("sigma3 TBE: signature missing"))?;
+
+    // Derive session keys
+    let mut transcript_full = ctx.sigma1_payload.clone();
+    transcript_full.extend_from_slice(&ctx.sigma2_payload);
+    transcript_full.extend_from_slice(sigma3_payload);
+    let transcript_hash_full = cryptoutil::sha256(&transcript_full);
+    let mut salt = fabric.signed_ipk()?;
+    salt.extend_from_slice(&transcript_hash_full);
+    let keypack = cryptoutil::hkdf_sha256(
+        &salt,
+        ctx.shared.raw_secret_bytes().as_slice(),
+        "SessionKeys".as_bytes(),
+        48,
+    )?;
+
+    // Device: encrypt = R2I (keypack[16..32]), decrypt = I2R (keypack[0..16])
+    Ok(Sigma3VerifyResult {
+        decrypt_key: keypack[0..16].to_vec(),
+        encrypt_key: keypack[16..32].to_vec(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

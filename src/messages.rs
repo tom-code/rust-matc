@@ -137,12 +137,19 @@ impl ProtocolMessageHeader {
     pub const INTERACTION_OPCODE_SUBSCRIBE_REQ:  u8 = 0x3;
     pub const INTERACTION_OPCODE_SUBSCRIBE_RESP: u8 = 0x4;
     pub const INTERACTION_OPCODE_REPORT_DATA:    u8 = 0x5;
+    pub const INTERACTION_OPCODE_WRITE_REQ:      u8 = 0x6;
+    pub const INTERACTION_OPCODE_WRITE_RESP:     u8 = 0x7;
     pub const INTERACTION_OPCODE_INVOKE_REQ:     u8 = 0x8;
     pub const INTERACTION_OPCODE_INVOKE_RESP:    u8 = 0x9;
     pub const INTERACTION_OPCODE_TIMED_REQ:      u8 = 0xa;
 
     pub const PROTOCOL_ID_SECURE_CHANNEL: u16 = 0;
     pub const PROTOCOL_ID_INTERACTION: u16 = 1;
+
+    pub const IM_STATUS_UNSUPPORTED_ATTRIBUTE: u8 = 0x86;
+    pub const IM_STATUS_INVALID_ACTION:        u8 = 0x80;
+    pub const IM_STATUS_UNSUPPORTED_CLUSTER:   u8 = 0xC3;
+    pub const IM_STATUS_UNSUPPORTED_EVENT:     u8 = 0xC7;
 
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut out = Vec::with_capacity(1024);
