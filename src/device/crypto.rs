@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
-use crate::tlv;
+use crate::{fabric, sigma};
 
 use super::Device;
 
@@ -32,42 +32,44 @@ impl Device {
         Ok(ecdsa::SigningKey::from(dac_key))
     }
 
-    pub(crate) fn extract_ca_public_key(&self) -> Result<Vec<u8>> {
-        let cert = self
-            .trusted_root_cert
-            .as_ref()
-            .context("No trusted root cert")?;
-        let tlv = tlv::decode_tlv(cert)?;
-        let pubkey = tlv
-            .get_octet_string(&[9])
-            .context("CA cert: public key (tag 9) missing")?;
-        Ok(pubkey.to_vec())
-    }
-
-    fn extract_noc_field(&self, tag_path: &[u8], field_name: &str) -> Result<u64> {
-        let noc = self.noc.as_ref().context("No NOC")?;
-        let tlv = tlv::decode_tlv(noc)?;
-        tlv.get_int(tag_path)
-            .with_context(|| format!("NOC: {} missing from subject", field_name))
-    }
-
-    pub(crate) fn extract_fabric_id(&self) -> Result<u64> {
-        self.extract_noc_field(&[6u8, 21], "fabric_id")
-    }
-
-    pub(crate) fn extract_device_node_id(&self) -> Result<u64> {
-        self.extract_noc_field(&[6u8, 17], "node_id")
-    }
-
-    pub(crate) fn extract_ca_id(&self) -> Result<u64> {
-        let cert = self
-            .trusted_root_cert
-            .as_ref()
-            .context("No trusted root cert")?;
-        let tlv = tlv::decode_tlv(cert)?;
-        let ca_id = tlv
-            .get_int(&[6, 20])
-            .context("CA cert: ca_id missing from subject")?;
-        Ok(ca_id)
+    /// Search all commissioned fabrics for one whose destination ID matches the
+    /// Sigma1 request.  Returns the index into `self.fabrics`.
+    pub(crate) fn find_fabric_by_destination_id(
+        &self,
+        initiator_random: &[u8],
+        received_destination_id: &[u8],
+    ) -> Option<usize> {
+        for (i, fi) in self.fabrics.iter().enumerate() {
+            let ca_public_key = match fi.ca_public_key() {
+                Ok(k) => k,
+                Err(_) => continue,
+            };
+            let fabric_id = match fi.fabric_id() {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
+            let ca_id = match fi.ca_id() {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
+            let device_node_id = match fi.device_node_id() {
+                Ok(id) => id,
+                Err(_) => continue,
+            };
+            let mut fab = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key);
+            fab.ipk_epoch_key = fi.ipk.clone();
+            if sigma::verify_destination_id(
+                initiator_random,
+                received_destination_id,
+                &fab,
+                &ca_public_key,
+                device_node_id,
+            )
+            .is_ok()
+            {
+                return Some(i);
+            }
+        }
+        None
     }
 }

@@ -131,6 +131,16 @@ impl TlvBuffer {
         self.data.write_u8(tag)?;
         self.data.write_u8(value)
     }
+    pub fn write_octetstring_notag(&mut self, data: &[u8]) -> Result<()> {
+        if data.len() > 0xff {
+            self.data.write_u8(TYPE_OCTET_STRING_L2)?;
+            self.data.write_u16::<LittleEndian>(data.len() as u16)?;
+        } else {
+            self.data.write_u8(TYPE_OCTET_STRING_L1)?;
+            self.data.write_u8(data.len() as u8)?;
+        }
+        self.data.write_all(data)
+    }
     pub fn write_uint8_notag(&mut self, value: u8) -> Result<()> {
         self.data.write_u8(TYPE_UINT_1)?;
         self.data.write_u8(value)
@@ -138,6 +148,10 @@ impl TlvBuffer {
     pub fn write_uint16_notag(&mut self, value: u16) -> Result<()> {
         self.data.write_u8(TYPE_UINT_2)?;
         self.data.write_u16::<LittleEndian>(value)
+    }
+    pub fn write_uint32_notag(&mut self, value: u32) -> Result<()> {
+        self.data.write_u8(TYPE_UINT_4)?;
+        self.data.write_u32::<LittleEndian>(value)
     }
     pub fn write_uint16(&mut self, tag: u8, value: u16) -> Result<()> {
         self.data.write_u8(CTRL_CTX_L1 | TYPE_UINT_2)?;

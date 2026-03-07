@@ -1,7 +1,7 @@
 use anyhow::{Context, Ok, Result};
 
 use crate::device::crypto::TEST_CERTIFICATION_DECLARATION;
-use crate::{clusters, device_messages, fabric, messages, tlv};
+use crate::{clusters, device_messages, messages, tlv};
 
 use super::Device;
 use super::types::FabricInfo;
@@ -56,8 +56,8 @@ impl Device {
             msg_header.message_counter as i64,
         )?;
 
-        self.send_pase_encrypted(addr, &resp).await?;
-        Ok(())
+        self.send_reply_by_session(addr, msg_header.session_id, &resp)
+            .await
     }
 
     fn generate_csr(&self) -> Result<Vec<u8>> {
@@ -144,7 +144,7 @@ impl Device {
         let root_cert = invoke_tlv
             .get_octet_string(&[2, 0, 1, 0])
             .context("AddTrustedRoot: cert missing")?;
-        self.trusted_root_cert = Some(root_cert.to_vec());
+        self.pending_root_cert = Some(root_cert.to_vec());
 
         let resp = device_messages::im_invoke_response_status(
             proto_header.exchange_id,
@@ -155,8 +155,8 @@ impl Device {
             msg_header.message_counter as i64,
         )?;
 
-        self.send_pase_encrypted(addr, &resp).await?;
-        Ok(())
+        self.send_reply_by_session(addr, msg_header.session_id, &resp)
+            .await
     }
 
     pub(crate) async fn handle_add_noc(
@@ -172,12 +172,7 @@ impl Device {
             .get_octet_string(&[2, 0, 1, 0])
             .context("AddNOC: noc missing")?;
         let icac = invoke_tlv.get_octet_string(&[2, 0, 1, 1]);
-        if let Some(icac) = icac {
-            if !icac.is_empty() {
-                log::info!("ICAC: {}", hex::encode(icac));
-                self.icac = icac.to_vec().into();
-            }
-        }
+        let icac_opt = icac.filter(|i| !i.is_empty()).map(|i| i.to_vec());
 
         let ipk = invoke_tlv
             .get_octet_string(&[2, 0, 1, 2])
@@ -187,69 +182,84 @@ impl Device {
             .context("AddNOC: controller_id missing")?;
         let vendor_id = invoke_tlv.get_int(&[2, 0, 1, 4]).unwrap_or(0) as u16;
 
-        self.noc = Some(noc.to_vec());
+        let trusted_root_cert = self
+            .pending_root_cert
+            .take()
+            .context("AddNOC: no trusted root cert (AddTrustedRootCertificate not called first)")?;
 
-        self.fabric_info = Some(FabricInfo {
+        let fabric_index = self.next_fabric_index;
+        self.next_fabric_index += 1;
+
+        let fabric_info = FabricInfo {
+            fabric_index,
             ipk: ipk.to_vec(),
             fabric: None,
             device_matter_cert: noc.to_vec(),
             controller_id,
             vendor_id,
-        });
-        let nod_id = self.extract_device_node_id()?;
-        {
-            let ca_public_key = self.extract_ca_public_key()?;
-            let fabric_id = self.extract_fabric_id()?;
-            let ca_id = self.extract_ca_id()?;
+            trusted_root_cert,
+            noc: noc.to_vec(),
+            icac: icac_opt,
+            label: String::new(),
+        };
 
-            let fabric = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key);
+        let nod_id = fabric_info.device_node_id()?;
+        let fabric_id = fabric_info.fabric_id()?;
+        let ca_id = fabric_info.ca_id()?;
+        let ca_public_key = fabric_info.ca_public_key()?;
+        log::info!(
+            "New fabric added: fabric_index={}, fabric_id={:016X}, ca_id={:016X}, ca_public_key={}, node_id={:016X}",
+            fabric_index,
+            fabric_id,
+            ca_id,
+            hex::encode(&ca_public_key[..8.min(ca_public_key.len())]),
+            nod_id
+        );
 
-            let iname = format!(
-                "{}-{:016X}",
-                hex::encode_upper(fabric.compressed()?),
-                nod_id
-            );
-            let op_port: u16 = self
-                .config
-                .listen_address
-                .rsplit(':')
-                .next()
-                .and_then(|p| p.parse().ok())
-                .unwrap_or(5540);
-            let svc = crate::mdns2::ServiceRegistration {
-                instance_name: iname,
-                service_type: "_matter._tcp.local".to_string(),
-                port: op_port,
-                txt_records: vec![],
-                hostname: self.config.hostname.clone(),
-                ttl: 120,
-                subtypes: vec![],
-            };
-            self.mdns.register_service(svc).await;
+        self.fabrics.push(fabric_info);
 
-            // Build real fabric list with commissioning data
-            let mut fab_tlv = tlv::TlvBuffer::new();
-            fab_tlv.write_array(2)?;
-            fab_tlv.write_anon_struct()?;
-            fab_tlv.write_octetstring(1, &ca_public_key)?;
-            fab_tlv.write_uint16(2, vendor_id)?;
-            fab_tlv.write_uint64(3, fabric_id)?;
-            fab_tlv.write_uint64(4, nod_id)?;
-            fab_tlv.write_string(5, "")?;
-            fab_tlv.write_struct_end()?;
-            fab_tlv.write_struct_end()?;
-            self.set_attribute_raw(
-                0,
-                clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS,
-                clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_FABRICS,
-                &fab_tlv.data,
-            );
+        let new_idx = self.fabrics.len() - 1;
+        self.register_operational_mdns(new_idx).await?;
+        self.rebuild_fabrics_attribute()?;
+
+        self.send_noc_response(addr, msg_header, proto_header, fabric_index)
+            .await?;
+        log::info!(
+            "IM: AddNOC OK (controller_id={}, fabric_index={})",
+            controller_id,
+            fabric_index
+        );
+        Ok(())
+    }
+
+    pub(crate) async fn handle_update_fabric_label(
+        &mut self,
+        addr: &std::net::SocketAddr,
+        msg_header: &messages::MessageHeader,
+        proto_header: &messages::ProtocolMessageHeader,
+        invoke_tlv: &tlv::TlvItem,
+    ) -> Result<()> {
+        let label = invoke_tlv.get_string_owned(&[2, 0, 1, 0]).unwrap_or_default();
+        log::info!("IM: UpdateFabricLabel label={:?}", label);
+
+        // Identify the fabric from the session that sent this command
+        let fabric_index = self
+            .case_sessions
+            .iter()
+            .find(|s| s.my_session_id == msg_header.session_id)
+            .map(|s| s.fabric_index)
+            .unwrap_or(0);
+
+        if let Some(fi) = self.fabrics.iter_mut().find(|fi| fi.fabric_index == fabric_index) {
+            fi.label = label;
         }
 
-        self.send_noc_response(addr, msg_header, proto_header)
-            .await?;
-        log::info!("IM: AddNOC OK (controller_id={})", controller_id);
-        Ok(())
+        self.rebuild_fabrics_attribute()?;
+        if let Some(ref state_dir) = self.config.state_dir.clone() {
+            self.save_state(state_dir)?;
+        }
+        self.send_noc_response(addr, msg_header, proto_header, fabric_index)
+            .await
     }
 
     pub(crate) async fn handle_remove_fabric(
@@ -257,10 +267,71 @@ impl Device {
         addr: &std::net::SocketAddr,
         msg_header: &messages::MessageHeader,
         proto_header: &messages::ProtocolMessageHeader,
-        _invoke_tlv: &tlv::TlvItem,
+        invoke_tlv: &tlv::TlvItem,
     ) -> Result<()> {
-        log::info!("IM: RemoveFabric (stub — fabric state not cleared)");
-        self.send_noc_response(addr, msg_header, proto_header).await
+        let fabric_index = invoke_tlv.get_int(&[2, 0, 1, 0]).unwrap_or(0) as u8;
+        log::info!("IM: RemoveFabric fabric_index={}", fabric_index);
+
+        self.fabrics.retain(|fi| fi.fabric_index != fabric_index);
+
+        // Drop CASE sessions that belonged to the removed fabric
+        let removed_session_ids: std::collections::HashSet<u16> = self
+            .case_sessions
+            .iter()
+            .filter(|s| s.fabric_index == fabric_index)
+            .map(|s| s.my_session_id)
+            .collect();
+        self.case_sessions
+            .retain(|s| s.fabric_index != fabric_index);
+
+        // Drop subscriptions on those sessions
+        let removed_sub_ids: std::collections::HashSet<u32> = self
+            .active_subscriptions
+            .iter()
+            .filter(|s| removed_session_ids.contains(&s.session_id))
+            .map(|s| s.subscription_id)
+            .collect();
+        self.active_subscriptions
+            .retain(|s| !removed_session_ids.contains(&s.session_id));
+        self.subscribe_states
+            .retain(|s| !removed_sub_ids.contains(&s.subscription_id));
+
+        self.rebuild_fabrics_attribute()?;
+
+        self.send_noc_response(addr, msg_header, proto_header, fabric_index)
+            .await
+    }
+
+    /// Build the Fabrics and CommissionedFabrics attributes from `self.fabrics`.
+    pub(crate) fn rebuild_fabrics_attribute(&mut self) -> Result<()> {
+        let mut fab_tlv = tlv::TlvBuffer::new();
+        fab_tlv.write_array(2)?;
+        for fi in &self.fabrics {
+            let ca_public_key = fi.ca_public_key()?;
+            let fabric_id = fi.fabric_id()?;
+            let nod_id = fi.device_node_id()?;
+            fab_tlv.write_anon_struct()?;
+            fab_tlv.write_octetstring(1, &ca_public_key)?;
+            fab_tlv.write_uint16(2, fi.vendor_id)?;
+            fab_tlv.write_uint64(3, fabric_id)?;
+            fab_tlv.write_uint64(4, nod_id)?;
+            fab_tlv.write_string(5, &fi.label)?;
+            fab_tlv.write_struct_end()?;
+        }
+        fab_tlv.write_struct_end()?;
+        self.set_attribute_raw(
+            0,
+            clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS,
+            clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_FABRICS,
+            &fab_tlv.data,
+        );
+        self.set_attribute_u8(
+            0,
+            clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS,
+            clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_COMMISSIONEDFABRICS,
+            self.fabrics.len() as u8,
+        );
+        Ok(())
     }
 
     async fn send_noc_response(
@@ -268,10 +339,11 @@ impl Device {
         addr: &std::net::SocketAddr,
         msg_header: &messages::MessageHeader,
         proto_header: &messages::ProtocolMessageHeader,
+        fabric_index: u8,
     ) -> Result<()> {
         let mut noc_resp = tlv::TlvBuffer::new();
         noc_resp.write_uint8(0, 0)?; // StatusCode = Success
-        noc_resp.write_uint8(1, 1)?; // FabricIndex
+        noc_resp.write_uint8(1, fabric_index)?; // FabricIndex
 
         let resp = device_messages::im_invoke_response_data(
             proto_header.exchange_id,
@@ -296,6 +368,9 @@ impl Device {
         self.send_general_commissioning_response(addr, msg_header, proto_header, 0x05, "")
             .await?;
         log::info!("IM: CommissioningComplete OK - device commissioned!");
+        if let Some(ref state_dir) = self.config.state_dir.clone() {
+            self.save_state(state_dir)?;
+        }
         Ok(())
     }
 
@@ -346,7 +421,7 @@ impl Device {
             msg_header.message_counter as i64,
         )?;
 
-        self.send_commissioning_reply(addr, &resp).await
+        self.send_commissioning_reply(addr, msg_header.session_id, &resp).await
     }
 
     pub(crate) async fn handle_attestation_request(
@@ -400,7 +475,7 @@ impl Device {
             msg_header.message_counter as i64,
         )?;
 
-        self.send_commissioning_reply(addr, &resp).await
+        self.send_commissioning_reply(addr, msg_header.session_id, &resp).await
     }
 
     pub(crate) async fn handle_cert_chain_request(
@@ -436,6 +511,6 @@ impl Device {
             msg_header.message_counter as i64,
         )?;
 
-        self.send_commissioning_reply(addr, &resp).await
+        self.send_commissioning_reply(addr, msg_header.session_id, &resp).await
     }
 }

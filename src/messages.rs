@@ -334,7 +334,7 @@ impl std::fmt::Display for StatusReportInfo {
     }
 }
 impl StatusReportInfo {
-    fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8]) -> Result<Self> {
         let mut cursor = std::io::Cursor::new(data);
         let general_code = cursor.read_u16::<LittleEndian>()?;
         let protocol_id = cursor.read_u32::<LittleEndian>()?;

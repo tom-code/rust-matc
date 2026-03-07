@@ -130,23 +130,50 @@ pub struct Sigma2ResponseCtx {
     responder_eph_pubkey: Vec<u8>,
 }
 
+pub(crate) fn verify_destination_id(
+    initiator_random: &[u8],
+    received_destination_id: &[u8],
+    fabric: &fabric::Fabric,
+    ca_public_key: &[u8],
+    device_node_id: u64,
+) -> Result<()> {
+    let mut data = Vec::new();
+    data.write_all(initiator_random)?;
+    data.write_all(ca_public_key)?;
+    data.write_u64::<LittleEndian>(fabric.id)?;
+    data.write_u64::<LittleEndian>(device_node_id)?;
+    let expected = cryptoutil::hmac_sha256(&data, &fabric.signed_ipk()?)?;
+    log::info!("Sigma1: received destinationId={}, expected destinationId={}", hex::encode(received_destination_id), hex::encode(&expected));
+    if expected != received_destination_id {
+        anyhow::bail!("CASE Sigma1: destinationId mismatch — wrong fabric or node");
+    }
+    Ok(())
+}
+
 pub fn sigma2_respond(
     fabric: &fabric::Fabric,
     sigma1_payload: &[u8],
     device_private_key: &p256::SecretKey,
     device_matter_cert: &[u8],
     icac: Option<&[u8]>,
+    ca_public_key: &[u8],
+    device_node_id: u64,
 ) -> Result<Sigma2ResponseCtx> {
     let sigma1_tlv = tlv::decode_tlv(sigma1_payload)?;
-    let _initiator_random = sigma1_tlv
+    let initiator_random = sigma1_tlv
         .get_octet_string(&[1])
         .ok_or_else(|| anyhow::anyhow!("sigma1: initiator_random missing"))?;
     let initiator_session_id = sigma1_tlv
         .get_int(&[2])
         .ok_or_else(|| anyhow::anyhow!("sigma1: session_id missing"))? as u16;
+    let received_destination_id = sigma1_tlv
+        .get_octet_string(&[3])
+        .ok_or_else(|| anyhow::anyhow!("sigma1: destinationId missing"))?;
     let initiator_eph_pubkey = sigma1_tlv
         .get_octet_string(&[4])
         .ok_or_else(|| anyhow::anyhow!("sigma1: eph_pubkey missing"))?;
+
+    verify_destination_id(initiator_random, received_destination_id, fabric, ca_public_key, device_node_id)?;
 
     let initiator_pub = p256::PublicKey::from_sec1_bytes(initiator_eph_pubkey)?;
 

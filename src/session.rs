@@ -14,6 +14,8 @@ pub struct Session {
     pub remote_node: Option<Vec<u8>>,
     pub encrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
     pub decrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
+    /// Fabric index for this session (0 = PASE / unassigned).
+    pub fabric_index: u8,
 }
 type Aes128Ccm = ccm::Ccm<aes::Aes128, ccm::consts::U16, ccm::consts::U13>;
 impl Session {
@@ -26,6 +28,7 @@ impl Session {
             remote_node: None,
             encrypt_key: None,
             decrypt_key: None,
+            fabric_index: 0,
         }
     }
     pub fn set_encrypt_key(&mut self, k: &[u8]) {

@@ -6,11 +6,14 @@ mod commissioning;
 mod crypto;
 mod interaction;
 mod pase;
+mod persist;
 mod send;
 mod types;
 
 pub use types::DeviceConfig;
-use types::{ActiveSubscription, CaseState, FabricInfo, PaseState, SubscribeState};
+pub use attributes::{attr_get_bool, attr_set_bool};
+use types::{ActiveSubscription, CaseState, FabricInfo, PaseState, PendingChunkState, SubscribeState};
+
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -19,7 +22,29 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use anyhow::{Ok, Result};
 use tokio::net::UdpSocket;
 
-use crate::{messages, session};
+use crate::{messages, session, tlv};
+
+/// Result returned by [`AppHandler::handle_command`].
+pub enum CommandResult {
+    /// Command succeeded; library will send an IM status response with status 0.
+    Success,
+    /// Command failed with the given status code.
+    Error(u16),
+    /// Command is not handled by this application handler.
+    Unhandled,
+}
+
+pub trait AppHandler: Send {
+    fn handle_command(
+        &mut self,
+        endpoint: u16,
+        cluster: u32,
+        command: u32,
+        payload: &tlv::TlvItem,
+        attributes: &mut HashMap<(u16, u32, u32), Vec<u8>>,
+        dirty_attributes: &mut HashSet<(u16, u32, u32)>,
+    ) -> CommandResult;
+}
 
 pub struct Device {
     pub(crate) config: DeviceConfig,
@@ -31,20 +56,26 @@ pub struct Device {
     // Commissioning state
     pub(crate) pase_state: Option<PaseState>,
     pub(crate) pase_session: Option<session::Session>,
-    pub(crate) case_state: Option<CaseState>,
-    pub(crate) case_session: Option<session::Session>,
+    pub(crate) case_states: HashMap<u16, CaseState>,
+    pub(crate) case_sessions: Vec<session::Session>,
     pub(crate) subscribe_states: Vec<SubscribeState>,
     pub(crate) active_subscriptions: Vec<ActiveSubscription>,
-    // Received from controller during commissioning
-    pub(crate) trusted_root_cert: Option<Vec<u8>>,
-    pub(crate) noc: Option<Vec<u8>>,
-    pub(crate) icac: Option<Vec<u8>>,
-    pub(crate) fabric_info: Option<FabricInfo>,
+    pub(crate) pending_chunks: Vec<PendingChunkState>,
+    // Commissioned fabric table (supports multiple fabrics)
+    pub(crate) fabrics: Vec<FabricInfo>,
+    /// Next fabric index to assign (1-based, monotonically increasing).
+    pub(crate) next_fabric_index: u8,
+    /// Temporary root cert from AddTrustedRootCertificate, consumed by AddNOC.
+    pub(crate) pending_root_cert: Option<Vec<u8>>,
     // Duplicate detection
     pub(crate) received_counters: HashSet<u32>,
     // Attribute store: (endpoint, cluster, attribute) -> pre-tagged TLV at context tag 2
     pub(crate) attributes: HashMap<(u16, u32, u32), Vec<u8>>,
+    /// Attributes mutated since last subscription report was sent.
+    pub(crate) dirty_attributes: HashSet<(u16, u32, u32)>,
     pub(crate) mdns: Arc<crate::mdns2::MdnsService>,
+    /// Extra attributes to include in persistence (registered by user code).
+    pub(crate) extra_persisted: Vec<(u16, u32, u32)>,
 }
 
 impl Device {
@@ -62,19 +93,22 @@ impl Device {
             message_counter: AtomicU32::new(rand::random()),
             pase_state: None,
             pase_session: None,
-            case_state: None,
-            case_session: None,
+            case_states: HashMap::new(),
+            case_sessions: Vec::new(),
             subscribe_states: Vec::new(),
             active_subscriptions: Vec::new(),
-            trusted_root_cert: None,
-            noc: None,
-            fabric_info: None,
+            pending_chunks: Vec::new(),
+            fabrics: Vec::new(),
+            next_fabric_index: 1,
+            pending_root_cert: None,
             received_counters: HashSet::new(),
             attributes: HashMap::new(),
+            dirty_attributes: HashSet::new(),
             mdns,
-            icac: None,
+            extra_persisted: Vec::new(),
         };
         device.setup_default_attributes()?;
+        device.dirty_attributes.clear();
 
         // Register mDNS commissionable service advertisement
         let port: u16 = device
@@ -91,6 +125,7 @@ impl Device {
             service_type: "_matterc._udp.local".to_string(),
             port,
             txt_records: vec![
+                ("DN".to_string(), device.config.product_name.clone()),
                 ("D".to_string(), device.config.discriminator.to_string()),
                 (
                     "VP".to_string(),
@@ -98,6 +133,7 @@ impl Device {
                 ),
                 ("CM".to_string(), "1".to_string()),
                 ("PH".to_string(), "33".to_string()),
+                ("DT".to_string(), "256".to_string()),
             ],
             hostname: device.config.hostname.clone(),
             ttl: 120,
@@ -112,7 +148,7 @@ impl Device {
         self.message_counter.fetch_add(1, Ordering::Relaxed)
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self, handler: &mut dyn AppHandler) -> Result<()> {
         let mut buf = [0u8; 4096];
         log::info!(
             "Device listening on {} (PIN: {})",
@@ -120,31 +156,37 @@ impl Device {
             self.config.pin
         );
         loop {
-            let keepalive_delay = self
+            let max_interval = self
                 .active_subscriptions
                 .iter()
-                .map(|sub| (sub.max_interval_secs as u64) / 2)
+                .map(|sub| sub.max_interval_secs as u64)
                 .min()
                 .map(std::time::Duration::from_secs)
                 .unwrap_or_else(|| std::time::Duration::from_secs(3600));
+            let has_dirty = !self.dirty_attributes.is_empty();
             tokio::select! {
                 result = self.socket.recv_from(&mut buf) => {
                     let (len, addr) = result?;
                     let data = buf[..len].to_vec();
-                    if let Err(e) = self.handle_packet(&data, &addr).await {
+                    if let Err(e) = self.handle_packet(&data, &addr, handler).await {
                         log::warn!("Error handling packet from {}: {:?}", addr, e);
                     }
                 }
-                _ = tokio::time::sleep(keepalive_delay) => {
+                _ = tokio::time::sleep(max_interval) => {
                     if let Err(e) = self.send_subscription_report().await {
                         log::warn!("Error sending subscription keepalive: {:?}", e);
+                    }
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_secs(1)), if has_dirty => {
+                    if let Err(e) = self.send_subscription_report().await {
+                        log::warn!("Error sending dirty subscription report: {:?}", e);
                     }
                 }
             }
         }
     }
 
-    async fn handle_packet(&mut self, data: &[u8], addr: &std::net::SocketAddr) -> Result<()> {
+    async fn handle_packet(&mut self, data: &[u8], addr: &std::net::SocketAddr, handler: &mut dyn AppHandler) -> Result<()> {
         let (msg_header, rest) = messages::MessageHeader::decode(data)?;
         log::debug!(
             "Received message: session={} counter={} from {}",
@@ -165,11 +207,11 @@ impl Device {
 
         // Try to decrypt if we have a session
         let payload = if msg_header.session_id != 0 {
-            // Encrypted message - try CASE session first, then PASE
+            // Encrypted message - search CASE sessions, then PASE
             let session = self
-                .case_session
-                .as_ref()
-                .filter(|s| s.my_session_id == msg_header.session_id)
+                .case_sessions
+                .iter()
+                .find(|s| s.my_session_id == msg_header.session_id)
                 .or_else(|| {
                     self.pase_session
                         .as_ref()
@@ -246,10 +288,16 @@ impl Device {
                     .await
             }
             (
+                messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
+                messages::ProtocolMessageHeader::OPCODE_STATUS,
+            ) => {
+                self.handle_status_report(&proto_payload).await
+            }
+            (
                 messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
                 messages::ProtocolMessageHeader::INTERACTION_OPCODE_INVOKE_REQ,
             ) => {
-                self.handle_invoke_request(addr, &msg_header, &proto_header, &proto_payload)
+                self.handle_invoke_request(addr, &msg_header, &proto_header, &proto_payload, handler)
                     .await
             }
             (

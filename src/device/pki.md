@@ -13,13 +13,13 @@ From the project root:
 ```bash
 # 1. Create PAA (root CA)
 cargo run --example pki -- create-ca \
-  --vendor-id 1 \
+  --vendor-id 65521 \
   --out-cert device-cert/paa-cert.pem \
   --out-key device-cert/paa-key.pem
 
 # 2. Create PAI (intermediate CA, signed by PAA)
 cargo run --example pki -- create-pai \
-  --vendor-id 1 \
+  --vendor-id 65521 \
   --ca-cert device-cert/paa-cert.pem \
   --ca-key device-cert/paa-key.pem \
   --out-cert device-cert/pai-cert.pem \
@@ -27,7 +27,7 @@ cargo run --example pki -- create-pai \
 
 # 3. Create DAC (device cert, signed by PAI)
 cargo run --example pki -- create-dac \
-  --vendor-id 1 \
+  --vendor-id 65521 \
   --product-id 32768 \
   --ca-cert device-cert/pai-cert.pem \
   --ca-key device-cert/pai-key.pem \

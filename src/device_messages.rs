@@ -111,7 +111,7 @@ pub fn device_ack_initiator(exchange: u16, ack: u32) -> Result<Vec<u8>> {
     .encode()
 }
 
-pub fn im_status_response(exchange: u16, status: u8, ack: i64) -> Result<Vec<u8>> {
+/*pub fn im_status_response(exchange: u16, status: u8, ack: i64) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: device_flags(ack),
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP,
@@ -125,9 +125,9 @@ pub fn im_status_response(exchange: u16, status: u8, ack: i64) -> Result<Vec<u8>
     tlv.write_uint8(0, status)?;
     tlv.write_struct_end()?;
     Ok(tlv.data)
-}
+}*/
 
-pub fn im_subscribe_response(subscription_id: u32, exchange: u16, ack: i64) -> Result<Vec<u8>> {
+pub fn im_subscribe_response(subscription_id: u32, exchange: u16, ack: i64, max_interval: u16) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: device_flags(ack),
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP,
@@ -139,7 +139,7 @@ pub fn im_subscribe_response(subscription_id: u32, exchange: u16, ack: i64) -> R
     let mut tlv = tlv::TlvBuffer::from_vec(b);
     tlv.write_anon_struct()?;
     tlv.write_uint32(0, subscription_id)?;
-    tlv.write_uint16(2, 120)?;
+    tlv.write_uint16(2, max_interval)?;
     tlv.write_struct_end()?;
     Ok(tlv.data)
 }
@@ -183,6 +183,7 @@ pub fn im_invoke_response_data(
 }
 
 /// One entry in a ReportData response — either actual attribute data or a status code.
+#[derive(Clone)]
 pub(crate) enum AttrReport {
     Data {
         endpoint: u16,
@@ -198,7 +199,7 @@ pub(crate) enum AttrReport {
     },
 }
 
-pub fn im_report_data(exchange: u16, reports: &[AttrReport], ack: i64, subscription_id: Option<u32>) -> Result<Vec<u8>> {
+pub fn im_report_data(exchange: u16, reports: &[AttrReport], ack: i64, subscription_id: Option<u32>, more_chunks: bool) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: device_flags(ack),
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA,
@@ -246,8 +247,9 @@ pub fn im_report_data(exchange: u16, reports: &[AttrReport], ack: i64, subscript
         }
     }
     tlv.write_struct_end()?;              // end array
-    //tlv.write_array(2)?;                 // tag 2: EventReportIBs (empty)
-    //tlv.write_struct_end()?;              // end array
+    if more_chunks {
+        tlv.write_bool(3, true)?;         // tag 3: MoreChunkedMessages
+    }
     tlv.write_struct_end()?;              // end top-level
     Ok(tlv.data)
 }
@@ -311,7 +313,7 @@ pub fn im_report_data_status(
     status: u8,
     ack: i64,
 ) -> Result<Vec<u8>> {
-    im_report_data(exchange, &[AttrReport::Status { endpoint, cluster, attribute, status }], ack, None)
+    im_report_data(exchange, &[AttrReport::Status { endpoint, cluster, attribute, status }], ack, None, false)
 }
 
 #[allow(dead_code)]
@@ -326,7 +328,7 @@ pub fn im_report_data_multi_status(
             AttrReport::Status { endpoint, cluster, attribute, status }
         })
         .collect();
-    im_report_data(exchange, &reports, ack, None)
+    im_report_data(exchange, &reports, ack, None, false)
 }
 
 pub fn im_invoke_response_status(
@@ -364,5 +366,37 @@ pub fn im_invoke_response_status(
     tlv.write_struct_end()?; // end InvokeResponseIB
     tlv.write_struct_end()?; // end InvokeResponses array
     tlv.write_struct_end()?; // end top-level struct
+    Ok(tlv.data)
+}
+
+/// WriteResponse with success status for each written attribute path.
+pub fn im_write_response_success(exchange: u16, ack: i64, paths: &[(u16, u32, u32)]) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: device_flags(ack),
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_WRITE_RESP,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: ack as u32,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_array(0)?;  // tag 0: WriteAttributeStatusIBs
+    for &(endpoint, cluster, attribute) in paths {
+        // WriteAttributeStatusIB: tag 0 = AttributePathIB (list), tag 1 = StatusIB (struct)
+        tlv.write_anon_struct()?;       // WriteAttributeStatusIB
+        tlv.write_list(0)?;             // tag 0: AttributePathIB
+        tlv.write_uint16(2, endpoint)?; //   tag 2: Endpoint
+        tlv.write_uint32(3, cluster)?;  //   tag 3: Cluster
+        tlv.write_uint32(4, attribute)?;//   tag 4: Attribute
+        tlv.write_struct_end()?;        // end AttributePathIB
+        tlv.write_struct(1)?;           // tag 1: StatusIB
+        tlv.write_uint8(0, 0)?;         //   tag 0: Status = SUCCESS (0)
+        tlv.write_struct_end()?;        // end StatusIB
+        tlv.write_struct_end()?;        // end WriteAttributeStatusIB
+    }
+    tlv.write_struct_end()?;  // end array
+    tlv.write_struct_end()?;  // end top-level struct
     Ok(tlv.data)
 }

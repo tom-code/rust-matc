@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::{messages, session};
 
@@ -33,11 +33,11 @@ impl Device {
         protocol_data: &[u8],
     ) -> Result<()> {
         let encoded = session.encode_message(protocol_data)?;
-        self.socket.send_to(&encoded, addr).await?;
+        let _res = self.socket.send_to(&encoded, addr).await?;
         Ok(())
     }
 
-    pub(crate) async fn send_pase_encrypted(
+    /*pub(crate) async fn send_pase_encrypted(
         &self,
         addr: &std::net::SocketAddr,
         protocol_data: &[u8],
@@ -47,19 +47,7 @@ impl Device {
             .as_ref()
             .context("No PASE session established")?;
         self.send_encrypted(addr, session, protocol_data).await
-    }
-
-    async fn send_case_encrypted(
-        &self,
-        addr: &std::net::SocketAddr,
-        protocol_data: &[u8],
-    ) -> Result<()> {
-        let session = self
-            .case_session
-            .as_ref()
-            .context("No CASE session established")?;
-        self.send_encrypted(addr, session, protocol_data).await
-    }
+    }*/
 
     pub(crate) async fn send_reply_by_session(
         &self,
@@ -67,14 +55,12 @@ impl Device {
         session_id: u16,
         data: &[u8],
     ) -> Result<()> {
-        if let Some(ref ses) = self.case_session {
-            if session_id == ses.my_session_id {
-                return self.send_case_encrypted(addr, data).await;
-            }
+        if let Some(ses) = self.case_sessions.iter().find(|s| s.my_session_id == session_id) {
+            return self.send_encrypted(addr, ses, data).await;
         }
         if let Some(ref ses) = self.pase_session {
             if session_id == ses.my_session_id {
-                return self.send_pase_encrypted(addr, data).await;
+                return self.send_encrypted(addr, ses, data).await;
             }
         }
         self.send_unencrypted(addr, data, None).await
@@ -83,12 +69,9 @@ impl Device {
     pub(crate) async fn send_commissioning_reply(
         &self,
         addr: &std::net::SocketAddr,
+        session_id: u16,
         data: &[u8],
     ) -> Result<()> {
-        if self.case_session.is_some() {
-            self.send_case_encrypted(addr, data).await
-        } else {
-            self.send_pase_encrypted(addr, data).await
-        }
+        self.send_reply_by_session(addr, session_id, data).await
     }
 }
