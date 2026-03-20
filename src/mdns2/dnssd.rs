@@ -17,6 +17,12 @@ pub struct ServiceRegistration {
     pub txt_records: Vec<(String, String)>,
     pub ttl: u32,
     pub subtypes: Vec<String>,
+    /// Override the IPv4 addresses advertised for this service.
+    /// When `None`, the mDNS service's globally auto-detected addresses are used.
+    pub ips_v4: Option<Vec<Ipv4Addr>>,
+    /// Override the IPv6 addresses advertised for this service.
+    /// When `None`, the mDNS service's globally auto-detected addresses are used.
+    pub ips_v6: Option<Vec<Ipv6Addr>>,
 }
 
 /// Events emitted by the mDNS service to the user.
@@ -175,7 +181,9 @@ pub(super) fn find_matching_services(
         let svc_type = reg.service_type.trim_end_matches('.').to_lowercase();
         let instance_full = format!("{}.{}", reg.instance_name.to_lowercase(), svc_type);
 
-        let all_records = build_service_records(reg, ips_v4, ips_v6);
+        let svc_v4 = reg.ips_v4.as_deref().unwrap_or(ips_v4);
+        let svc_v6 = reg.ips_v6.as_deref().unwrap_or(ips_v6);
+        let all_records = build_service_records(reg, svc_v4, svc_v6);
         let is_any = query_type == mdns::QTYPE_ANY;
 
         // Check if query matches a subtype

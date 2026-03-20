@@ -276,13 +276,16 @@ impl Device {
                     .await
             }
             _ => {
+                let mut ctx = super::AttrContext {
+                    attributes: &mut self.attributes,
+                    dirty: &mut self.dirty_attributes,
+                };
                 let result = handler.handle_command(
                     endpoint,
                     cluster,
                     command,
                     &invoke_tlv,
-                    &mut self.attributes,
-                    &mut self.dirty_attributes,
+                    &mut ctx,
                 );
                 let status_code = match result {
                     super::CommandResult::Success => 0u16,
@@ -361,7 +364,6 @@ impl Device {
     ) -> Result<()> {
         log::info!("Subscribe request");
         let sub_tlv = tlv::decode_tlv(proto_payload)?;
-        sub_tlv.dump(1);
         // Tag 0: KeepSubscriptions (bool), Tag 1: MinIntervalFloor (u16), Tag 2: MaxIntervalCeiling (u16)
         let max_interval_secs = sub_tlv.get_int(&[2]).map(|v| v as u16).unwrap_or(120);
 

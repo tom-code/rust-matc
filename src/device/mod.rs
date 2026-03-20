@@ -11,7 +11,7 @@ mod send;
 mod types;
 
 pub use types::DeviceConfig;
-pub use attributes::{attr_get_bool, attr_set_bool};
+pub use attributes::AttrContext;
 use types::{ActiveSubscription, CaseState, FabricInfo, PaseState, PendingChunkState, SubscribeState};
 
 
@@ -41,8 +41,7 @@ pub trait AppHandler: Send {
         cluster: u32,
         command: u32,
         payload: &tlv::TlvItem,
-        attributes: &mut HashMap<(u16, u32, u32), Vec<u8>>,
-        dirty_attributes: &mut HashSet<(u16, u32, u32)>,
+        attrs: &mut AttrContext,
     ) -> CommandResult;
 }
 
@@ -69,6 +68,8 @@ pub struct Device {
     pub(crate) pending_root_cert: Option<Vec<u8>>,
     // Duplicate detection
     pub(crate) received_counters: HashSet<u32>,
+    /// Registered application endpoints (EP0 is always present).
+    pub(crate) endpoints: Vec<u16>,
     // Attribute store: (endpoint, cluster, attribute) -> pre-tagged TLV at context tag 2
     pub(crate) attributes: HashMap<(u16, u32, u32), Vec<u8>>,
     /// Attributes mutated since last subscription report was sent.
@@ -102,6 +103,7 @@ impl Device {
             next_fabric_index: 1,
             pending_root_cert: None,
             received_counters: HashSet::new(),
+            endpoints: vec![0],
             attributes: HashMap::new(),
             dirty_attributes: HashSet::new(),
             mdns,
@@ -120,6 +122,7 @@ impl Device {
             .unwrap_or(5540);
         let short_disc = device.config.discriminator >> 8;
         let instance_name = format!("{:016X}", rand::random::<u64>());
+        let (adv_v4, adv_v6) = device.config.split_advertise_ips();
         let svc = crate::mdns2::ServiceRegistration {
             instance_name,
             service_type: "_matterc._udp.local".to_string(),
@@ -138,6 +141,8 @@ impl Device {
             hostname: device.config.hostname.clone(),
             ttl: 120,
             subtypes: vec![format!("_S{}", short_disc)],
+            ips_v4: adv_v4,
+            ips_v6: adv_v6,
         };
         device.mdns.register_service(svc).await;
 

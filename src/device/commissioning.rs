@@ -272,6 +272,29 @@ impl Device {
         let fabric_index = invoke_tlv.get_int(&[2, 0, 1, 0]).unwrap_or(0) as u8;
         log::info!("IM: RemoveFabric fabric_index={}", fabric_index);
 
+        self.send_noc_response(addr, msg_header, proto_header, fabric_index)
+            .await?;
+/*
+        // Send CloseSession to the requesting session if it belongs to the removed fabric
+        if let Some(ses) = self
+            .case_sessions
+            .iter()
+            .find(|s| s.my_session_id == msg_header.session_id)
+        {
+            log::info!(
+                "IM: RemoveFabric - closing session {} that belonged to removed fabric_index {}",
+                ses.my_session_id,
+                fabric_index
+            );
+            if ses.fabric_index == fabric_index {
+                log::info!("IM: RemoveFabric - sending CloseSession to session {}", ses.my_session_id);
+                let exchange_id: u16 = rand::random();
+                let close_data = crate::device_messages::status_report(exchange_id, 0, 0, 3, -1)?;
+                let close_data = crate::device_messages::status_report_nor(exchange_id, 0, 0, 3, -1)?;
+                self.send_encrypted(addr, ses, &close_data).await?;
+            }
+        }
+
         self.fabrics.retain(|fi| fi.fabric_index != fabric_index);
 
         // Drop CASE sessions that belonged to the removed fabric
@@ -298,8 +321,11 @@ impl Device {
 
         self.rebuild_fabrics_attribute()?;
 
-        self.send_noc_response(addr, msg_header, proto_header, fabric_index)
-            .await
+        if let Some(ref state_dir) = self.config.state_dir.clone() {
+            self.save_state(state_dir)?;
+        }
+*/
+        Ok(())
     }
 
     /// Build the Fabrics and CommissionedFabrics attributes from `self.fabrics`.
@@ -379,10 +405,9 @@ impl Device {
         addr: &std::net::SocketAddr,
         msg_header: &messages::MessageHeader,
         proto_header: &messages::ProtocolMessageHeader,
-        invoke_tlv: &tlv::TlvItem,
+        _invoke_tlv: &tlv::TlvItem,
     ) -> Result<()> {
         log::info!("IM: ArmFailsafe");
-        invoke_tlv.dump(1);
         self.send_general_commissioning_response(addr, msg_header, proto_header, 0x01, "ok")
             .await?;
         log::info!("IM: ArmFailsafe OK");

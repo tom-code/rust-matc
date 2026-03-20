@@ -26,7 +26,7 @@ impl Device {
         Ok(())
     }
 
-    async fn send_encrypted(
+    pub(crate) async fn send_encrypted(
         &self,
         addr: &std::net::SocketAddr,
         session: &session::Session,

@@ -1,3 +1,5 @@
+use std::net::{Ipv4Addr, Ipv6Addr};
+
 use anyhow::{Context, Result};
 
 use crate::{fabric, sigma, spake2p, tlv};
@@ -21,6 +23,31 @@ pub struct DeviceConfig {
     pub software_version: u32,
     pub serial_number: String,
     pub unique_id: String,
+    /// IP addresses to advertise in mDNS A/AAAA records.
+    /// When `None`, all local non-loopback addresses are advertised automatically.
+    /// Each registered service (commissionable and per-fabric operational) will use these IPs.
+    pub advertise_addresses: Option<Vec<std::net::IpAddr>>,
+}
+
+impl DeviceConfig {
+    /// Split `advertise_addresses` into separate IPv4 and IPv6 lists for mDNS registration.
+    /// Returns `(None, None)` when no override is configured (auto-detect fallback).
+    pub fn split_advertise_ips(&self) -> (Option<Vec<Ipv4Addr>>, Option<Vec<Ipv6Addr>>) {
+        match &self.advertise_addresses {
+            None => (None, None),
+            Some(addrs) => {
+                let v4: Vec<Ipv4Addr> = addrs.iter().filter_map(|a| match a {
+                    std::net::IpAddr::V4(ip) => Some(*ip),
+                    _ => None,
+                }).collect();
+                let v6: Vec<Ipv6Addr> = addrs.iter().filter_map(|a| match a {
+                    std::net::IpAddr::V6(ip) => Some(*ip),
+                    _ => None,
+                }).collect();
+                (Some(v4), Some(v6))
+            }
+        }
+    }
 }
 
 /// Serde helper: serialize `Vec<u8>` as a lowercase hex string.

@@ -332,8 +332,9 @@ impl MdnsService {
         if let Some(idx) = idx {
             let reg = state.services.remove(idx);
             // Build goodbye records (TTL=0)
-            let mut goodbye_records =
-                build_service_records(&reg, &state.local_ips_v4, &state.local_ips_v6);
+            let svc_v4 = reg.ips_v4.as_deref().unwrap_or(&state.local_ips_v4);
+            let svc_v6 = reg.ips_v6.as_deref().unwrap_or(&state.local_ips_v6);
+            let mut goodbye_records = build_service_records(&reg, svc_v4, svc_v6);
             for rr in &mut goodbye_records {
                 rr.ttl = 0;
             }
@@ -350,7 +351,9 @@ impl MdnsService {
         let mut all_answers = Vec::new();
         let mut all_additional = Vec::new();
         for reg in &state.services {
-            let records = build_service_records(reg, &state.local_ips_v4, &state.local_ips_v6);
+            let svc_v4 = reg.ips_v4.as_deref().unwrap_or(&state.local_ips_v4);
+            let svc_v6 = reg.ips_v6.as_deref().unwrap_or(&state.local_ips_v6);
+            let records = build_service_records(reg, svc_v4, svc_v6);
             // PTR goes as answer, everything else as additional
             for r in records {
                 if r.typ == mdns::TYPE_PTR {

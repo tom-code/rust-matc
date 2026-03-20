@@ -211,12 +211,12 @@ pub(super) fn create_multicast_socket_v6(interface: u32) -> Result<std::net::Udp
 // TODO: ipv6 is disabled for testing
 pub(super) fn get_local_ips() -> (Vec<Ipv4Addr>, Vec<Ipv6Addr>) {
     let mut v4 = Vec::new();
-    let v6 = Vec::new();
+    let mut v6 = Vec::new();
     if let Ok(ifaces) = if_addrs::get_if_addrs() {
         for iface in ifaces {
             match iface.ip() {
                 std::net::IpAddr::V4(ip) if !ip.is_loopback() => v4.push(ip),
-                //std::net::IpAddr::V6(ip) if !ip.is_loopback() => v6.push(ip),
+                std::net::IpAddr::V6(ip) if !ip.is_loopback() => v6.push(ip),
                 _ => {}
             }
         }

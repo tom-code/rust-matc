@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use crate::{clusters, tlv};
 
@@ -594,28 +594,192 @@ impl Device {
 
 use std::collections::{HashMap, HashSet};
 
-pub fn attr_set_bool(
-    attributes: &mut HashMap<(u16, u32, u32), Vec<u8>>,
-    dirty: &mut HashSet<(u16, u32, u32)>,
-    ep: u16,
-    cluster: u32,
-    attr: u32,
-    value: bool,
-) {
-    let mut buf = tlv::TlvBuffer::new();
-    let _ = buf.write_bool(2, value);
-    attributes.insert((ep, cluster, attr), buf.data);
-    dirty.insert((ep, cluster, attr));
+/// Context passed to [`super::AppHandler::handle_command`] giving typed attribute access.
+pub struct AttrContext<'a> {
+    pub(crate) attributes: &'a mut HashMap<(u16, u32, u32), Vec<u8>>,
+    pub(crate) dirty: &'a mut HashSet<(u16, u32, u32)>,
 }
 
-pub fn attr_get_bool(
-    attributes: &HashMap<(u16, u32, u32), Vec<u8>>,
-    ep: u16,
-    cluster: u32,
-    attr: u32,
-) -> Option<bool> {
-    attributes
-        .get(&(ep, cluster, attr))
-        .and_then(|v| tlv::decode_tlv(v).ok())
-        .map(|item| bool::from(item.value))
+impl<'a> AttrContext<'a> {
+    pub fn get_bool(&self, ep: u16, cluster: u32, attr: u32) -> Option<bool> {
+        self.attributes.get(&(ep, cluster, attr))
+            .and_then(|v| tlv::decode_tlv(v).ok())
+            .and_then(|item| item.get_bool(&[]))
+    }
+    pub fn get_u8(&self, ep: u16, cluster: u32, attr: u32) -> Option<u8> {
+        self.attributes.get(&(ep, cluster, attr))
+            .and_then(|v| tlv::decode_tlv(v).ok())
+            .and_then(|item| item.get_u8(&[]))
+    }
+    pub fn get_u16(&self, ep: u16, cluster: u32, attr: u32) -> Option<u16> {
+        self.attributes.get(&(ep, cluster, attr))
+            .and_then(|v| tlv::decode_tlv(v).ok())
+            .and_then(|item| item.get_u16(&[]))
+    }
+    pub fn get_u32(&self, ep: u16, cluster: u32, attr: u32) -> Option<u32> {
+        self.attributes.get(&(ep, cluster, attr))
+            .and_then(|v| tlv::decode_tlv(v).ok())
+            .and_then(|item| item.get_u32(&[]))
+    }
+    pub fn get_u64(&self, ep: u16, cluster: u32, attr: u32) -> Option<u64> {
+        self.attributes.get(&(ep, cluster, attr))
+            .and_then(|v| tlv::decode_tlv(v).ok())
+            .and_then(|item| item.get_u64(&[]))
+    }
+    pub fn set_bool(&mut self, ep: u16, cluster: u32, attr: u32, value: bool) {
+        let mut buf = tlv::TlvBuffer::new();
+        let _ = buf.write_bool(2, value);
+        self.attributes.insert((ep, cluster, attr), buf.data);
+        self.dirty.insert((ep, cluster, attr));
+    }
+    pub fn set_u8(&mut self, ep: u16, cluster: u32, attr: u32, value: u8) {
+        let mut buf = tlv::TlvBuffer::new();
+        let _ = buf.write_uint8(2, value);
+        self.attributes.insert((ep, cluster, attr), buf.data);
+        self.dirty.insert((ep, cluster, attr));
+    }
+    pub fn set_u16(&mut self, ep: u16, cluster: u32, attr: u32, value: u16) {
+        let mut buf = tlv::TlvBuffer::new();
+        let _ = buf.write_uint16(2, value);
+        self.attributes.insert((ep, cluster, attr), buf.data);
+        self.dirty.insert((ep, cluster, attr));
+    }
+    pub fn set_u32(&mut self, ep: u16, cluster: u32, attr: u32, value: u32) {
+        let mut buf = tlv::TlvBuffer::new();
+        let _ = buf.write_uint32(2, value);
+        self.attributes.insert((ep, cluster, attr), buf.data);
+        self.dirty.insert((ep, cluster, attr));
+    }
+    pub fn set_u64(&mut self, ep: u16, cluster: u32, attr: u32, value: u64) {
+        let mut buf = tlv::TlvBuffer::new();
+        let _ = buf.write_uint64(2, value);
+        self.attributes.insert((ep, cluster, attr), buf.data);
+        self.dirty.insert((ep, cluster, attr));
+    }
+    pub fn set_string(&mut self, ep: u16, cluster: u32, attr: u32, value: &str) {
+        let mut buf = tlv::TlvBuffer::new();
+        let _ = buf.write_string(2, value);
+        self.attributes.insert((ep, cluster, attr), buf.data);
+        self.dirty.insert((ep, cluster, attr));
+    }
 }
+
+impl Device {
+    /// Register a new application endpoint with a Descriptor cluster.
+    ///
+    /// Sets up DeviceTypeList, ServerList (initially containing only Descriptor),
+    /// empty ClientList and PartsList, and Descriptor globals. Then appends the
+    /// endpoint to EP0's PartsList.
+    pub fn add_endpoint(
+        &mut self,
+        endpoint: u16,
+        device_type_id: u32,
+        device_type_revision: u16,
+    ) -> Result<()> {
+        use clusters::defs::*;
+        if self.endpoints.contains(&endpoint) {
+            bail!("endpoint {} already registered", endpoint);
+        }
+
+        let mut buf = tlv::TlvBuffer::new();
+        buf.write_array(2)?;
+        buf.write_anon_struct()?;
+        buf.write_uint32(0, device_type_id)?;
+        buf.write_uint16(1, device_type_revision)?;
+        buf.write_struct_end()?;
+        buf.write_struct_end()?;
+        self.set_attribute_raw(endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_DEVICETYPELIST, &buf.data);
+
+        let mut buf = tlv::TlvBuffer::new();
+        buf.write_array(2)?;
+        buf.write_uint32_notag(CLUSTER_ID_DESCRIPTOR)?;
+        buf.write_struct_end()?;
+        self.set_attribute_raw(endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST, &buf.data);
+
+        self.set_empty_array(endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_CLIENTLIST);
+        self.set_empty_array(endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST);
+
+        self.set_cluster_globals(
+            endpoint,
+            CLUSTER_ID_DESCRIPTOR,
+            3,
+            0,
+            &[
+                CLUSTER_DESCRIPTOR_ATTR_ID_DEVICETYPELIST,
+                CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
+                CLUSTER_DESCRIPTOR_ATTR_ID_CLIENTLIST,
+                CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+            ],
+            &[],
+            &[],
+        )?;
+
+        self.endpoints.push(endpoint);
+        self.rebuild_ep0_partslist()?;
+        Ok(())
+    }
+
+    /// Add a cluster to an existing endpoint: sets cluster globals and updates
+    /// the endpoint's Descriptor ServerList.
+    pub fn add_cluster(
+        &mut self,
+        endpoint: u16,
+        cluster_id: u32,
+        revision: u16,
+        feature_map: u32,
+        attr_ids: &[u32],
+        accepted_cmds: &[u32],
+        generated_cmds: &[u32],
+    ) -> Result<()> {
+        if !self.endpoints.contains(&endpoint) {
+            bail!("endpoint {} not registered; call add_endpoint first", endpoint);
+        }
+        self.set_cluster_globals(endpoint, cluster_id, revision, feature_map, attr_ids, accepted_cmds, generated_cmds)?;
+        self.rebuild_server_list(endpoint, cluster_id)?;
+        Ok(())
+    }
+
+    /// Rebuild EP0 Descriptor PartsList from the current `self.endpoints` (excluding EP0).
+    fn rebuild_ep0_partslist(&mut self) -> Result<()> {
+        use clusters::defs::*;
+        let mut buf = tlv::TlvBuffer::new();
+        buf.write_array(2)?;
+        for &ep in &self.endpoints {
+            if ep != 0 {
+                buf.write_uint16_notag(ep)?;
+            }
+        }
+        buf.write_struct_end()?;
+        self.set_attribute_raw(0, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST, &buf.data);
+        Ok(())
+    }
+
+    /// Append `cluster_id` to the Descriptor ServerList for `endpoint`.
+    fn rebuild_server_list(&mut self, endpoint: u16, cluster_id: u32) -> Result<()> {
+        use clusters::defs::*;
+        let existing: Vec<u32> = self.attributes
+            .get(&(endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST))
+            .and_then(|data| tlv::decode_tlv(data).ok())
+            .map(|item| {
+                if let tlv::TlvItemValue::List(entries) = item.value {
+                    entries.into_iter()
+                        .filter_map(|e| if let tlv::TlvItemValue::Int(i) = e.value { Some(i as u32) } else { None })
+                        .collect()
+                } else {
+                    vec![]
+                }
+            })
+            .unwrap_or_default();
+
+        let mut buf = tlv::TlvBuffer::new();
+        buf.write_array(2)?;
+        for id in existing {
+            buf.write_uint32_notag(id)?;
+        }
+        buf.write_uint32_notag(cluster_id)?;
+        buf.write_struct_end()?;
+        self.set_attribute_raw(endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST, &buf.data);
+        Ok(())
+    }
+}
+

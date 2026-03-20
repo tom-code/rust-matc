@@ -38,7 +38,12 @@ impl Device {
     /// Persist current commissioned state to `{state_dir}/device_state.json`.
     pub(crate) fn save_state(&self, state_dir: &str) -> Result<()> {
         if self.fabrics.is_empty() {
-            anyhow::bail!("Device not commissioned: no fabrics");
+            let path = format!("{}/device_state.json", state_dir);
+            if std::path::Path::new(&path).exists() {
+                std::fs::remove_file(&path)?;
+                log::info!("All fabrics removed — deleted {}", path);
+            }
+            return Ok(());
         }
 
         let fabrics: Vec<PersistedFabricState> = self
@@ -94,6 +99,7 @@ impl Device {
             .next()
             .and_then(|p| p.parse().ok())
             .unwrap_or(5540);
+        let (adv_v4, adv_v6) = self.config.split_advertise_ips();
         let svc = crate::mdns2::ServiceRegistration {
             instance_name: iname,
             service_type: "_matter._tcp.local".to_string(),
@@ -102,6 +108,8 @@ impl Device {
             hostname: self.config.hostname.clone(),
             ttl: 120,
             subtypes: vec![],
+            ips_v4: adv_v4,
+            ips_v6: adv_v6,
         };
         self.mdns.register_service(svc).await;
         Ok(())
@@ -167,6 +175,7 @@ impl Device {
             next_fabric_index: state.next_fabric_index,
             pending_root_cert: None,
             received_counters: HashSet::new(),
+            endpoints: vec![0],
             attributes: HashMap::new(),
             dirty_attributes: HashSet::new(),
             mdns,

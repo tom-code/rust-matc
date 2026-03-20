@@ -65,7 +65,16 @@ pub fn encode_manual_pairing_code(info: &OnboardingInfo) -> String {
     let third = info.passcode >> 14;
     let digits = format!("{:01}{:05}{:04}", first, second, third);
     let check = verhoeff_checksum(&digits);
-    format!("{}-{:05}-{:04}-{}", first, second, third, check)
+    let num = format!("{}{:05}{:04}{}", first, second, third, check);
+    // Insert dashes after each 4th digit
+    let mut formatted = String::new();
+    for (i, ch) in num.chars().enumerate() {
+        if i > 0 && i % 4 == 0 {
+            formatted.push('-');
+        }
+        formatted.push(ch);
+    }
+    formatted
 }
 
 #[cfg(test)]
