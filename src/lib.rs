@@ -17,8 +17,10 @@
 //! - [discover](discover) - simple mdns based discovery of matter devices on local network
 //! - [devman](devman) - High level device manager which uses all above components to provide simpler api.
 //!                      It stores device information and certificates in specified directory and allows
-//!                      to commission new devices and connect to already commissioned devices by name
-//!                      without worrying about certificates and transport details.
+//!                      to commission new devices (by address or by manual pairing code with mDNS discovery)
+//!                      and connect to already commissioned devices by name.
+//!                      Connections automatically re-discover devices via operational mDNS if the stored
+//!                      address is stale (e.g. device changed IP).
 //! - [clusters](clusters) - matter cluster definitions and encoders/decoders for cluster attributes and commands.
 //!
 //!
@@ -70,7 +72,21 @@
 //! # }
 //! ```
 //!
-//! Example how to connect to already commissioned device by name and send command to it:
+//! Example how to commission device using manual pairing code (mDNS discovery happens automatically):
+//! ```no_run
+//! # use matc::devman::DeviceManager;
+//! # use anyhow::Result;
+//! # #[tokio::main]
+//! # async fn main() -> Result<()> {
+//! const DATA_DIR: &str = "./matter-data";
+//! let devman = DeviceManager::load(DATA_DIR).await?;
+//! let device = devman.commission_with_code("0251-520-0076", 300, "My Device").await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Example how to connect to already commissioned device by name and send command to it.
+//! If the device changed its IP, the connection automatically re-discovers it via operational mDNS:
 //! ```no_run
 //! # use matc::devman::DeviceManager;
 //! # use anyhow::Result;

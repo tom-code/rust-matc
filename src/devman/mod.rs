@@ -1,7 +1,20 @@
 //! Device manager for simplified Matter device interaction.
 //!
-//! Wraps certificate management, transport, controller, and a persistent device
-//! registry so that commissioning and connecting to devices is simpler
+//! Wraps certificate management, transport, controller, mDNS discovery, and a persistent device
+//! registry so that commissioning and connecting to devices is simpler.
+//!
+//! # Features
+//!
+//! - **Commission by address**: [`DeviceManager::commission`] when the device IP is known
+//! - **Commission by pairing code**: [`DeviceManager::commission_with_code`] decodes a manual
+//!   pairing code, discovers the device via commissionable mDNS (`_matterc._udp.local`),
+//!   and commissions it automatically
+//! - **Connect with auto-rediscovery**: [`DeviceManager::connect`] and
+//!   [`DeviceManager::connect_by_name`] try the stored address first; if the connection fails
+//!   (e.g. device changed IP), they automatically re-discover the device via operational mDNS
+//!   (`_matter._tcp.local`) and retry
+//! - **Explicit discovery**: [`DeviceManager::discover_device`] finds the current address of a
+//!   commissioned device via operational mDNS and updates the registry
 //!
 //! # First-time setup
 //! ```no_run
@@ -16,7 +29,21 @@
 //! # }
 //! ```
 //!
+//! # Commission using manual pairing code
+//! ```no_run
+//! # use matc::devman::DeviceManager;
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
+//! let dm = DeviceManager::load("./matter-data").await?;
+//! let conn = dm.commission_with_code("0251-520-0076", 300, "kitchen light").await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Reconnecting later
+//!
+//! If the device changed its IP address since commissioning, the connection automatically
+//! falls back to operational mDNS discovery, updates the stored address, and retries.
 //! ```no_run
 //! # use matc::devman::DeviceManager;
 //! # #[tokio::main]
@@ -37,7 +64,11 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 
-use crate::{certmanager, controller, transport};
+use std::time::Duration;
+
+use tokio::sync::mpsc::UnboundedReceiver;
+
+use crate::{certmanager, controller, discover, fabric::Fabric, mdns2, onboarding, transport};
 
 pub struct DeviceManager {
     base_path: String,
@@ -46,6 +77,8 @@ pub struct DeviceManager {
     controller: Arc<controller::Controller>,
     certmanager: Arc<dyn certmanager::CertManager>,
     registry: std::sync::Mutex<device::DeviceRegistry>,
+    mdns: Arc<mdns2::MdnsService>,
+    mdns_receiver: tokio::sync::Mutex<UnboundedReceiver<mdns2::MdnsEvent>>,
 }
 
 impl DeviceManager {
@@ -65,6 +98,7 @@ impl DeviceManager {
         let transport = transport::Transport::new(&config.local_address).await?;
         let controller = controller::Controller::new(&cm, &transport, config.fabric_id)?;
         let registry = device::DeviceRegistry::load(&config::devices_path(base_path))?;
+        let (mdns, mdns_receiver) = mdns2::MdnsService::new().await?;
 
         Ok(Self {
             base_path: base_path.to_owned(),
@@ -73,6 +107,8 @@ impl DeviceManager {
             controller,
             certmanager: cm,
             registry: std::sync::Mutex::new(registry),
+            mdns,
+            mdns_receiver: tokio::sync::Mutex::new(mdns_receiver),
         })
     }
 
@@ -84,6 +120,7 @@ impl DeviceManager {
         let transport = transport::Transport::new(&config.local_address).await?;
         let controller = controller::Controller::new(&cm, &transport, config.fabric_id)?;
         let registry = device::DeviceRegistry::load(&config::devices_path(base_path))?;
+        let (mdns, mdns_receiver) = mdns2::MdnsService::new().await?;
 
         Ok(Self {
             base_path: base_path.to_owned(),
@@ -92,6 +129,8 @@ impl DeviceManager {
             controller,
             certmanager: cm,
             registry: std::sync::Mutex::new(registry),
+            mdns,
+            mdns_receiver: tokio::sync::Mutex::new(mdns_receiver),
         })
     }
 
@@ -124,6 +163,7 @@ impl DeviceManager {
     }
 
     /// Connect to a previously commissioned device by node ID.
+    /// If the stored address fails, automatically re-discovers the device via operational mDNS.
     pub async fn connect(&self, node_id: u64) -> Result<controller::Connection> {
         let address = {
             let reg = self.registry.lock().map_err(|e| anyhow::anyhow!("registry lock: {}", e))?;
@@ -132,13 +172,11 @@ impl DeviceManager {
                 .address
                 .clone()
         };
-        let conn = self.transport.create_connection(&address).await;
-        self.controller
-            .auth_sigma(&conn, node_id, self.config.controller_id)
-            .await
+        self.connect_with_rediscovery(node_id, &address).await
     }
 
     /// Connect to a previously commissioned device by friendly name.
+    /// If the stored address fails, automatically re-discovers the device via operational mDNS.
     pub async fn connect_by_name(&self, name: &str) -> Result<controller::Connection> {
         let (node_id, address) = {
             let reg = self.registry.lock().map_err(|e| anyhow::anyhow!("registry lock: {}", e))?;
@@ -147,10 +185,148 @@ impl DeviceManager {
                 .context(format!("device '{}' not found in registry", name))?;
             (dev.node_id, dev.address.clone())
         };
-        let conn = self.transport.create_connection(&address).await;
-        self.controller
-            .auth_sigma(&conn, node_id, self.config.controller_id)
-            .await
+        self.connect_with_rediscovery(node_id, &address).await
+    }
+
+    /// Try auth_sigma at the given address; on failure, re-discover via mDNS and retry once.
+    async fn connect_with_rediscovery(&self, node_id: u64, address: &str) -> Result<controller::Connection> {
+        let conn = self.transport.create_connection(address).await;
+        match self.controller.auth_sigma(&conn, node_id, self.config.controller_id).await {
+            Ok(c) => Ok(c),
+            Err(e) => {
+                log::info!("Connection to {} failed ({}), attempting operational rediscovery...", address, e);
+                let new_address = self.discover_device(node_id).await
+                    .context(format!("rediscovery for node {} after connect failure", node_id))?;
+                let conn = self.transport.create_connection(&new_address).await;
+                self.controller
+                    .auth_sigma(&conn, node_id, self.config.controller_id)
+                    .await
+                    .context(format!("connection still failed after rediscovery at {}", new_address))
+            }
+        }
+    }
+
+    /// Commission a device using a manual pairing code.
+    /// Decodes the pairing code to extract the discriminator, discovers the device via
+    /// commissionable mDNS, then commissions it. Returns an authenticated connection.
+    pub async fn commission_with_code(
+        &self,
+        pairing_code: &str,
+        node_id: u64,
+        name: &str,
+    ) -> Result<controller::Connection> {
+        let info = onboarding::decode_manual_pairing_code(pairing_code)
+            .context("decoding manual pairing code")?;
+        let discriminator = info.discriminator;
+        let passcode = info.passcode;
+
+        log::info!("Discovering device with discriminator {}...", discriminator);
+
+        self.mdns.add_query("_matterc._udp.local", 0xff, Duration::from_secs(5)).await;
+        let mut receiver = self.mdns_receiver.lock().await;
+
+        let (ips, port) = loop {
+            match receiver.recv().await {
+                Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
+                    if svc_name != "_matterc._udp.local." {
+                        continue;
+                    }
+                    let matter_info = match discover::extract_matter_info(&target, &self.mdns).await {
+                        Ok(i) => i,
+                        Err(e) => {
+                            log::debug!("Failed to extract Matter info from {}: {}", target, e);
+                            continue;
+                        }
+                    };
+                    if let Some(ref d) = matter_info.discriminator {
+                        if *d == discriminator.to_string() {
+                            self.mdns.remove_query("_matterc._udp.local").await;
+                            break (matter_info.ips, matter_info.port.unwrap_or(5540));
+                        }
+                    }
+                }
+                None => {
+                    anyhow::bail!("no commissionable device found with discriminator {}", discriminator);
+                }
+                _ => {}
+            }
+        };
+        drop(receiver);
+
+        if ips.is_empty() {
+            anyhow::bail!("discovered device with discriminator {} but no IPs returned", discriminator);
+        }
+
+        let mut last_err = anyhow::anyhow!("no IPs to try");
+        for ip in &ips {
+            let address = if ip.is_ipv6() {
+                format!("[{}]:{}", ip, port)
+            } else {
+                format!("{}:{}", ip, port)
+            };
+            match self.commission(&address, passcode, node_id, name).await {
+                Ok(conn) => return Ok(conn),
+                Err(e) => {
+                    log::debug!("Commission attempt at {} failed: {}", address, e);
+                    last_err = e;
+                }
+            }
+        }
+        Err(last_err).context(format!("commissioning failed on all IPs for discriminator {}", discriminator))
+    }
+
+    /// Discover the current address of a commissioned device via operational mDNS.
+    /// Returns as soon as the device is found (no fixed timeout wait).
+    /// Updates the stored address in the registry and returns the new address.
+    pub async fn discover_device(&self, node_id: u64) -> Result<String> {
+        let ca_public_key = self.certmanager.get_ca_public_key()?;
+        let fabric = Fabric::new(self.config.fabric_id, 0, &ca_public_key);
+        let compressed = fabric.compressed().context("computing compressed fabric ID")?;
+        let instance_name = format!("{}-{:016X}", hex::encode_upper(&compressed), node_id);
+        let expected_target = format!("{}._matter._tcp.local.", instance_name);
+
+        log::info!("Operational discovery for instance {}...", instance_name);
+
+        self.mdns.add_query("_matter._tcp.local", 0xff, Duration::from_secs(10)).await;
+        let mut receiver = self.mdns_receiver.lock().await;
+
+        let (ips, port) = loop {
+            match receiver.recv().await {
+                Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
+                    if svc_name != "_matter._tcp.local." {
+                        continue;
+                    }
+                    if target != expected_target {
+                        continue;
+                    }
+                    let matter_info = match discover::extract_matter_info(&target, &self.mdns).await {
+                        Ok(i) => i,
+                        Err(e) => {
+                            log::debug!("Failed to extract Matter info from {}: {}", target, e);
+                            continue;
+                        }
+                    };
+                    self.mdns.remove_query("_matter._tcp.local").await;
+                    break (matter_info.ips, matter_info.port.unwrap_or(5540));
+                }
+                None => {
+                    anyhow::bail!("no operational mDNS result for instance {}", instance_name);
+                }
+                _ => {}
+            }
+        };
+        drop(receiver);
+
+        let ip = ips.first()
+            .context(format!("discovered {} but no IPs in response", instance_name))?;
+        let address = if ip.is_ipv6() {
+            format!("[{}]:{}", ip, port)
+        } else {
+            format!("{}:{}", ip, port)
+        };
+
+        self.update_device_address(node_id, &address)?;
+        Ok(address)
     }
 
     /// List all registered devices.
@@ -193,6 +369,11 @@ impl DeviceManager {
             .lock()
             .map_err(|e| anyhow::anyhow!("registry lock: {}", e))?
             .update_address(node_id, address)
+    }
+
+    /// Get a reference to the shared mDNS service.
+    pub fn mdns(&self) -> &Arc<mdns2::MdnsService> {
+        &self.mdns
     }
 
     /// Get a reference to the underlying controller.

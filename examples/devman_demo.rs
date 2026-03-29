@@ -19,7 +19,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{clusters, devman::{DeviceManager, ManagerConfig}};
-use std::time::Duration;
 
 const DEFAULT_DATA_DIR: &str = "./matter-data";
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
@@ -124,33 +123,6 @@ fn resolve_node_id(dm: &DeviceManager, device: &str) -> Result<u64> {
     Ok(dev.node_id)
 }
 
-async fn discover(discriminator: u16) -> Result<(Vec<std::net::IpAddr>, u16)> {
-    let (mdns, mut receiver) = matc::mdns2::MdnsService::new().await?;
-    mdns.add_query("_matterc._udp.local", 0xff, Duration::from_secs(3)).await;
-    while let Some(dns) = receiver.recv().await {
-        if let matc::mdns2::MdnsEvent::ServiceDiscovered {name, records: _, target } = dns {
-            if name != "_matterc._udp.local." {
-                continue;
-            }
-            let info = matc::discover::extract_matter_info(&target, &mdns).await;
-            let info = match info {
-                Ok(info) => info,
-                Err(e) => {
-                    log::debug!("Failed to extract Matter info from {}: {}", target, e);
-                    continue;
-                }
-            };
-            if let Some(ref d) = info.discriminator {
-                if *d == discriminator.to_string() {
-                    println!("Found device: {:?}", info);
-                    mdns.shutdown();
-                    return Ok((info.ips, info.port.unwrap_or(5540)));
-                }
-            }
-        }
-    }
-    anyhow::bail!("No device found with discriminator {}", discriminator)
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -202,63 +174,36 @@ async fn main() -> Result<()> {
         }
         Commands::CommissionWithDiscovery { pairing_code, node_id, name } => {
             let dm = DeviceManager::load(data_dir).await?;
-            let onboarding_info = matc::onboarding::decode_manual_pairing_code(&pairing_code).unwrap();
-            println!("Discovering device with discriminator {}...", onboarding_info.discriminator);
-            let (ips, port) = discover(onboarding_info.discriminator).await?;
-            if ips.is_empty() {
-                println!("No device found with discriminator {}", onboarding_info.discriminator);
-                return Ok(());
-            }
-            println!("Found device at IPs: {:?}", ips);
-            for ip in &ips {
-                println!("Attempting to commission at {}:{}...", ip, port);
-                let address = if ip.is_ipv6() {
-                    format!("[{}]:{}", ip, port)
-                } else {
-                    format!("{}:{}", ip, port)
-                };
+            let connection = dm.commission_with_code(&pairing_code, node_id, &name).await?;
+            println!("Commissioned '{}' (node {})", name, node_id);
 
-                let pin = onboarding_info.passcode;
-                match dm.commission(&address, pin, node_id, &name).await {
-                    Ok(connection) => {
-                        println!("Commissioned '{}' (node {}) at {}", name, node_id, address);
-                        let resptlv = connection
-                            .read_request2(
-                                0,
-                                clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                                clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
-                            )
-                            .await
-                            .unwrap();
-                        let mut endpoints = matc::clusters::codec::descriptor_cluster::decode_parts_list(&resptlv).unwrap();
-                        println!("Endpoints: {:?}", endpoints);
-                        endpoints.push(0);
-                        for ep in endpoints {
-                            let resptlv = connection
-                                .read_request2(
-                                    ep,
-                                    clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
-                                )
-                                .await.unwrap();
-                            let clusters = matc::clusters::codec::descriptor_cluster::decode_server_list(&resptlv).unwrap();
-                            let names = clusters.iter().map(|c| {
-                                match clusters::names::get_cluster_name(*c) {
-                                    Some(name) => name.to_string(),
-                                    None => format!("unknown (0x{:x})", c),
-                                }
-                            }).collect::<Vec<_>>();
-                            println!("Supported clusters on endpoint {:?}: {:?}", ep, names);
-                        }
-                        return Ok(());
+            let resptlv = connection
+                .read_request2(
+                    0,
+                    clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+                )
+                .await?;
+            let mut endpoints = matc::clusters::codec::descriptor_cluster::decode_parts_list(&resptlv)?;
+            println!("Endpoints: {:?}", endpoints);
+            endpoints.push(0);
+            for ep in endpoints {
+                let resptlv = connection
+                    .read_request2(
+                        ep,
+                        clusters::defs::CLUSTER_ID_DESCRIPTOR,
+                        clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
+                    )
+                    .await?;
+                let clusters = matc::clusters::codec::descriptor_cluster::decode_server_list(&resptlv)?;
+                let names = clusters.iter().map(|c| {
+                    match clusters::names::get_cluster_name(*c) {
+                        Some(name) => name.to_string(),
+                        None => format!("unknown (0x{:x})", c),
                     }
-                    Err(e) => {
-                        println!("Failed to commission at {}: {}. Trying next IP if available...", address, e);
-                        tokio::time::sleep(Duration::from_secs(3)).await; // brief pause before next attempt
-                    }
-                }
+                }).collect::<Vec<_>>();
+                println!("Supported clusters on endpoint {:?}: {:?}", ep, names);
             }
-            println!("Failed to commission '{}' (node {}) at any discovered IPs", name, node_id);
         }
         Commands::List => {
             let dm = DeviceManager::load(data_dir).await?;
