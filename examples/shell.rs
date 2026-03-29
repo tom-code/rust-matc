@@ -49,6 +49,7 @@ const COMMANDS: &[&str] = &[
     "connect", "connect-all", "disconnect",
     "on", "off", "toggle", "level", "hue",
     "read", "read-all", "clusters", "parts", "invoke",
+    "subscribe", "subscribe-onoff", "unsubscribe", "subscriptions",
     "rename", "remove",
 ];
 
@@ -56,6 +57,7 @@ const COMMANDS: &[&str] = &[
 const DEVICE_COMMANDS: &[&str] = &[
     "on", "off", "toggle", "level", "hue",
     "read", "read-all", "clusters", "parts", "invoke",
+    "subscribe", "subscribe-onoff", "unsubscribe",
     "connect", "disconnect", "rename", "remove",
 ];
 
@@ -163,15 +165,32 @@ fn parse_args() -> Args {
 
 // ── Shell state ───────────────────────────────────────────────────────────────
 
+struct SubscriptionEntry {
+    endpoint: u16,
+    cluster: u32,
+    attr: u32,
+    /// Human-readable label, e.g. "OnOff/OnOff"
+    label: String,
+}
+
+struct DeviceSubscriptions {
+    /// List of active subscriptions, shared with the background listener.
+    entries: Arc<Mutex<Vec<SubscriptionEntry>>>,
+    /// Background listener task (one per device).
+    handle: tokio::task::JoinHandle<()>,
+}
+
 struct Shell {
     dm: DeviceManager,
     /// node_id → active CASE-authenticated connection
-    connections: HashMap<u64, Connection>,
+    connections: HashMap<u64, Arc<Connection>>,
+    /// node_id → subscription state (entries + listener task)
+    subscriptions: HashMap<u64, DeviceSubscriptions>,
 }
 
 impl Shell {
     fn new(dm: DeviceManager) -> Self {
-        Self { dm, connections: HashMap::new() }
+        Self { dm, connections: HashMap::new(), subscriptions: HashMap::new() }
     }
 
     /// Resolve "name or node_id" string → node_id.
@@ -219,7 +238,7 @@ impl Shell {
         let _ = try1;
         self.connections.remove(&node_id);
         println!("  reconnecting to {} (node {})…", device, node_id);
-        let conn = self.dm.connect(node_id).await?;
+        let conn = Arc::new(self.dm.connect(node_id).await?);
         self.connections.insert(node_id, conn);
         let conn = self.connections.get(&node_id).unwrap();
         conn.invoke_request(endpoint, cluster, command, payload).await?;
@@ -242,14 +261,11 @@ impl Shell {
             Err(anyhow::anyhow!("no connection"))
         };
 
-        match try1 {
-            Ok(v) => return Ok(v),
-            Err(_) => {}
-        }
+        if let Ok(v) = try1 { return Ok(v) }
 
         self.connections.remove(&node_id);
         println!("  reconnecting to {} (node {})…", device, node_id);
-        let conn = self.dm.connect(node_id).await?;
+        let conn = Arc::new(self.dm.connect(node_id).await?);
         self.connections.insert(node_id, conn);
         let conn = self.connections.get(&node_id).unwrap();
         conn.read_request2(endpoint, cluster, attr).await
@@ -352,6 +368,13 @@ Matter Interactive Shell — available commands:
     clusters <device> [endpoint]          List supported clusters on endpoint (default 0)
     parts <device>                        List endpoints (descriptor parts list)
 
+  Subscriptions:
+    subscribe <device> <endpoint> <cluster> <attr>
+                                          Subscribe to any attribute change
+    subscribe-onoff <device> [endpoint]   Shorthand: subscribe to OnOff (default ep 1)
+    unsubscribe <device>                  Cancel all subscriptions on a device
+    subscriptions                         List all active subscriptions
+
   Generic invoke:
     invoke <device> <endpoint> <cluster> <command> [hex_payload]
                                           Invoke any command with optional TLV payload
@@ -406,7 +429,7 @@ async fn cmd_commission(shell: &mut Shell, args: &[String]) -> Result<()> {
     let pin: u32 = args[2].parse()?;
     let name = &args[3];
     println!("Commissioning '{}' (node {}) at {} …", name, node_id, addr);
-    let conn = shell.dm.commission(addr, pin, node_id, name).await?;
+    let conn = Arc::new(shell.dm.commission(addr, pin, node_id, name).await?);
     println!("Commissioned '{}' (node {}).", name, node_id);
 
     // Show supported clusters on endpoint 0
@@ -437,7 +460,7 @@ async fn cmd_commission_discover(shell: &mut Shell, args: &[String]) -> Result<(
     let node_id = parse_u64(&args[1])?;
     let name = &args[2];
     println!("Discovering and commissioning '{}' (node {}) …", name, node_id);
-    let conn = shell.dm.commission_with_code(code, node_id, name).await?;
+    let conn = Arc::new(shell.dm.commission_with_code(code, node_id, name).await?);
     println!("Commissioned '{}' (node {}).", name, node_id);
     shell.connections.insert(node_id, conn);
     Ok(())
@@ -486,7 +509,7 @@ async fn cmd_connect(shell: &mut Shell, args: &[String]) -> Result<()> {
         return Ok(());
     }
     println!("Connecting to '{}' (node {}) …", device, node_id);
-    let conn = shell.dm.connect(node_id).await?;
+    let conn = Arc::new(shell.dm.connect(node_id).await?);
     shell.connections.insert(node_id, conn);
     println!("Connected.");
     Ok(())
@@ -508,7 +531,7 @@ async fn cmd_connect_all(shell: &mut Shell) -> Result<()> {
         let _ = std::io::stdout().flush();
         match shell.dm.connect(node_id).await {
             Ok(conn) => {
-                shell.connections.insert(node_id, conn);
+                shell.connections.insert(node_id, Arc::new(conn));
                 println!("OK");
             }
             Err(e) => println!("FAILED: {}", e),
@@ -631,7 +654,7 @@ async fn cmd_read_all(shell: &mut Shell, args: &[String]) -> Result<()> {
     // Ensure connection
     if !shell.connections.contains_key(&node_id) {
         println!("  connecting to '{}' …", device);
-        let conn = shell.dm.connect(node_id).await?;
+        let conn = Arc::new(shell.dm.connect(node_id).await?);
         shell.connections.insert(node_id, conn);
     }
 
@@ -767,6 +790,193 @@ async fn cmd_invoke(shell: &mut Shell, args: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Build a human-readable label for a cluster/attribute pair.
+fn attr_label(cluster: u32, attr: u32) -> String {
+    let cluster_name = matc::clusters::names::get_cluster_name(cluster).unwrap_or("?");
+    let attr_name = matc::clusters::codec::get_attribute_list(cluster)
+        .into_iter()
+        .find(|(id, _)| *id == attr)
+        .map(|(_, name)| name)
+        .unwrap_or("?");
+    format!("{}/{}", cluster_name, attr_name)
+}
+
+/// Decode all (endpoint, cluster, attr, value) tuples from a ReportData TLV.
+/// Iterates the full AttributeReports list so batched reports are not missed.
+fn decode_attr_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, matc::tlv::TlvItemValue)> {
+    let mut out = Vec::new();
+    // AttributeReports = tag 1, value = List of AttributeReportIB
+    if let Some(attr_reports) = tlv.get_item(&[1]) {
+        if let matc::tlv::TlvItemValue::List(reports) = &attr_reports.value {
+            for report_ib in reports {
+                // Within each AttributeReportIB, navigate AttributeDataIB (tag 1):
+                //   tag 1 = AttributePathIB → tag 2=endpoint, 3=cluster, 4=attr
+                //   tag 2 = Data value
+                let ep  = report_ib.get_u16(&[1, 1, 2]);
+                let cl  = report_ib.get_u32(&[1, 1, 3]);
+                let att = report_ib.get_u32(&[1, 1, 4]);
+                let val = report_ib.get(&[1, 2]).cloned();
+                if let (Some(ep), Some(cl), Some(att), Some(val)) = (ep, cl, att, val) {
+                    out.push((ep, cl, att, val));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Core subscribe logic: subscribe to one attribute, print priming value,
+/// start the background listener if not already running, add entry to list.
+async fn do_subscribe(
+    shell: &mut Shell,
+    device: &str,
+    endpoint: u16,
+    cluster: u32,
+    attr: u32,
+) -> Result<()> {
+    let node_id = shell.resolve_node_id(device)?;
+
+    // Ensure connection
+    if !shell.connections.contains_key(&node_id) {
+        println!("  connecting to '{}' …", device);
+        let conn = Arc::new(shell.dm.connect(node_id).await?);
+        shell.connections.insert(node_id, conn);
+    }
+    let conn = shell.connections.get(&node_id).unwrap().clone();
+
+    // Keep existing subscriptions alive when adding a second one on the same connection.
+    let keep = shell.subscriptions.contains_key(&node_id);
+    let res = conn.im_subscribe_request_attr(endpoint, cluster, attr, keep).await?;
+
+    if res.protocol_header.opcode != matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
+        println!("unexpected subscribe response opcode 0x{:x}", res.protocol_header.opcode);
+        return Ok(());
+    }
+
+    // Print priming report (current state)
+    let label = attr_label(cluster, attr);
+    let priming = decode_attr_reports(&res.tlv);
+    if let Some((_, _, _, val)) = priming.first() {
+        let json = matc::clusters::codec::decode_attribute_json(cluster, attr, val);
+        println!("[{}] ep{} {} = {} (current)", device, endpoint, label, json);
+    } else {
+        println!("[{}] ep{} {} subscribed (no initial value)", device, endpoint, label);
+    }
+
+    // Ack priming report
+    conn.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await?;
+
+    // Do NOT wait for SubscribeResponse here: if a listener is already running it holds
+    // the recv_event lock and we would deadlock. The listener receives and ignores it.
+
+    // If first subscription on this device, start the background listener
+    if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
+        let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
+        let entries_clone = entries.clone();
+        let conn_clone = conn.clone();
+        let device_name = device.to_string();
+        let handle = tokio::spawn(async move {
+            loop {
+                let ev = match conn_clone.recv_event().await {
+                    Some(e) => e,
+                    None => break,
+                };
+                match ev.protocol_header.opcode {
+                    matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
+                        for (rep_ep, rep_cl, rep_att, val) in decode_attr_reports(&ev.tlv) {
+                            let lbl = {
+                                let entries = entries_clone.lock().unwrap();
+                                entries.iter()
+                                    .find(|e| e.endpoint == rep_ep && e.cluster == rep_cl && e.attr == rep_att)
+                                    .map(|e| e.label.clone())
+                                    .unwrap_or_else(|| attr_label(rep_cl, rep_att))
+                            };
+                            let json = matc::clusters::codec::decode_attribute_json(rep_cl, rep_att, &val);
+                            println!("\n[{}] ep{} {} = {}", device_name, rep_ep, lbl, json);
+                        }
+                        // (empty list = keepalive — silent)
+                        let _ = conn_clone.im_status_response(ev.protocol_header.exchange_id, 2, ev.message_header.message_counter).await;
+                    }
+                    matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP => {
+                        // periodic heartbeat — ignore
+                    }
+                    _ => {
+                        log::debug!("[{}] subscription: unhandled opcode 0x{:x}", device_name, ev.protocol_header.opcode);
+                    }
+                }
+            }
+            log::debug!("[{}] subscription listener exited", device_name);
+        });
+        e.insert(DeviceSubscriptions { entries, handle });
+    }
+
+    // Register the new entry
+    let entry = SubscriptionEntry { endpoint, cluster, attr, label: label.clone() };
+    shell.subscriptions.get(&node_id).unwrap().entries.lock().unwrap().push(entry);
+
+    println!("Subscribed: [{}] ep{} {}. Use 'unsubscribe {}' to stop.", device, endpoint, label, device);
+    Ok(())
+}
+
+async fn cmd_subscribe(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.len() < 4 {
+        println!("usage: subscribe <device> <endpoint> <cluster> <attr>");
+        return Ok(());
+    }
+    let device = args[0].clone();
+    let endpoint = parse_u16(&args[1])?;
+    let cluster = parse_u32(&args[2])?;
+    let attr = parse_u32(&args[3])?;
+    do_subscribe(shell, &device, endpoint, cluster, attr).await
+}
+
+async fn cmd_subscribe_onoff(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.is_empty() {
+        println!("usage: subscribe-onoff <device> [endpoint]");
+        return Ok(());
+    }
+    let device = args[0].clone();
+    let endpoint: u16 = if args.len() > 1 { parse_u16(&args[1])? } else { 1 };
+    do_subscribe(shell, &device, endpoint, CLUSTER_ID_ON_OFF, CLUSTER_ON_OFF_ATTR_ID_ONOFF).await
+}
+
+async fn cmd_unsubscribe(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.is_empty() {
+        println!("usage: unsubscribe <device>");
+        return Ok(());
+    }
+    let node_id = shell.resolve_node_id(&args[0])?;
+    if let Some(ds) = shell.subscriptions.remove(&node_id) {
+        ds.handle.abort();
+        // Tell the device to cancel all subscriptions on this session.
+        if let Some(conn) = shell.connections.get(&node_id) {
+            let _ = conn.im_unsubscribe_all().await;
+        }
+        println!("All subscriptions cancelled for node {}.", node_id);
+    } else {
+        println!("No active subscriptions for node {}.", node_id);
+    }
+    Ok(())
+}
+
+fn cmd_subscriptions(shell: &Shell) -> Result<()> {
+    if shell.subscriptions.is_empty() {
+        println!("No active subscriptions.");
+        return Ok(());
+    }
+    for (node_id, ds) in &shell.subscriptions {
+        let name = shell.dm.get_device(*node_id)
+            .ok().flatten()
+            .map(|d| d.name)
+            .unwrap_or_else(|| node_id.to_string());
+        let entries = ds.entries.lock().unwrap();
+        for e in entries.iter() {
+            println!("  {} (node {}) ep{} {}", name, node_id, e.endpoint, e.label);
+        }
+    }
+    Ok(())
+}
+
 fn cmd_rename(shell: &Shell, args: &[String]) -> Result<()> {
     if args.len() < 2 { println!("usage: rename <device> <new_name>"); return Ok(()); }
     let node_id = shell.resolve_node_id(&args[0])?;
@@ -797,7 +1007,7 @@ async fn dispatch(shell: &mut Shell, tokens: &[String]) -> Result<bool> {
         "help" | "?" => print_help(),
         "quit" | "exit" | "q" => return Ok(false),
 
-        "init" => cmd_init(args, &shell.dm.base_path().to_string()).await?,
+        "init" => cmd_init(args, shell.dm.base_path()).await?,
 
         "commission" => cmd_commission(shell, args).await?,
         "commission-discover" => cmd_commission_discover(shell, args).await?,
@@ -824,6 +1034,11 @@ async fn dispatch(shell: &mut Shell, tokens: &[String]) -> Result<bool> {
         "parts" => cmd_parts(shell, args).await?,
 
         "invoke" => cmd_invoke(shell, args).await?,
+
+        "subscribe" => cmd_subscribe(shell, args).await?,
+        "subscribe-onoff" => cmd_subscribe_onoff(shell, args).await?,
+        "unsubscribe" => cmd_unsubscribe(shell, args).await?,
+        "subscriptions" => cmd_subscriptions(shell)?,
 
         other => {
             println!("Unknown command: '{}'. Type 'help' for a list of commands.", other);

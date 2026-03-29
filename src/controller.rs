@@ -190,6 +190,34 @@ impl Connection {
         self.active.request(exchange, &msg).await
     }
 
+    /// Subscribe to attribute changes. Returns the initial ReportData message.
+    /// Set `keep_subscriptions = true` when adding a second subscription on the same
+    /// connection so the device does not cancel the first one.
+    pub async fn im_subscribe_request_attr(
+        &self,
+        endpoint: u16,
+        cluster: u32,
+        attr: u32,
+        keep_subscriptions: bool,
+    ) -> Result<Message> {
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "im_subscribe_request_attr exch:{} endpoint:{} cluster:{} attr:{} keep:{}",
+            exchange, endpoint, cluster, attr, keep_subscriptions
+        );
+        let msg = messages::im_subscribe_request_attr(endpoint, cluster, attr, exchange, keep_subscriptions)?;
+        self.active.request(exchange, &msg).await
+    }
+
+    /// Cancel all subscriptions on this session by sending a SubscribeRequest with
+    /// `KeepSubscriptions = false` and no paths. The device drops all prior subscriptions.
+    pub async fn im_unsubscribe_all(&self) -> Result<Message> {
+        let exchange: u16 = rand::random();
+        log::debug!("im_unsubscribe_all exch:{}", exchange);
+        let msg = messages::im_unsubscribe_all(exchange)?;
+        self.active.request(exchange, &msg).await
+    }
+
     pub async fn im_status_response(
         &self,
         exchange: u16,

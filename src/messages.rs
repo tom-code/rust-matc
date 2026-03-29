@@ -625,6 +625,65 @@ pub fn im_subscribe_request(endpoint: u16, cluster: u32, exchange: u16, event: u
     Ok(tlv.data)
 }
 
+/// Build a SubscribeRequest for an attribute path (AttributeRequests, tag 3).
+/// `keep_subscriptions`: if true the device keeps existing subscriptions alive;
+/// if false the device cancels all prior subscriptions before creating this one.
+pub fn im_subscribe_request_attr(endpoint: u16, cluster: u32, attr: u32, exchange: u16, keep_subscriptions: bool) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 5,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: 0,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_bool(0, keep_subscriptions)?; // KeepSubscriptions
+    tlv.write_uint16(1, 10)?;       // MinIntervalFloor
+    tlv.write_uint16(2, 30)?;       // MaxIntervalCeiling
+    tlv.write_array(3)?;            // AttributeRequests
+
+    tlv.write_anon_list()?;
+    tlv.write_uint16(2, endpoint)?;
+    tlv.write_uint32(3, cluster)?;
+    tlv.write_uint32(4, attr)?;
+
+    tlv.write_struct_end()?;        // end AttributePathIB
+    tlv.write_struct_end()?;        // end AttributeRequests array
+
+    tlv.write_bool(7, false)?;      // FabricFiltered
+    tlv.write_uint8(0xff, 10)?;     // InteractionModelRevision
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
+/// Build a SubscribeRequest with `KeepSubscriptions = false` and no attribute/event paths.
+/// Sending this causes the device to cancel all existing subscriptions for this session.
+pub fn im_unsubscribe_all(exchange: u16) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 5,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: 0,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_bool(0, false)?;       // KeepSubscriptions = false → cancel all
+    tlv.write_uint16(1, 0)?;         // MinIntervalFloor
+    tlv.write_uint16(2, 0)?;         // MaxIntervalCeiling
+    tlv.write_array(3)?;             // AttributeRequests — empty
+    tlv.write_struct_end()?;
+    tlv.write_bool(7, false)?;       // FabricFiltered
+    tlv.write_uint8(0xff, 10)?;      // InteractionModelRevision
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
 pub fn im_status_response(exchange: u16, flags: u8, ack: u32) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: 4 | flags,
