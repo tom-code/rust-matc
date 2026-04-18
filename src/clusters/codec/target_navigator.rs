@@ -161,6 +161,26 @@ pub fn decode_navigate_target_response(inp: &tlv::TlvItemValue) -> anyhow::Resul
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `NavigateTarget` command on cluster `Target Navigator`.
+pub async fn navigate_target(conn: &crate::controller::Connection, endpoint: u16, target: u8, data: String) -> anyhow::Result<NavigateTargetResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TARGET_NAVIGATOR, crate::clusters::defs::CLUSTER_TARGET_NAVIGATOR_CMD_ID_NAVIGATETARGET, &encode_navigate_target(target, data)?).await?;
+    decode_navigate_target_response(&tlv)
+}
+
+/// Read `TargetList` attribute from cluster `Target Navigator`.
+pub async fn read_target_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TargetInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TARGET_NAVIGATOR, crate::clusters::defs::CLUSTER_TARGET_NAVIGATOR_ATTR_ID_TARGETLIST).await?;
+    decode_target_list(&tlv)
+}
+
+/// Read `CurrentTarget` attribute from cluster `Target Navigator`.
+pub async fn read_current_target(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TARGET_NAVIGATOR, crate::clusters::defs::CLUSTER_TARGET_NAVIGATOR_ATTR_ID_CURRENTTARGET).await?;
+    decode_current_target(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct TargetUpdatedEvent {
     pub target_list: Option<Vec<TargetInfo>>,

@@ -1,4 +1,4 @@
-use matc::{clusters, devman::{DeviceManager, ManagerConfig}};
+use matc::{clusters::codec::descriptor_cluster, devman::{DeviceManager, ManagerConfig}};
 use anyhow::Result;
 
 
@@ -35,20 +35,16 @@ async fn main() -> Result<()> {
     }?;
 
     let conn = devman.commission("192.168.1.21:5540", 123456, NODE_ID, NAME).await?;
-    let res = conn.read_request2(0, clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST).await?;
-    let endpoints = matc::clusters::codec::descriptor_cluster::decode_parts_list(&res).unwrap();
+    let endpoints = descriptor_cluster::read_parts_list(&conn, 0).await?;
     println!("Endpoints: {:?}", endpoints);
 
     // drop connection - just to demonstrate how we can connect to the same device after it is commissioned
     drop(conn);
     tokio::time::sleep(std::time::Duration::from_secs(1)).await; // wait for the connection to be fully cleaned up
 
-    println!("Reconnecting to device by name...");   
+    println!("Reconnecting to device by name...");
     let conn = devman.connect_by_name(NAME).await?;
-    let res = conn.read_request2(0, clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST).await?;
-    let endpoints = matc::clusters::codec::descriptor_cluster::decode_parts_list(&res).unwrap();
+    let endpoints = descriptor_cluster::read_parts_list(&conn, 0).await?;
     println!("Endpoints : {:?}", endpoints);
 
     Ok(())

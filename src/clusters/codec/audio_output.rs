@@ -154,3 +154,29 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SelectOutput` command on cluster `Audio Output`.
+pub async fn select_output(conn: &crate::controller::Connection, endpoint: u16, index: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_AUDIO_OUTPUT, crate::clusters::defs::CLUSTER_AUDIO_OUTPUT_CMD_ID_SELECTOUTPUT, &encode_select_output(index)?).await?;
+    Ok(())
+}
+
+/// Invoke `RenameOutput` command on cluster `Audio Output`.
+pub async fn rename_output(conn: &crate::controller::Connection, endpoint: u16, index: u8, name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_AUDIO_OUTPUT, crate::clusters::defs::CLUSTER_AUDIO_OUTPUT_CMD_ID_RENAMEOUTPUT, &encode_rename_output(index, name)?).await?;
+    Ok(())
+}
+
+/// Read `OutputList` attribute from cluster `Audio Output`.
+pub async fn read_output_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<OutputInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_AUDIO_OUTPUT, crate::clusters::defs::CLUSTER_AUDIO_OUTPUT_ATTR_ID_OUTPUTLIST).await?;
+    decode_output_list(&tlv)
+}
+
+/// Read `CurrentOutput` attribute from cluster `Audio Output`.
+pub async fn read_current_output(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_AUDIO_OUTPUT, crate::clusters::defs::CLUSTER_AUDIO_OUTPUT_ATTR_ID_CURRENTOUTPUT).await?;
+    decode_current_output(&tlv)
+}
+

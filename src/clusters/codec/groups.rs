@@ -215,3 +215,47 @@ pub fn decode_remove_group_response(inp: &tlv::TlvItemValue) -> anyhow::Result<R
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AddGroup` command on cluster `Groups`.
+pub async fn add_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, group_name: String) -> anyhow::Result<AddGroupResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_ADDGROUP, &encode_add_group(group_id, group_name)?).await?;
+    decode_add_group_response(&tlv)
+}
+
+/// Invoke `ViewGroup` command on cluster `Groups`.
+pub async fn view_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<ViewGroupResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_VIEWGROUP, &encode_view_group(group_id)?).await?;
+    decode_view_group_response(&tlv)
+}
+
+/// Invoke `GetGroupMembership` command on cluster `Groups`.
+pub async fn get_group_membership(conn: &crate::controller::Connection, endpoint: u16, group_list: Vec<u8>) -> anyhow::Result<GetGroupMembershipResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_GETGROUPMEMBERSHIP, &encode_get_group_membership(group_list)?).await?;
+    decode_get_group_membership_response(&tlv)
+}
+
+/// Invoke `RemoveGroup` command on cluster `Groups`.
+pub async fn remove_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<RemoveGroupResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_REMOVEGROUP, &encode_remove_group(group_id)?).await?;
+    decode_remove_group_response(&tlv)
+}
+
+/// Invoke `RemoveAllGroups` command on cluster `Groups`.
+pub async fn remove_all_groups(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_REMOVEALLGROUPS, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `AddGroupIfIdentifying` command on cluster `Groups`.
+pub async fn add_group_if_identifying(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, group_name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_ADDGROUPIFIDENTIFYING, &encode_add_group_if_identifying(group_id, group_name)?).await?;
+    Ok(())
+}
+
+/// Read `NameSupport` attribute from cluster `Groups`.
+pub async fn read_name_support(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<NameSupport> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_ATTR_ID_NAMESUPPORT).await?;
+    decode_name_support(&tlv)
+}
+

@@ -74,3 +74,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `SoilMoistureMeasurementLimits` attribute from cluster `Soil Measurement`.
+pub async fn read_soil_moisture_measurement_limits(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SOIL_MEASUREMENT, crate::clusters::defs::CLUSTER_SOIL_MEASUREMENT_ATTR_ID_SOILMOISTUREMEASUREMENTLIMITS).await?;
+    decode_soil_moisture_measurement_limits(&tlv)
+}
+
+/// Read `SoilMoistureMeasuredValue` attribute from cluster `Soil Measurement`.
+pub async fn read_soil_moisture_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SOIL_MEASUREMENT, crate::clusters::defs::CLUSTER_SOIL_MEASUREMENT_ATTR_ID_SOILMOISTUREMEASUREDVALUE).await?;
+    decode_soil_moisture_measured_value(&tlv)
+}
+

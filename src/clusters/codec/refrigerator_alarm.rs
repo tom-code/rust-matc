@@ -18,3 +18,11 @@ pub mod alarm {
 
 // Command encoders
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ModifyEnabledAlarms` command on cluster `Refrigerator Alarm`.
+pub async fn modify_enabled_alarms(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_REFRIGERATOR_ALARM, crate::clusters::defs::CLUSTER_REFRIGERATOR_ALARM_CMD_ID_MODIFYENABLEDALARMS, &[]).await?;
+    Ok(())
+}
+

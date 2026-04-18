@@ -166,3 +166,41 @@ pub fn decode_operational_dataset_response(inp: &tlv::TlvItemValue) -> anyhow::R
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AddNetwork` command on cluster `Thread Network Directory`.
+pub async fn add_network(conn: &crate::controller::Connection, endpoint: u16, operational_dataset: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIRECTORY, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIRECTORY_CMD_ID_ADDNETWORK, &encode_add_network(operational_dataset)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveNetwork` command on cluster `Thread Network Directory`.
+pub async fn remove_network(conn: &crate::controller::Connection, endpoint: u16, extended_pan_id: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIRECTORY, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIRECTORY_CMD_ID_REMOVENETWORK, &encode_remove_network(extended_pan_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetOperationalDataset` command on cluster `Thread Network Directory`.
+pub async fn get_operational_dataset(conn: &crate::controller::Connection, endpoint: u16, extended_pan_id: Vec<u8>) -> anyhow::Result<OperationalDatasetResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIRECTORY, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIRECTORY_CMD_ID_GETOPERATIONALDATASET, &encode_get_operational_dataset(extended_pan_id)?).await?;
+    decode_operational_dataset_response(&tlv)
+}
+
+/// Read `PreferredExtendedPanID` attribute from cluster `Thread Network Directory`.
+pub async fn read_preferred_extended_pan_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIRECTORY, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIRECTORY_ATTR_ID_PREFERREDEXTENDEDPANID).await?;
+    decode_preferred_extended_pan_id(&tlv)
+}
+
+/// Read `ThreadNetworks` attribute from cluster `Thread Network Directory`.
+pub async fn read_thread_networks(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ThreadNetwork>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIRECTORY, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIRECTORY_ATTR_ID_THREADNETWORKS).await?;
+    decode_thread_networks(&tlv)
+}
+
+/// Read `ThreadNetworkTableSize` attribute from cluster `Thread Network Directory`.
+pub async fn read_thread_network_table_size(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIRECTORY, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIRECTORY_ATTR_ID_THREADNETWORKTABLESIZE).await?;
+    decode_thread_network_table_size(&tlv)
+}
+

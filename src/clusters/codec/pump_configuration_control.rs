@@ -535,3 +535,149 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `MaxPressure` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_pressure(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXPRESSURE).await?;
+    decode_max_pressure(&tlv)
+}
+
+/// Read `MaxSpeed` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXSPEED).await?;
+    decode_max_speed(&tlv)
+}
+
+/// Read `MaxFlow` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_flow(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXFLOW).await?;
+    decode_max_flow(&tlv)
+}
+
+/// Read `MinConstPressure` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_min_const_pressure(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MINCONSTPRESSURE).await?;
+    decode_min_const_pressure(&tlv)
+}
+
+/// Read `MaxConstPressure` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_const_pressure(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXCONSTPRESSURE).await?;
+    decode_max_const_pressure(&tlv)
+}
+
+/// Read `MinCompPressure` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_min_comp_pressure(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MINCOMPPRESSURE).await?;
+    decode_min_comp_pressure(&tlv)
+}
+
+/// Read `MaxCompPressure` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_comp_pressure(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXCOMPPRESSURE).await?;
+    decode_max_comp_pressure(&tlv)
+}
+
+/// Read `MinConstSpeed` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_min_const_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MINCONSTSPEED).await?;
+    decode_min_const_speed(&tlv)
+}
+
+/// Read `MaxConstSpeed` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_const_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXCONSTSPEED).await?;
+    decode_max_const_speed(&tlv)
+}
+
+/// Read `MinConstFlow` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_min_const_flow(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MINCONSTFLOW).await?;
+    decode_min_const_flow(&tlv)
+}
+
+/// Read `MaxConstFlow` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_const_flow(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXCONSTFLOW).await?;
+    decode_max_const_flow(&tlv)
+}
+
+/// Read `MinConstTemp` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_min_const_temp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MINCONSTTEMP).await?;
+    decode_min_const_temp(&tlv)
+}
+
+/// Read `MaxConstTemp` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_max_const_temp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_MAXCONSTTEMP).await?;
+    decode_max_const_temp(&tlv)
+}
+
+/// Read `PumpStatus` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_pump_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PumpStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_PUMPSTATUS).await?;
+    decode_pump_status(&tlv)
+}
+
+/// Read `EffectiveOperationMode` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_effective_operation_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_EFFECTIVEOPERATIONMODE).await?;
+    decode_effective_operation_mode(&tlv)
+}
+
+/// Read `EffectiveControlMode` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_effective_control_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ControlMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_EFFECTIVECONTROLMODE).await?;
+    decode_effective_control_mode(&tlv)
+}
+
+/// Read `Capacity` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_capacity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_CAPACITY).await?;
+    decode_capacity(&tlv)
+}
+
+/// Read `Speed` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_SPEED).await?;
+    decode_speed(&tlv)
+}
+
+/// Read `LifetimeRunningHours` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_lifetime_running_hours(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_LIFETIMERUNNINGHOURS).await?;
+    decode_lifetime_running_hours(&tlv)
+}
+
+/// Read `Power` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_POWER).await?;
+    decode_power(&tlv)
+}
+
+/// Read `LifetimeEnergyConsumed` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_lifetime_energy_consumed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_LIFETIMEENERGYCONSUMED).await?;
+    decode_lifetime_energy_consumed(&tlv)
+}
+
+/// Read `OperationMode` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_operation_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_OPERATIONMODE).await?;
+    decode_operation_mode(&tlv)
+}
+
+/// Read `ControlMode` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_control_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ControlMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_CONTROLMODE).await?;
+    decode_control_mode(&tlv)
+}
+
+/// Read `AlarmMask` attribute from cluster `Pump Configuration and Control`.
+pub async fn read_alarm_mask(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUMP_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_PUMP_CONFIGURATION_AND_CONTROL_ATTR_ID_ALARMMASK).await?;
+    decode_alarm_mask(&tlv)
+}
+

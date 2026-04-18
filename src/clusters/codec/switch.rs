@@ -90,6 +90,26 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `NumberOfPositions` attribute from cluster `Switch`.
+pub async fn read_number_of_positions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SWITCH, crate::clusters::defs::CLUSTER_SWITCH_ATTR_ID_NUMBEROFPOSITIONS).await?;
+    decode_number_of_positions(&tlv)
+}
+
+/// Read `CurrentPosition` attribute from cluster `Switch`.
+pub async fn read_current_position(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SWITCH, crate::clusters::defs::CLUSTER_SWITCH_ATTR_ID_CURRENTPOSITION).await?;
+    decode_current_position(&tlv)
+}
+
+/// Read `MultiPressMax` attribute from cluster `Switch`.
+pub async fn read_multi_press_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SWITCH, crate::clusters::defs::CLUSTER_SWITCH_ATTR_ID_MULTIPRESSMAX).await?;
+    decode_multi_press_max(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SwitchLatchedEvent {
     pub new_position: Option<u8>,

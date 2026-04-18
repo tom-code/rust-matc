@@ -106,3 +106,11 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `AirQuality` attribute from cluster `Air Quality`.
+pub async fn read_air_quality(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AirQuality> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_AIR_QUALITY, crate::clusters::defs::CLUSTER_AIR_QUALITY_ATTR_ID_AIRQUALITY).await?;
+    decode_air_quality(&tlv)
+}
+

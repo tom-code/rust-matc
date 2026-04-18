@@ -197,3 +197,23 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `TemperatureDisplayMode` attribute from cluster `Thermostat User Interface Configuration`.
+pub async fn read_temperature_display_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TemperatureDisplayMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT_USER_INTERFACE_CONFIGURATION, crate::clusters::defs::CLUSTER_THERMOSTAT_USER_INTERFACE_CONFIGURATION_ATTR_ID_TEMPERATUREDISPLAYMODE).await?;
+    decode_temperature_display_mode(&tlv)
+}
+
+/// Read `KeypadLockout` attribute from cluster `Thermostat User Interface Configuration`.
+pub async fn read_keypad_lockout(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<KeypadLockout> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT_USER_INTERFACE_CONFIGURATION, crate::clusters::defs::CLUSTER_THERMOSTAT_USER_INTERFACE_CONFIGURATION_ATTR_ID_KEYPADLOCKOUT).await?;
+    decode_keypad_lockout(&tlv)
+}
+
+/// Read `ScheduleProgrammingVisibility` attribute from cluster `Thermostat User Interface Configuration`.
+pub async fn read_schedule_programming_visibility(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ScheduleProgrammingVisibility> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT_USER_INTERFACE_CONFIGURATION, crate::clusters::defs::CLUSTER_THERMOSTAT_USER_INTERFACE_CONFIGURATION_ATTR_ID_SCHEDULEPROGRAMMINGVISIBILITY).await?;
+    decode_schedule_programming_visibility(&tlv)
+}
+

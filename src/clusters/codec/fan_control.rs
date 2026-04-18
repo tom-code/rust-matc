@@ -427,3 +427,83 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Step` command on cluster `Fan Control`.
+pub async fn step(conn: &crate::controller::Connection, endpoint: u16, direction: StepDirection, wrap: bool, lowest_off: bool) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_CMD_ID_STEP, &encode_step(direction, wrap, lowest_off)?).await?;
+    Ok(())
+}
+
+/// Read `FanMode` attribute from cluster `Fan Control`.
+pub async fn read_fan_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<FanMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_FANMODE).await?;
+    decode_fan_mode(&tlv)
+}
+
+/// Read `FanModeSequence` attribute from cluster `Fan Control`.
+pub async fn read_fan_mode_sequence(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<FanModeSequence> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_FANMODESEQUENCE).await?;
+    decode_fan_mode_sequence(&tlv)
+}
+
+/// Read `PercentSetting` attribute from cluster `Fan Control`.
+pub async fn read_percent_setting(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_PERCENTSETTING).await?;
+    decode_percent_setting(&tlv)
+}
+
+/// Read `PercentCurrent` attribute from cluster `Fan Control`.
+pub async fn read_percent_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_PERCENTCURRENT).await?;
+    decode_percent_current(&tlv)
+}
+
+/// Read `SpeedMax` attribute from cluster `Fan Control`.
+pub async fn read_speed_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_SPEEDMAX).await?;
+    decode_speed_max(&tlv)
+}
+
+/// Read `SpeedSetting` attribute from cluster `Fan Control`.
+pub async fn read_speed_setting(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_SPEEDSETTING).await?;
+    decode_speed_setting(&tlv)
+}
+
+/// Read `SpeedCurrent` attribute from cluster `Fan Control`.
+pub async fn read_speed_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_SPEEDCURRENT).await?;
+    decode_speed_current(&tlv)
+}
+
+/// Read `RockSupport` attribute from cluster `Fan Control`.
+pub async fn read_rock_support(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Rock> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_ROCKSUPPORT).await?;
+    decode_rock_support(&tlv)
+}
+
+/// Read `RockSetting` attribute from cluster `Fan Control`.
+pub async fn read_rock_setting(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Rock> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_ROCKSETTING).await?;
+    decode_rock_setting(&tlv)
+}
+
+/// Read `WindSupport` attribute from cluster `Fan Control`.
+pub async fn read_wind_support(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Wind> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_WINDSUPPORT).await?;
+    decode_wind_support(&tlv)
+}
+
+/// Read `WindSetting` attribute from cluster `Fan Control`.
+pub async fn read_wind_setting(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Wind> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_WINDSETTING).await?;
+    decode_wind_setting(&tlv)
+}
+
+/// Read `AirflowDirection` attribute from cluster `Fan Control`.
+pub async fn read_airflow_direction(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AirflowDirection> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_ATTR_ID_AIRFLOWDIRECTION).await?;
+    decode_airflow_direction(&tlv)
+}
+

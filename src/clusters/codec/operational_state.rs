@@ -280,6 +280,68 @@ pub fn decode_operational_command_response(inp: &tlv::TlvItemValue) -> anyhow::R
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Pause` command on cluster `Operational State`.
+pub async fn pause(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationalCommandResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_CMD_ID_PAUSE, &[]).await?;
+    decode_operational_command_response(&tlv)
+}
+
+/// Invoke `Stop` command on cluster `Operational State`.
+pub async fn stop(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationalCommandResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_CMD_ID_STOP, &[]).await?;
+    decode_operational_command_response(&tlv)
+}
+
+/// Invoke `Start` command on cluster `Operational State`.
+pub async fn start(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationalCommandResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_CMD_ID_START, &[]).await?;
+    decode_operational_command_response(&tlv)
+}
+
+/// Invoke `Resume` command on cluster `Operational State`.
+pub async fn resume(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationalCommandResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_CMD_ID_RESUME, &[]).await?;
+    decode_operational_command_response(&tlv)
+}
+
+/// Read `PhaseList` attribute from cluster `Operational State`.
+pub async fn read_phase_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_ATTR_ID_PHASELIST).await?;
+    decode_phase_list(&tlv)
+}
+
+/// Read `CurrentPhase` attribute from cluster `Operational State`.
+pub async fn read_current_phase(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_ATTR_ID_CURRENTPHASE).await?;
+    decode_current_phase(&tlv)
+}
+
+/// Read `CountdownTime` attribute from cluster `Operational State`.
+pub async fn read_countdown_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_ATTR_ID_COUNTDOWNTIME).await?;
+    decode_countdown_time(&tlv)
+}
+
+/// Read `OperationalStateList` attribute from cluster `Operational State`.
+pub async fn read_operational_state_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<OperationalState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_ATTR_ID_OPERATIONALSTATELIST).await?;
+    decode_operational_state_list(&tlv)
+}
+
+/// Read `OperationalState` attribute from cluster `Operational State`.
+pub async fn read_operational_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationalStateEnum> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_ATTR_ID_OPERATIONALSTATE).await?;
+    decode_operational_state(&tlv)
+}
+
+/// Read `OperationalError` attribute from cluster `Operational State`.
+pub async fn read_operational_error(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ErrorState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OPERATIONAL_STATE_ATTR_ID_OPERATIONALERROR).await?;
+    decode_operational_error(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct OperationalErrorEvent {
     pub error_state: Option<ErrorState>,

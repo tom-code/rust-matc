@@ -264,6 +264,38 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AnnounceOTAProvider` command on cluster `OTA Software Update Requestor`.
+pub async fn announce_ota_provider(conn: &crate::controller::Connection, endpoint: u16, provider_node_id: u64, vendor_id: u16, announcement_reason: AnnouncementReason, metadata_for_node: Vec<u8>, endpoint_: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_REQUESTOR, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_REQUESTOR_CMD_ID_ANNOUNCEOTAPROVIDER, &encode_announce_ota_provider(provider_node_id, vendor_id, announcement_reason, metadata_for_node, endpoint_)?).await?;
+    Ok(())
+}
+
+/// Read `DefaultOTAProviders` attribute from cluster `OTA Software Update Requestor`.
+pub async fn read_default_ota_providers(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ProviderLocation>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_REQUESTOR, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_REQUESTOR_ATTR_ID_DEFAULTOTAPROVIDERS).await?;
+    decode_default_ota_providers(&tlv)
+}
+
+/// Read `UpdatePossible` attribute from cluster `OTA Software Update Requestor`.
+pub async fn read_update_possible(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_REQUESTOR, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_REQUESTOR_ATTR_ID_UPDATEPOSSIBLE).await?;
+    decode_update_possible(&tlv)
+}
+
+/// Read `UpdateState` attribute from cluster `OTA Software Update Requestor`.
+pub async fn read_update_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<UpdateState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_REQUESTOR, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_REQUESTOR_ATTR_ID_UPDATESTATE).await?;
+    decode_update_state(&tlv)
+}
+
+/// Read `UpdateStateProgress` attribute from cluster `OTA Software Update Requestor`.
+pub async fn read_update_state_progress(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_REQUESTOR, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_REQUESTOR_ATTR_ID_UPDATESTATEPROGRESS).await?;
+    decode_update_state_progress(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct StateTransitionEvent {
     pub previous_state: Option<UpdateState>,

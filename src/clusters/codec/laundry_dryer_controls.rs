@@ -119,3 +119,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `SupportedDrynessLevels` attribute from cluster `Laundry Dryer Controls`.
+pub async fn read_supported_dryness_levels(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DrynessLevel>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_DRYER_CONTROLS, crate::clusters::defs::CLUSTER_LAUNDRY_DRYER_CONTROLS_ATTR_ID_SUPPORTEDDRYNESSLEVELS).await?;
+    decode_supported_dryness_levels(&tlv)
+}
+
+/// Read `SelectedDrynessLevel` attribute from cluster `Laundry Dryer Controls`.
+pub async fn read_selected_dryness_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DrynessLevel>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_DRYER_CONTROLS, crate::clusters::defs::CLUSTER_LAUNDRY_DRYER_CONTROLS_ATTR_ID_SELECTEDDRYNESSLEVEL).await?;
+    decode_selected_dryness_level(&tlv)
+}
+

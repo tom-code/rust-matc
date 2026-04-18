@@ -156,3 +156,47 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SetTemperature` command on cluster `Temperature Control`.
+pub async fn set_temperature(conn: &crate::controller::Connection, endpoint: u16, target_temperature: i16, target_temperature_level: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_CMD_ID_SETTEMPERATURE, &encode_set_temperature(target_temperature, target_temperature_level)?).await?;
+    Ok(())
+}
+
+/// Read `TemperatureSetpoint` attribute from cluster `Temperature Control`.
+pub async fn read_temperature_setpoint(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_ATTR_ID_TEMPERATURESETPOINT).await?;
+    decode_temperature_setpoint(&tlv)
+}
+
+/// Read `MinTemperature` attribute from cluster `Temperature Control`.
+pub async fn read_min_temperature(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_ATTR_ID_MINTEMPERATURE).await?;
+    decode_min_temperature(&tlv)
+}
+
+/// Read `MaxTemperature` attribute from cluster `Temperature Control`.
+pub async fn read_max_temperature(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_ATTR_ID_MAXTEMPERATURE).await?;
+    decode_max_temperature(&tlv)
+}
+
+/// Read `Step` attribute from cluster `Temperature Control`.
+pub async fn read_step(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_ATTR_ID_STEP).await?;
+    decode_step(&tlv)
+}
+
+/// Read `SelectedTemperatureLevel` attribute from cluster `Temperature Control`.
+pub async fn read_selected_temperature_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_ATTR_ID_SELECTEDTEMPERATURELEVEL).await?;
+    decode_selected_temperature_level(&tlv)
+}
+
+/// Read `SupportedTemperatureLevels` attribute from cluster `Temperature Control`.
+pub async fn read_supported_temperature_levels(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TEMPERATURE_CONTROL, crate::clusters::defs::CLUSTER_TEMPERATURE_CONTROL_ATTR_ID_SUPPORTEDTEMPERATURELEVELS).await?;
+    decode_supported_temperature_levels(&tlv)
+}
+

@@ -580,6 +580,116 @@ pub fn decode_set_time_zone_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SetUTCTime` command on cluster `Time Synchronization`.
+pub async fn set_utc_time(conn: &crate::controller::Connection, endpoint: u16, utc_time: u64, granularity: Granularity, time_source: TimeSource) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_CMD_ID_SETUTCTIME, &encode_set_utc_time(utc_time, granularity, time_source)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetTrustedTimeSource` command on cluster `Time Synchronization`.
+pub async fn set_trusted_time_source(conn: &crate::controller::Connection, endpoint: u16, trusted_time_source: Option<FabricScopedTrustedTimeSource>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_CMD_ID_SETTRUSTEDTIMESOURCE, &encode_set_trusted_time_source(trusted_time_source)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetTimeZone` command on cluster `Time Synchronization`.
+pub async fn set_time_zone(conn: &crate::controller::Connection, endpoint: u16, time_zone: Vec<TimeZone>) -> anyhow::Result<SetTimeZoneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_CMD_ID_SETTIMEZONE, &encode_set_time_zone(time_zone)?).await?;
+    decode_set_time_zone_response(&tlv)
+}
+
+/// Invoke `SetDSTOffset` command on cluster `Time Synchronization`.
+pub async fn set_dst_offset(conn: &crate::controller::Connection, endpoint: u16, dst_offset: Vec<DSTOffset>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_CMD_ID_SETDSTOFFSET, &encode_set_dst_offset(dst_offset)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetDefaultNTP` command on cluster `Time Synchronization`.
+pub async fn set_default_ntp(conn: &crate::controller::Connection, endpoint: u16, default_ntp: Option<String>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_CMD_ID_SETDEFAULTNTP, &encode_set_default_ntp(default_ntp)?).await?;
+    Ok(())
+}
+
+/// Read `UTCTime` attribute from cluster `Time Synchronization`.
+pub async fn read_utc_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_UTCTIME).await?;
+    decode_utc_time(&tlv)
+}
+
+/// Read `Granularity` attribute from cluster `Time Synchronization`.
+pub async fn read_granularity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Granularity> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_GRANULARITY).await?;
+    decode_granularity(&tlv)
+}
+
+/// Read `TimeSource` attribute from cluster `Time Synchronization`.
+pub async fn read_time_source(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TimeSource> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_TIMESOURCE).await?;
+    decode_time_source(&tlv)
+}
+
+/// Read `TrustedTimeSource` attribute from cluster `Time Synchronization`.
+pub async fn read_trusted_time_source(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<TrustedTimeSource>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_TRUSTEDTIMESOURCE).await?;
+    decode_trusted_time_source(&tlv)
+}
+
+/// Read `DefaultNTP` attribute from cluster `Time Synchronization`.
+pub async fn read_default_ntp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_DEFAULTNTP).await?;
+    decode_default_ntp(&tlv)
+}
+
+/// Read `TimeZone` attribute from cluster `Time Synchronization`.
+pub async fn read_time_zone(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TimeZone>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_TIMEZONE).await?;
+    decode_time_zone(&tlv)
+}
+
+/// Read `DSTOffset` attribute from cluster `Time Synchronization`.
+pub async fn read_dst_offset(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DSTOffset>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_DSTOFFSET).await?;
+    decode_dst_offset(&tlv)
+}
+
+/// Read `LocalTime` attribute from cluster `Time Synchronization`.
+pub async fn read_local_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_LOCALTIME).await?;
+    decode_local_time(&tlv)
+}
+
+/// Read `TimeZoneDatabase` attribute from cluster `Time Synchronization`.
+pub async fn read_time_zone_database(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TimeZoneDatabase> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_TIMEZONEDATABASE).await?;
+    decode_time_zone_database(&tlv)
+}
+
+/// Read `NTPServerAvailable` attribute from cluster `Time Synchronization`.
+pub async fn read_ntp_server_available(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_NTPSERVERAVAILABLE).await?;
+    decode_ntp_server_available(&tlv)
+}
+
+/// Read `TimeZoneListMaxSize` attribute from cluster `Time Synchronization`.
+pub async fn read_time_zone_list_max_size(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_TIMEZONELISTMAXSIZE).await?;
+    decode_time_zone_list_max_size(&tlv)
+}
+
+/// Read `DSTOffsetListMaxSize` attribute from cluster `Time Synchronization`.
+pub async fn read_dst_offset_list_max_size(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_DSTOFFSETLISTMAXSIZE).await?;
+    decode_dst_offset_list_max_size(&tlv)
+}
+
+/// Read `SupportsDNSResolve` attribute from cluster `Time Synchronization`.
+pub async fn read_supports_dns_resolve(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_ATTR_ID_SUPPORTSDNSRESOLVE).await?;
+    decode_supports_dns_resolve(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct DSTStatusEvent {
     pub dst_offset_active: Option<bool>,

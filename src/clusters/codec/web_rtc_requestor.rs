@@ -112,3 +112,35 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Offer` command on cluster `WebRTC Transport Requestor`.
+pub async fn offer(conn: &crate::controller::Connection, endpoint: u16, web_rtc_session_id: u8, sdp: String, ice_transport_policy: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WEBRTC_TRANSPORT_REQUESTOR, crate::clusters::defs::CLUSTER_WEBRTC_TRANSPORT_REQUESTOR_CMD_ID_OFFER, &encode_offer(web_rtc_session_id, sdp, ice_transport_policy)?).await?;
+    Ok(())
+}
+
+/// Invoke `Answer` command on cluster `WebRTC Transport Requestor`.
+pub async fn answer(conn: &crate::controller::Connection, endpoint: u16, web_rtc_session_id: u8, sdp: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WEBRTC_TRANSPORT_REQUESTOR, crate::clusters::defs::CLUSTER_WEBRTC_TRANSPORT_REQUESTOR_CMD_ID_ANSWER, &encode_answer(web_rtc_session_id, sdp)?).await?;
+    Ok(())
+}
+
+/// Invoke `ICECandidates` command on cluster `WebRTC Transport Requestor`.
+pub async fn ice_candidates(conn: &crate::controller::Connection, endpoint: u16, web_rtc_session_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WEBRTC_TRANSPORT_REQUESTOR, crate::clusters::defs::CLUSTER_WEBRTC_TRANSPORT_REQUESTOR_CMD_ID_ICECANDIDATES, &encode_ice_candidates(web_rtc_session_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `End` command on cluster `WebRTC Transport Requestor`.
+pub async fn end(conn: &crate::controller::Connection, endpoint: u16, web_rtc_session_id: u8, reason: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WEBRTC_TRANSPORT_REQUESTOR, crate::clusters::defs::CLUSTER_WEBRTC_TRANSPORT_REQUESTOR_CMD_ID_END, &encode_end(web_rtc_session_id, reason)?).await?;
+    Ok(())
+}
+
+/// Read `CurrentSessions` attribute from cluster `WebRTC Transport Requestor`.
+pub async fn read_current_sessions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WEBRTC_TRANSPORT_REQUESTOR, crate::clusters::defs::CLUSTER_WEBRTC_TRANSPORT_REQUESTOR_ATTR_ID_CURRENTSESSIONS).await?;
+    decode_current_sessions(&tlv)
+}
+

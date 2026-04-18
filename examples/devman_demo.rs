@@ -18,7 +18,10 @@
 ///   cargo run --example devman_demo -- -d ./matter-data off "kitchen light"
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use matc::{clusters, devman::{DeviceManager, ManagerConfig}};
+use matc::{
+    clusters::{self, codec::{descriptor_cluster, on_off}},
+    devman::{DeviceManager, ManagerConfig},
+};
 
 const DEFAULT_DATA_DIR: &str = "./matter-data";
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
@@ -158,16 +161,12 @@ async fn main() -> Result<()> {
             println!("Commissioned '{}' (node {}) at {}", name, node_id, address);
 
             // List endpoints
-            let res = conn.read_request2(0, clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                                         clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST).await;
-            if let Ok(matc::tlv::TlvItemValue::List(l)) = res {
+            if let Ok(server_list) = descriptor_cluster::read_server_list(&conn, 0).await {
                 println!("Supported clusters:");
-                for c in l {
-                    if let matc::tlv::TlvItemValue::Int(v) = c.value {
-                        match clusters::names::get_cluster_name(v as u32) {
-                            Some(name) => println!("  {}", name),
-                            None => println!("  unknown (0x{:x})", v),
-                        }
+                for c in server_list {
+                    match clusters::names::get_cluster_name(c) {
+                        Some(name) => println!("  {}", name),
+                        None => println!("  unknown (0x{:x})", c),
                     }
                 }
             }
@@ -177,26 +176,12 @@ async fn main() -> Result<()> {
             let connection = dm.commission_with_code(&pairing_code, node_id, &name).await?;
             println!("Commissioned '{}' (node {})", name, node_id);
 
-            let resptlv = connection
-                .read_request2(
-                    0,
-                    clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                    clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
-                )
-                .await?;
-            let mut endpoints = matc::clusters::codec::descriptor_cluster::decode_parts_list(&resptlv)?;
+            let mut endpoints = descriptor_cluster::read_parts_list(&connection, 0).await?;
             println!("Endpoints: {:?}", endpoints);
             endpoints.push(0);
             for ep in endpoints {
-                let resptlv = connection
-                    .read_request2(
-                        ep,
-                        clusters::defs::CLUSTER_ID_DESCRIPTOR,
-                        clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
-                    )
-                    .await?;
-                let clusters = matc::clusters::codec::descriptor_cluster::decode_server_list(&resptlv)?;
-                let names = clusters.iter().map(|c| {
+                let server_list = descriptor_cluster::read_server_list(&connection, ep).await?;
+                let names = server_list.iter().map(|c| {
                     match clusters::names::get_cluster_name(*c) {
                         Some(name) => name.to_string(),
                         None => format!("unknown (0x{:x})", c),
@@ -221,22 +206,19 @@ async fn main() -> Result<()> {
         Commands::On { device } => {
             let dm = DeviceManager::load(data_dir).await?;
             let conn = connect_by_name_or_id(&dm, &device).await?;
-            conn.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF,
-                                clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+            on_off::on(&conn, 1).await?;
             println!("ON sent to '{}'", device);
         }
         Commands::Off { device } => {
             let dm = DeviceManager::load(data_dir).await?;
             let conn = connect_by_name_or_id(&dm, &device).await?;
-            conn.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF,
-                                clusters::defs::CLUSTER_ON_OFF_CMD_ID_OFF, &[]).await?;
+            on_off::off(&conn, 1).await?;
             println!("OFF sent to '{}'", device);
         }
         Commands::Toggle { device } => {
             let dm = DeviceManager::load(data_dir).await?;
             let conn = connect_by_name_or_id(&dm, &device).await?;
-            conn.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF,
-                                clusters::defs::CLUSTER_ON_OFF_CMD_ID_TOGGLE, &[]).await?;
+            on_off::toggle(&conn, 1).await?;
             println!("TOGGLE sent to '{}'", device);
         }
         Commands::Remove { device } => {

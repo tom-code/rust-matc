@@ -497,3 +497,107 @@ pub fn decode_set_tc_acknowledgements_response(inp: &tlv::TlvItemValue) -> anyho
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ArmFailSafe` command on cluster `General Commissioning`.
+pub async fn arm_fail_safe(conn: &crate::controller::Connection, endpoint: u16, expiry_length_seconds: u16, breadcrumb: u64) -> anyhow::Result<ArmFailSafeResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_CMD_ID_ARMFAILSAFE, &encode_arm_fail_safe(expiry_length_seconds, breadcrumb)?).await?;
+    decode_arm_fail_safe_response(&tlv)
+}
+
+/// Invoke `SetRegulatoryConfig` command on cluster `General Commissioning`.
+pub async fn set_regulatory_config(conn: &crate::controller::Connection, endpoint: u16, new_regulatory_config: RegulatoryLocationType, country_code: String, breadcrumb: u64) -> anyhow::Result<SetRegulatoryConfigResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_CMD_ID_SETREGULATORYCONFIG, &encode_set_regulatory_config(new_regulatory_config, country_code, breadcrumb)?).await?;
+    decode_set_regulatory_config_response(&tlv)
+}
+
+/// Invoke `CommissioningComplete` command on cluster `General Commissioning`.
+pub async fn commissioning_complete(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<CommissioningCompleteResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_CMD_ID_COMMISSIONINGCOMPLETE, &[]).await?;
+    decode_commissioning_complete_response(&tlv)
+}
+
+/// Invoke `SetTCAcknowledgements` command on cluster `General Commissioning`.
+pub async fn set_tc_acknowledgements(conn: &crate::controller::Connection, endpoint: u16, tc_version: u16, tc_user_response: u8) -> anyhow::Result<SetTCAcknowledgementsResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_CMD_ID_SETTCACKNOWLEDGEMENTS, &encode_set_tc_acknowledgements(tc_version, tc_user_response)?).await?;
+    decode_set_tc_acknowledgements_response(&tlv)
+}
+
+/// Read `Breadcrumb` attribute from cluster `General Commissioning`.
+pub async fn read_breadcrumb(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_BREADCRUMB).await?;
+    decode_breadcrumb(&tlv)
+}
+
+/// Read `BasicCommissioningInfo` attribute from cluster `General Commissioning`.
+pub async fn read_basic_commissioning_info(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BasicCommissioningInfo> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_BASICCOMMISSIONINGINFO).await?;
+    decode_basic_commissioning_info(&tlv)
+}
+
+/// Read `RegulatoryConfig` attribute from cluster `General Commissioning`.
+pub async fn read_regulatory_config(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<RegulatoryLocationType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_REGULATORYCONFIG).await?;
+    decode_regulatory_config(&tlv)
+}
+
+/// Read `LocationCapability` attribute from cluster `General Commissioning`.
+pub async fn read_location_capability(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<RegulatoryLocationType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_LOCATIONCAPABILITY).await?;
+    decode_location_capability(&tlv)
+}
+
+/// Read `SupportsConcurrentConnection` attribute from cluster `General Commissioning`.
+pub async fn read_supports_concurrent_connection(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_SUPPORTSCONCURRENTCONNECTION).await?;
+    decode_supports_concurrent_connection(&tlv)
+}
+
+/// Read `TCAcceptedVersion` attribute from cluster `General Commissioning`.
+pub async fn read_tc_accepted_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_TCACCEPTEDVERSION).await?;
+    decode_tc_accepted_version(&tlv)
+}
+
+/// Read `TCMinRequiredVersion` attribute from cluster `General Commissioning`.
+pub async fn read_tc_min_required_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_TCMINREQUIREDVERSION).await?;
+    decode_tc_min_required_version(&tlv)
+}
+
+/// Read `TCAcknowledgements` attribute from cluster `General Commissioning`.
+pub async fn read_tc_acknowledgements(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_TCACKNOWLEDGEMENTS).await?;
+    decode_tc_acknowledgements(&tlv)
+}
+
+/// Read `TCAcknowledgementsRequired` attribute from cluster `General Commissioning`.
+pub async fn read_tc_acknowledgements_required(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_TCACKNOWLEDGEMENTSREQUIRED).await?;
+    decode_tc_acknowledgements_required(&tlv)
+}
+
+/// Read `TCUpdateDeadline` attribute from cluster `General Commissioning`.
+pub async fn read_tc_update_deadline(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_TCUPDATEDEADLINE).await?;
+    decode_tc_update_deadline(&tlv)
+}
+
+/// Read `RecoveryIdentifier` attribute from cluster `General Commissioning`.
+pub async fn read_recovery_identifier(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_RECOVERYIDENTIFIER).await?;
+    decode_recovery_identifier(&tlv)
+}
+
+/// Read `NetworkRecoveryReason` attribute from cluster `General Commissioning`.
+pub async fn read_network_recovery_reason(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<NetworkRecoveryReason>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_NETWORKRECOVERYREASON).await?;
+    decode_network_recovery_reason(&tlv)
+}
+
+/// Read `IsCommissioningWithoutPower` attribute from cluster `General Commissioning`.
+pub async fn read_is_commissioning_without_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_COMMISSIONING, crate::clusters::defs::CLUSTER_GENERAL_COMMISSIONING_ATTR_ID_ISCOMMISSIONINGWITHOUTPOWER).await?;
+    decode_is_commissioning_without_power(&tlv)
+}
+

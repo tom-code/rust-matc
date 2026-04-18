@@ -78,3 +78,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `ActiveLocale` attribute from cluster `Localization Configuration`.
+pub async fn read_active_locale(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LOCALIZATION_CONFIGURATION, crate::clusters::defs::CLUSTER_LOCALIZATION_CONFIGURATION_ATTR_ID_ACTIVELOCALE).await?;
+    decode_active_locale(&tlv)
+}
+
+/// Read `SupportedLocales` attribute from cluster `Localization Configuration`.
+pub async fn read_supported_locales(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LOCALIZATION_CONFIGURATION, crate::clusters::defs::CLUSTER_LOCALIZATION_CONFIGURATION_ATTR_ID_SUPPORTEDLOCALES).await?;
+    decode_supported_locales(&tlv)
+}
+

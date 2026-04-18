@@ -62,3 +62,11 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `LabelList` attribute from cluster `Fixed Label`.
+pub async fn read_label_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_FIXED_LABEL, crate::clusters::defs::CLUSTER_FIXED_LABEL_ATTR_ID_LABELLIST).await?;
+    decode_label_list(&tlv)
+}
+

@@ -77,3 +77,11 @@ pub fn decode_content_app_message_response(inp: &tlv::TlvItemValue) -> anyhow::R
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ContentAppMessage` command on cluster `Content App Observer`.
+pub async fn content_app_message(conn: &crate::controller::Connection, endpoint: u16, data: String, encoding_hint: String) -> anyhow::Result<ContentAppMessageResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_APP_OBSERVER, crate::clusters::defs::CLUSTER_CONTENT_APP_OBSERVER_CMD_ID_CONTENTAPPMESSAGE, &encode_content_app_message(data, encoding_hint)?).await?;
+    decode_content_app_message_response(&tlv)
+}
+

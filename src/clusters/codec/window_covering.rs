@@ -521,3 +521,119 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `UpOrOpen` command on cluster `Window Covering`.
+pub async fn up_or_open(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_UPOROPEN, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `DownOrClose` command on cluster `Window Covering`.
+pub async fn down_or_close(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_DOWNORCLOSE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `StopMotion` command on cluster `Window Covering`.
+pub async fn stop_motion(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_STOPMOTION, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `GoToLiftPercentage` command on cluster `Window Covering`.
+pub async fn go_to_lift_percentage(conn: &crate::controller::Connection, endpoint: u16, lift_percent100ths_value: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_GOTOLIFTPERCENTAGE, &encode_go_to_lift_percentage(lift_percent100ths_value)?).await?;
+    Ok(())
+}
+
+/// Invoke `GoToTiltPercentage` command on cluster `Window Covering`.
+pub async fn go_to_tilt_percentage(conn: &crate::controller::Connection, endpoint: u16, tilt_percent100ths_value: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_GOTOTILTPERCENTAGE, &encode_go_to_tilt_percentage(tilt_percent100ths_value)?).await?;
+    Ok(())
+}
+
+/// Read `Type` attribute from cluster `Window Covering`.
+pub async fn read_type_(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Type> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_TYPE).await?;
+    decode_type_(&tlv)
+}
+
+/// Read `NumberOfActuationsLift` attribute from cluster `Window Covering`.
+pub async fn read_number_of_actuations_lift(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_NUMBEROFACTUATIONSLIFT).await?;
+    decode_number_of_actuations_lift(&tlv)
+}
+
+/// Read `NumberOfActuationsTilt` attribute from cluster `Window Covering`.
+pub async fn read_number_of_actuations_tilt(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_NUMBEROFACTUATIONSTILT).await?;
+    decode_number_of_actuations_tilt(&tlv)
+}
+
+/// Read `ConfigStatus` attribute from cluster `Window Covering`.
+pub async fn read_config_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ConfigStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CONFIGSTATUS).await?;
+    decode_config_status(&tlv)
+}
+
+/// Read `CurrentPositionLiftPercentage` attribute from cluster `Window Covering`.
+pub async fn read_current_position_lift_percentage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CURRENTPOSITIONLIFTPERCENTAGE).await?;
+    decode_current_position_lift_percentage(&tlv)
+}
+
+/// Read `CurrentPositionTiltPercentage` attribute from cluster `Window Covering`.
+pub async fn read_current_position_tilt_percentage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CURRENTPOSITIONTILTPERCENTAGE).await?;
+    decode_current_position_tilt_percentage(&tlv)
+}
+
+/// Read `OperationalStatus` attribute from cluster `Window Covering`.
+pub async fn read_operational_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperationalStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_OPERATIONALSTATUS).await?;
+    decode_operational_status(&tlv)
+}
+
+/// Read `TargetPositionLiftPercent100ths` attribute from cluster `Window Covering`.
+pub async fn read_target_position_lift_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_TARGETPOSITIONLIFTPERCENT100THS).await?;
+    decode_target_position_lift_percent100ths(&tlv)
+}
+
+/// Read `TargetPositionTiltPercent100ths` attribute from cluster `Window Covering`.
+pub async fn read_target_position_tilt_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_TARGETPOSITIONTILTPERCENT100THS).await?;
+    decode_target_position_tilt_percent100ths(&tlv)
+}
+
+/// Read `EndProductType` attribute from cluster `Window Covering`.
+pub async fn read_end_product_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<EndProductType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_ENDPRODUCTTYPE).await?;
+    decode_end_product_type(&tlv)
+}
+
+/// Read `CurrentPositionLiftPercent100ths` attribute from cluster `Window Covering`.
+pub async fn read_current_position_lift_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CURRENTPOSITIONLIFTPERCENT100THS).await?;
+    decode_current_position_lift_percent100ths(&tlv)
+}
+
+/// Read `CurrentPositionTiltPercent100ths` attribute from cluster `Window Covering`.
+pub async fn read_current_position_tilt_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CURRENTPOSITIONTILTPERCENT100THS).await?;
+    decode_current_position_tilt_percent100ths(&tlv)
+}
+
+/// Read `Mode` attribute from cluster `Window Covering`.
+pub async fn read_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Mode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_MODE).await?;
+    decode_mode(&tlv)
+}
+
+/// Read `SafetyStatus` attribute from cluster `Window Covering`.
+pub async fn read_safety_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SafetyStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_SAFETYSTATUS).await?;
+    decode_safety_status(&tlv)
+}
+

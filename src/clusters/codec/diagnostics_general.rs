@@ -557,6 +557,86 @@ pub fn decode_payload_test_response(inp: &tlv::TlvItemValue) -> anyhow::Result<P
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `TestEventTrigger` command on cluster `General Diagnostics`.
+pub async fn test_event_trigger(conn: &crate::controller::Connection, endpoint: u16, enable_key: Vec<u8>, event_trigger: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_CMD_ID_TESTEVENTTRIGGER, &encode_test_event_trigger(enable_key, event_trigger)?).await?;
+    Ok(())
+}
+
+/// Invoke `TimeSnapshot` command on cluster `General Diagnostics`.
+pub async fn time_snapshot(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TimeSnapshotResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_CMD_ID_TIMESNAPSHOT, &[]).await?;
+    decode_time_snapshot_response(&tlv)
+}
+
+/// Invoke `PayloadTestRequest` command on cluster `General Diagnostics`.
+pub async fn payload_test_request(conn: &crate::controller::Connection, endpoint: u16, enable_key: Vec<u8>, value: u8, count: u16) -> anyhow::Result<PayloadTestResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_CMD_ID_PAYLOADTESTREQUEST, &encode_payload_test_request(enable_key, value, count)?).await?;
+    decode_payload_test_response(&tlv)
+}
+
+/// Read `NetworkInterfaces` attribute from cluster `General Diagnostics`.
+pub async fn read_network_interfaces(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NetworkInterface>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_NETWORKINTERFACES).await?;
+    decode_network_interfaces(&tlv)
+}
+
+/// Read `RebootCount` attribute from cluster `General Diagnostics`.
+pub async fn read_reboot_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_REBOOTCOUNT).await?;
+    decode_reboot_count(&tlv)
+}
+
+/// Read `UpTime` attribute from cluster `General Diagnostics`.
+pub async fn read_up_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_UPTIME).await?;
+    decode_up_time(&tlv)
+}
+
+/// Read `TotalOperationalHours` attribute from cluster `General Diagnostics`.
+pub async fn read_total_operational_hours(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_TOTALOPERATIONALHOURS).await?;
+    decode_total_operational_hours(&tlv)
+}
+
+/// Read `BootReason` attribute from cluster `General Diagnostics`.
+pub async fn read_boot_reason(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BootReason> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_BOOTREASON).await?;
+    decode_boot_reason(&tlv)
+}
+
+/// Read `ActiveHardwareFaults` attribute from cluster `General Diagnostics`.
+pub async fn read_active_hardware_faults(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<HardwareFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_ACTIVEHARDWAREFAULTS).await?;
+    decode_active_hardware_faults(&tlv)
+}
+
+/// Read `ActiveRadioFaults` attribute from cluster `General Diagnostics`.
+pub async fn read_active_radio_faults(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<RadioFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_ACTIVERADIOFAULTS).await?;
+    decode_active_radio_faults(&tlv)
+}
+
+/// Read `ActiveNetworkFaults` attribute from cluster `General Diagnostics`.
+pub async fn read_active_network_faults(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NetworkFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_ACTIVENETWORKFAULTS).await?;
+    decode_active_network_faults(&tlv)
+}
+
+/// Read `TestEventTriggersEnabled` attribute from cluster `General Diagnostics`.
+pub async fn read_test_event_triggers_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_TESTEVENTTRIGGERSENABLED).await?;
+    decode_test_event_triggers_enabled(&tlv)
+}
+
+/// Read `DoNotUse` attribute from cluster `General Diagnostics`.
+pub async fn read_do_not_use(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_DONOTUSE).await?;
+    decode_do_not_use(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct HardwareFaultChangeEvent {
     pub current: Option<Vec<HardwareFault>>,

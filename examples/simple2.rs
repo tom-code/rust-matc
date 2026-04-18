@@ -3,7 +3,11 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use matc::{certmanager, clusters, controller, tlv, transport};
+use matc::{
+    certmanager,
+    clusters::codec::{level_control, on_off},
+    controller, transport,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,78 +25,26 @@ async fn main() -> Result<()> {
         .await?;
 
     // send ON command to device
-    connection
-        .invoke_request(1, 0x6, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[])
-        .await?;
+    on_off::on(&connection, 1).await?;
 
     // read ON/OFF state
-    let res = connection
-        .read_request2(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF,
-        )
-        .await?;
-    assert!(res == tlv::TlvItemValue::Bool(true));
+    assert_eq!(on_off::read_on_off(&connection, 1).await?, true);
 
     // send OFF command to device
-    connection
-        .invoke_request(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_CMD_ID_OFF,
-            &[],
-        )
-        .await?;
+    on_off::off(&connection, 1).await?;
 
     // read ON/OFF state
-    let res = connection
-        .read_request2(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF,
-        )
-        .await?;
-    assert!(res == tlv::TlvItemValue::Bool(false));
+    assert_eq!(on_off::read_on_off(&connection, 1).await?, false);
 
     // send ON command to device
-    connection
-        .invoke_request(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON,
-            &[],
-        )
-        .await?;
+    on_off::on(&connection, 1).await?;
 
     // send MoveToLevel command
-    let tlv = std::convert::Into::<tlv::TlvItemEnc>::into((
-        0,
-        tlv::TlvItemValueEnc::StructInvisible(vec![
-            (0, tlv::TlvItemValueEnc::UInt8(50)).into(), // level
-            (1, tlv::TlvItemValueEnc::UInt16(1000)).into(), // transition time
-            (2, tlv::TlvItemValueEnc::UInt8(0)).into(), // options mask
-            (3, tlv::TlvItemValueEnc::UInt8(0)).into(), // options override
-        ]))).encode()?;
-
-    connection
-        .invoke_request(
-            1,
-            clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
-            clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL,
-            &tlv,
-        )
-        .await?;
+    level_control::move_to_level(&connection, 1, 50, Some(1000), 0, 0).await?;
 
     // read level
-    let res = connection
-        .read_request2(
-            1,
-            clusters::defs::CLUSTER_ID_LEVEL_CONTROL,
-            clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTLEVEL,
-        )
-        .await?;
-    println!("{:?}", res);
+    let level = level_control::read_current_level(&connection, 1).await?;
+    println!("{:?}", level);
 
     Ok(())
 }

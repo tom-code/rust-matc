@@ -1440,3 +1440,311 @@ pub fn decode_capture_snapshot_response(inp: &tlv::TlvItemValue) -> anyhow::Resu
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AudioStreamAllocate` command on cluster `Camera AV Stream Management`.
+pub async fn audio_stream_allocate(conn: &crate::controller::Connection, endpoint: u16, stream_usage: u8, audio_codec: AudioCodec, channel_count: u8, sample_rate: u32, bit_rate: u32, bit_depth: u8) -> anyhow::Result<AudioStreamAllocateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_AUDIOSTREAMALLOCATE, &encode_audio_stream_allocate(stream_usage, audio_codec, channel_count, sample_rate, bit_rate, bit_depth)?).await?;
+    decode_audio_stream_allocate_response(&tlv)
+}
+
+/// Invoke `AudioStreamDeallocate` command on cluster `Camera AV Stream Management`.
+pub async fn audio_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, audio_stream_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_AUDIOSTREAMDEALLOCATE, &encode_audio_stream_deallocate(audio_stream_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `VideoStreamAllocate` command on cluster `Camera AV Stream Management`.
+pub async fn video_stream_allocate(conn: &crate::controller::Connection, endpoint: u16, params: VideoStreamAllocateParams) -> anyhow::Result<VideoStreamAllocateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_VIDEOSTREAMALLOCATE, &encode_video_stream_allocate(params)?).await?;
+    decode_video_stream_allocate_response(&tlv)
+}
+
+/// Invoke `VideoStreamModify` command on cluster `Camera AV Stream Management`.
+pub async fn video_stream_modify(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_VIDEOSTREAMMODIFY, &encode_video_stream_modify(video_stream_id, watermark_enabled, osd_enabled)?).await?;
+    Ok(())
+}
+
+/// Invoke `VideoStreamDeallocate` command on cluster `Camera AV Stream Management`.
+pub async fn video_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_VIDEOSTREAMDEALLOCATE, &encode_video_stream_deallocate(video_stream_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `SnapshotStreamAllocate` command on cluster `Camera AV Stream Management`.
+pub async fn snapshot_stream_allocate(conn: &crate::controller::Connection, endpoint: u16, image_codec: ImageCodec, max_frame_rate: u16, min_resolution: VideoResolution, max_resolution: VideoResolution, quality: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<SnapshotStreamAllocateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SNAPSHOTSTREAMALLOCATE, &encode_snapshot_stream_allocate(image_codec, max_frame_rate, min_resolution, max_resolution, quality, watermark_enabled, osd_enabled)?).await?;
+    decode_snapshot_stream_allocate_response(&tlv)
+}
+
+/// Invoke `SnapshotStreamModify` command on cluster `Camera AV Stream Management`.
+pub async fn snapshot_stream_modify(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SNAPSHOTSTREAMMODIFY, &encode_snapshot_stream_modify(snapshot_stream_id, watermark_enabled, osd_enabled)?).await?;
+    Ok(())
+}
+
+/// Invoke `SnapshotStreamDeallocate` command on cluster `Camera AV Stream Management`.
+pub async fn snapshot_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SNAPSHOTSTREAMDEALLOCATE, &encode_snapshot_stream_deallocate(snapshot_stream_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetStreamPriorities` command on cluster `Camera AV Stream Management`.
+pub async fn set_stream_priorities(conn: &crate::controller::Connection, endpoint: u16, stream_priorities: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SETSTREAMPRIORITIES, &encode_set_stream_priorities(stream_priorities)?).await?;
+    Ok(())
+}
+
+/// Invoke `CaptureSnapshot` command on cluster `Camera AV Stream Management`.
+pub async fn capture_snapshot(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: Option<u8>, requested_resolution: VideoResolution) -> anyhow::Result<CaptureSnapshotResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_CAPTURESNAPSHOT, &encode_capture_snapshot(snapshot_stream_id, requested_resolution)?).await?;
+    decode_capture_snapshot_response(&tlv)
+}
+
+/// Read `MaxConcurrentEncoders` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_max_concurrent_encoders(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MAXCONCURRENTENCODERS).await?;
+    decode_max_concurrent_encoders(&tlv)
+}
+
+/// Read `MaxEncodedPixelRate` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_max_encoded_pixel_rate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MAXENCODEDPIXELRATE).await?;
+    decode_max_encoded_pixel_rate(&tlv)
+}
+
+/// Read `VideoSensorParams` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_video_sensor_params(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<VideoSensorParams> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_VIDEOSENSORPARAMS).await?;
+    decode_video_sensor_params(&tlv)
+}
+
+/// Read `NightVisionUsesInfrared` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_night_vision_uses_infrared(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_NIGHTVISIONUSESINFRARED).await?;
+    decode_night_vision_uses_infrared(&tlv)
+}
+
+/// Read `MinViewportResolution` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_min_viewport_resolution(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<VideoResolution> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MINVIEWPORTRESOLUTION).await?;
+    decode_min_viewport_resolution(&tlv)
+}
+
+/// Read `RateDistortionTradeOffPoints` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_rate_distortion_trade_off_points(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<RateDistortionTradeOffPoints>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_RATEDISTORTIONTRADEOFFPOINTS).await?;
+    decode_rate_distortion_trade_off_points(&tlv)
+}
+
+/// Read `MaxContentBufferSize` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_max_content_buffer_size(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MAXCONTENTBUFFERSIZE).await?;
+    decode_max_content_buffer_size(&tlv)
+}
+
+/// Read `MicrophoneCapabilities` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_microphone_capabilities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AudioCapabilities> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MICROPHONECAPABILITIES).await?;
+    decode_microphone_capabilities(&tlv)
+}
+
+/// Read `SpeakerCapabilities` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_speaker_capabilities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AudioCapabilities> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SPEAKERCAPABILITIES).await?;
+    decode_speaker_capabilities(&tlv)
+}
+
+/// Read `TwoWayTalkSupport` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_two_way_talk_support(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TwoWayTalkSupportType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_TWOWAYTALKSUPPORT).await?;
+    decode_two_way_talk_support(&tlv)
+}
+
+/// Read `SnapshotCapabilities` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_snapshot_capabilities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<SnapshotCapabilities>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SNAPSHOTCAPABILITIES).await?;
+    decode_snapshot_capabilities(&tlv)
+}
+
+/// Read `MaxNetworkBandwidth` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_max_network_bandwidth(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MAXNETWORKBANDWIDTH).await?;
+    decode_max_network_bandwidth(&tlv)
+}
+
+/// Read `CurrentFrameRate` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_current_frame_rate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_CURRENTFRAMERATE).await?;
+    decode_current_frame_rate(&tlv)
+}
+
+/// Read `HDRModeEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_hdr_mode_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_HDRMODEENABLED).await?;
+    decode_hdr_mode_enabled(&tlv)
+}
+
+/// Read `SupportedStreamUsages` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_supported_stream_usages(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SUPPORTEDSTREAMUSAGES).await?;
+    decode_supported_stream_usages(&tlv)
+}
+
+/// Read `AllocatedVideoStreams` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_allocated_video_streams(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<VideoStream>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_ALLOCATEDVIDEOSTREAMS).await?;
+    decode_allocated_video_streams(&tlv)
+}
+
+/// Read `AllocatedAudioStreams` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_allocated_audio_streams(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<AudioStream>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_ALLOCATEDAUDIOSTREAMS).await?;
+    decode_allocated_audio_streams(&tlv)
+}
+
+/// Read `AllocatedSnapshotStreams` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_allocated_snapshot_streams(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<SnapshotStream>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_ALLOCATEDSNAPSHOTSTREAMS).await?;
+    decode_allocated_snapshot_streams(&tlv)
+}
+
+/// Read `StreamUsagePriorities` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_stream_usage_priorities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_STREAMUSAGEPRIORITIES).await?;
+    decode_stream_usage_priorities(&tlv)
+}
+
+/// Read `SoftRecordingPrivacyModeEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_soft_recording_privacy_mode_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SOFTRECORDINGPRIVACYMODEENABLED).await?;
+    decode_soft_recording_privacy_mode_enabled(&tlv)
+}
+
+/// Read `SoftLivestreamPrivacyModeEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_soft_livestream_privacy_mode_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SOFTLIVESTREAMPRIVACYMODEENABLED).await?;
+    decode_soft_livestream_privacy_mode_enabled(&tlv)
+}
+
+/// Read `HardPrivacyModeOn` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_hard_privacy_mode_on(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_HARDPRIVACYMODEON).await?;
+    decode_hard_privacy_mode_on(&tlv)
+}
+
+/// Read `NightVision` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_night_vision(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TriStateAuto> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_NIGHTVISION).await?;
+    decode_night_vision(&tlv)
+}
+
+/// Read `NightVisionIllum` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_night_vision_illum(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TriStateAuto> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_NIGHTVISIONILLUM).await?;
+    decode_night_vision_illum(&tlv)
+}
+
+/// Read `Viewport` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_viewport(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_VIEWPORT).await?;
+    decode_viewport(&tlv)
+}
+
+/// Read `SpeakerMuted` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_speaker_muted(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SPEAKERMUTED).await?;
+    decode_speaker_muted(&tlv)
+}
+
+/// Read `SpeakerVolumeLevel` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_speaker_volume_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SPEAKERVOLUMELEVEL).await?;
+    decode_speaker_volume_level(&tlv)
+}
+
+/// Read `SpeakerMaxLevel` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_speaker_max_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SPEAKERMAXLEVEL).await?;
+    decode_speaker_max_level(&tlv)
+}
+
+/// Read `SpeakerMinLevel` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_speaker_min_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_SPEAKERMINLEVEL).await?;
+    decode_speaker_min_level(&tlv)
+}
+
+/// Read `MicrophoneMuted` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_microphone_muted(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MICROPHONEMUTED).await?;
+    decode_microphone_muted(&tlv)
+}
+
+/// Read `MicrophoneVolumeLevel` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_microphone_volume_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MICROPHONEVOLUMELEVEL).await?;
+    decode_microphone_volume_level(&tlv)
+}
+
+/// Read `MicrophoneMaxLevel` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_microphone_max_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MICROPHONEMAXLEVEL).await?;
+    decode_microphone_max_level(&tlv)
+}
+
+/// Read `MicrophoneMinLevel` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_microphone_min_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MICROPHONEMINLEVEL).await?;
+    decode_microphone_min_level(&tlv)
+}
+
+/// Read `MicrophoneAGCEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_microphone_agc_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_MICROPHONEAGCENABLED).await?;
+    decode_microphone_agc_enabled(&tlv)
+}
+
+/// Read `ImageRotation` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_image_rotation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_IMAGEROTATION).await?;
+    decode_image_rotation(&tlv)
+}
+
+/// Read `ImageFlipHorizontal` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_image_flip_horizontal(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_IMAGEFLIPHORIZONTAL).await?;
+    decode_image_flip_horizontal(&tlv)
+}
+
+/// Read `ImageFlipVertical` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_image_flip_vertical(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_IMAGEFLIPVERTICAL).await?;
+    decode_image_flip_vertical(&tlv)
+}
+
+/// Read `LocalVideoRecordingEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_local_video_recording_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_LOCALVIDEORECORDINGENABLED).await?;
+    decode_local_video_recording_enabled(&tlv)
+}
+
+/// Read `LocalSnapshotRecordingEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_local_snapshot_recording_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_LOCALSNAPSHOTRECORDINGENABLED).await?;
+    decode_local_snapshot_recording_enabled(&tlv)
+}
+
+/// Read `StatusLightEnabled` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_status_light_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_STATUSLIGHTENABLED).await?;
+    decode_status_light_enabled(&tlv)
+}
+
+/// Read `StatusLightBrightness` attribute from cluster `Camera AV Stream Management`.
+pub async fn read_status_light_brightness(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_ATTR_ID_STATUSLIGHTBRIGHTNESS).await?;
+    decode_status_light_brightness(&tlv)
+}
+

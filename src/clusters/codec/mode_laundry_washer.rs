@@ -180,3 +180,29 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `SupportedModes` attribute from cluster `Laundry Washer Mode`.
+pub async fn read_supported_modes(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_MODE, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_MODE_ATTR_ID_SUPPORTEDMODES).await?;
+    decode_supported_modes(&tlv)
+}
+
+/// Read `CurrentMode` attribute from cluster `Laundry Washer Mode`.
+pub async fn read_current_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_MODE, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_MODE_ATTR_ID_CURRENTMODE).await?;
+    decode_current_mode(&tlv)
+}
+
+/// Read `StartUpMode` attribute from cluster `Laundry Washer Mode`.
+pub async fn read_start_up_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_MODE, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_MODE_ATTR_ID_STARTUPMODE).await?;
+    decode_start_up_mode(&tlv)
+}
+
+/// Read `OnMode` attribute from cluster `Laundry Washer Mode`.
+pub async fn read_on_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_MODE, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_MODE_ATTR_ID_ONMODE).await?;
+    decode_on_mode(&tlv)
+}
+

@@ -149,3 +149,41 @@ impl From<OperationalState> for u8 {
 
 // Command encoders
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Pause` command on cluster `RVC Operational State`.
+pub async fn pause(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_RVC_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_RVC_OPERATIONAL_STATE_CMD_ID_PAUSE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Stop` command on cluster `RVC Operational State`.
+pub async fn stop(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_RVC_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_RVC_OPERATIONAL_STATE_CMD_ID_STOP, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Start` command on cluster `RVC Operational State`.
+pub async fn start(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_RVC_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_RVC_OPERATIONAL_STATE_CMD_ID_START, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Resume` command on cluster `RVC Operational State`.
+pub async fn resume(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_RVC_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_RVC_OPERATIONAL_STATE_CMD_ID_RESUME, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `OperationalCommandResponse` command on cluster `RVC Operational State`.
+pub async fn operational_command_response(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_RVC_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_RVC_OPERATIONAL_STATE_CMD_ID_OPERATIONALCOMMANDRESPONSE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `GoHome` command on cluster `RVC Operational State`.
+pub async fn go_home(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_RVC_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_RVC_OPERATIONAL_STATE_CMD_ID_GOHOME, &[]).await?;
+    Ok(())
+}
+

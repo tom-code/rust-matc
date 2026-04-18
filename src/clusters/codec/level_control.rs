@@ -466,3 +466,143 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `MoveToLevel` command on cluster `Level Control`.
+pub async fn move_to_level(conn: &crate::controller::Connection, endpoint: u16, level: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVEL, &encode_move_to_level(level, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `Move` command on cluster `Level Control`.
+pub async fn move_(conn: &crate::controller::Connection, endpoint: u16, move_mode: MoveMode, rate: Option<u8>, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVE, &encode_move_(move_mode, rate, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `Step` command on cluster `Level Control`.
+pub async fn step(conn: &crate::controller::Connection, endpoint: u16, step_mode: StepMode, step_size: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_STEP, &encode_step(step_mode, step_size, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `Stop` command on cluster `Level Control`.
+pub async fn stop(conn: &crate::controller::Connection, endpoint: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_STOP, &encode_stop(options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveToLevelWithOnOff` command on cluster `Level Control`.
+pub async fn move_to_level_with_on_off(conn: &crate::controller::Connection, endpoint: u16, level: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOLEVELWITHONOFF, &encode_move_to_level_with_on_off(level, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveWithOnOff` command on cluster `Level Control`.
+pub async fn move_with_on_off(conn: &crate::controller::Connection, endpoint: u16, move_mode: MoveMode, rate: Option<u8>, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVEWITHONOFF, &encode_move_with_on_off(move_mode, rate, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StepWithOnOff` command on cluster `Level Control`.
+pub async fn step_with_on_off(conn: &crate::controller::Connection, endpoint: u16, step_mode: StepMode, step_size: u8, transition_time: Option<u16>, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_STEPWITHONOFF, &encode_step_with_on_off(step_mode, step_size, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StopWithOnOff` command on cluster `Level Control`.
+pub async fn stop_with_on_off(conn: &crate::controller::Connection, endpoint: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_STOPWITHONOFF, &encode_stop_with_on_off(options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveToClosestFrequency` command on cluster `Level Control`.
+pub async fn move_to_closest_frequency(conn: &crate::controller::Connection, endpoint: u16, frequency: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_CMD_ID_MOVETOCLOSESTFREQUENCY, &encode_move_to_closest_frequency(frequency)?).await?;
+    Ok(())
+}
+
+/// Read `CurrentLevel` attribute from cluster `Level Control`.
+pub async fn read_current_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTLEVEL).await?;
+    decode_current_level(&tlv)
+}
+
+/// Read `RemainingTime` attribute from cluster `Level Control`.
+pub async fn read_remaining_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_REMAININGTIME).await?;
+    decode_remaining_time(&tlv)
+}
+
+/// Read `MinLevel` attribute from cluster `Level Control`.
+pub async fn read_min_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_MINLEVEL).await?;
+    decode_min_level(&tlv)
+}
+
+/// Read `MaxLevel` attribute from cluster `Level Control`.
+pub async fn read_max_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_MAXLEVEL).await?;
+    decode_max_level(&tlv)
+}
+
+/// Read `CurrentFrequency` attribute from cluster `Level Control`.
+pub async fn read_current_frequency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTFREQUENCY).await?;
+    decode_current_frequency(&tlv)
+}
+
+/// Read `MinFrequency` attribute from cluster `Level Control`.
+pub async fn read_min_frequency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_MINFREQUENCY).await?;
+    decode_min_frequency(&tlv)
+}
+
+/// Read `MaxFrequency` attribute from cluster `Level Control`.
+pub async fn read_max_frequency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_MAXFREQUENCY).await?;
+    decode_max_frequency(&tlv)
+}
+
+/// Read `Options` attribute from cluster `Level Control`.
+pub async fn read_options(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Options> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_OPTIONS).await?;
+    decode_options(&tlv)
+}
+
+/// Read `OnOffTransitionTime` attribute from cluster `Level Control`.
+pub async fn read_on_off_transition_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_ONOFFTRANSITIONTIME).await?;
+    decode_on_off_transition_time(&tlv)
+}
+
+/// Read `OnLevel` attribute from cluster `Level Control`.
+pub async fn read_on_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_ONLEVEL).await?;
+    decode_on_level(&tlv)
+}
+
+/// Read `OnTransitionTime` attribute from cluster `Level Control`.
+pub async fn read_on_transition_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_ONTRANSITIONTIME).await?;
+    decode_on_transition_time(&tlv)
+}
+
+/// Read `OffTransitionTime` attribute from cluster `Level Control`.
+pub async fn read_off_transition_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_OFFTRANSITIONTIME).await?;
+    decode_off_transition_time(&tlv)
+}
+
+/// Read `DefaultMoveRate` attribute from cluster `Level Control`.
+pub async fn read_default_move_rate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_DEFAULTMOVERATE).await?;
+    decode_default_move_rate(&tlv)
+}
+
+/// Read `StartUpCurrentLevel` attribute from cluster `Level Control`.
+pub async fn read_start_up_current_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LEVEL_CONTROL, crate::clusters::defs::CLUSTER_LEVEL_CONTROL_ATTR_ID_STARTUPCURRENTLEVEL).await?;
+    decode_start_up_current_level(&tlv)
+}
+

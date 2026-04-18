@@ -223,6 +223,56 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Boost` command on cluster `Water Heater Management`.
+pub async fn boost(conn: &crate::controller::Connection, endpoint: u16, boost_info: WaterHeaterBoostInfo) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_CMD_ID_BOOST, &encode_boost(boost_info)?).await?;
+    Ok(())
+}
+
+/// Invoke `CancelBoost` command on cluster `Water Heater Management`.
+pub async fn cancel_boost(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_CMD_ID_CANCELBOOST, &[]).await?;
+    Ok(())
+}
+
+/// Read `HeaterTypes` attribute from cluster `Water Heater Management`.
+pub async fn read_heater_types(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<WaterHeaterHeatSource> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_ATTR_ID_HEATERTYPES).await?;
+    decode_heater_types(&tlv)
+}
+
+/// Read `HeatDemand` attribute from cluster `Water Heater Management`.
+pub async fn read_heat_demand(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<WaterHeaterHeatSource> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_ATTR_ID_HEATDEMAND).await?;
+    decode_heat_demand(&tlv)
+}
+
+/// Read `TankVolume` attribute from cluster `Water Heater Management`.
+pub async fn read_tank_volume(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_ATTR_ID_TANKVOLUME).await?;
+    decode_tank_volume(&tlv)
+}
+
+/// Read `EstimatedHeatRequired` attribute from cluster `Water Heater Management`.
+pub async fn read_estimated_heat_required(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_ATTR_ID_ESTIMATEDHEATREQUIRED).await?;
+    decode_estimated_heat_required(&tlv)
+}
+
+/// Read `TankPercentage` attribute from cluster `Water Heater Management`.
+pub async fn read_tank_percentage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_ATTR_ID_TANKPERCENTAGE).await?;
+    decode_tank_percentage(&tlv)
+}
+
+/// Read `BoostState` attribute from cluster `Water Heater Management`.
+pub async fn read_boost_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BoostState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_HEATER_MANAGEMENT, crate::clusters::defs::CLUSTER_WATER_HEATER_MANAGEMENT_ATTR_ID_BOOSTSTATE).await?;
+    decode_boost_state(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct BoostStartedEvent {
     pub boost_info: Option<WaterHeaterBoostInfo>,

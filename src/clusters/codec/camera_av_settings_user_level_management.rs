@@ -374,3 +374,107 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `MPTZSetPosition` command on cluster `Camera AV Settings User Level Management`.
+pub async fn mptz_set_position(conn: &crate::controller::Connection, endpoint: u16, pan: i16, tilt: i16, zoom: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZSETPOSITION, &encode_mptz_set_position(pan, tilt, zoom)?).await?;
+    Ok(())
+}
+
+/// Invoke `MPTZRelativeMove` command on cluster `Camera AV Settings User Level Management`.
+pub async fn mptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, pan_delta: i16, tilt_delta: i16, zoom_delta: i8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZRELATIVEMOVE, &encode_mptz_relative_move(pan_delta, tilt_delta, zoom_delta)?).await?;
+    Ok(())
+}
+
+/// Invoke `MPTZMoveToPreset` command on cluster `Camera AV Settings User Level Management`.
+pub async fn mptz_move_to_preset(conn: &crate::controller::Connection, endpoint: u16, preset_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZMOVETOPRESET, &encode_mptz_move_to_preset(preset_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `MPTZSavePreset` command on cluster `Camera AV Settings User Level Management`.
+pub async fn mptz_save_preset(conn: &crate::controller::Connection, endpoint: u16, preset_id: u8, name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZSAVEPRESET, &encode_mptz_save_preset(preset_id, name)?).await?;
+    Ok(())
+}
+
+/// Invoke `MPTZRemovePreset` command on cluster `Camera AV Settings User Level Management`.
+pub async fn mptz_remove_preset(conn: &crate::controller::Connection, endpoint: u16, preset_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZREMOVEPRESET, &encode_mptz_remove_preset(preset_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `DPTZSetViewport` command on cluster `Camera AV Settings User Level Management`.
+pub async fn dptz_set_viewport(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_DPTZSETVIEWPORT, &encode_dptz_set_viewport(video_stream_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `DPTZRelativeMove` command on cluster `Camera AV Settings User Level Management`.
+pub async fn dptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, delta_x: i16, delta_y: i16, zoom_delta: i8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_DPTZRELATIVEMOVE, &encode_dptz_relative_move(video_stream_id, delta_x, delta_y, zoom_delta)?).await?;
+    Ok(())
+}
+
+/// Read `MPTZPosition` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_mptz_position(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<MPTZ> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_MPTZPOSITION).await?;
+    decode_mptz_position(&tlv)
+}
+
+/// Read `MaxPresets` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_max_presets(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_MAXPRESETS).await?;
+    decode_max_presets(&tlv)
+}
+
+/// Read `MPTZPresets` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_mptz_presets(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<MPTZPreset>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_MPTZPRESETS).await?;
+    decode_mptz_presets(&tlv)
+}
+
+/// Read `DPTZStreams` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_dptz_streams(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DPTZ>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_DPTZSTREAMS).await?;
+    decode_dptz_streams(&tlv)
+}
+
+/// Read `ZoomMax` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_zoom_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_ZOOMMAX).await?;
+    decode_zoom_max(&tlv)
+}
+
+/// Read `TiltMin` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_tilt_min(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_TILTMIN).await?;
+    decode_tilt_min(&tlv)
+}
+
+/// Read `TiltMax` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_tilt_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_TILTMAX).await?;
+    decode_tilt_max(&tlv)
+}
+
+/// Read `PanMin` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_pan_min(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_PANMIN).await?;
+    decode_pan_min(&tlv)
+}
+
+/// Read `PanMax` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_pan_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_PANMAX).await?;
+    decode_pan_max(&tlv)
+}
+
+/// Read `MovementState` attribute from cluster `Camera AV Settings User Level Management`.
+pub async fn read_movement_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PhysicalMovement> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_ATTR_ID_MOVEMENTSTATE).await?;
+    decode_movement_state(&tlv)
+}
+

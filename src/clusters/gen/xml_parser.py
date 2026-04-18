@@ -81,7 +81,12 @@ class ClusterParser:
             if cmd_direction != 'commandToServer':
                 continue
 
-            command = MatterCommand(cmd_id, cmd_name, cmd_direction)
+            # Capture response reference; XML uses name of the response command,
+            # or "Y" for DefaultResponse (no typed response struct).
+            response_attr = cmd_elem.get('response')
+            response_name = response_attr if response_attr and response_attr != 'Y' else None
+
+            command = MatterCommand(cmd_id, cmd_name, cmd_direction, response_name=response_name)
 
             # Parse command fields
             for field_elem in cmd_elem.findall('field'):

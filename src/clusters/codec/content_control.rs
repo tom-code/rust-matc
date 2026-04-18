@@ -554,3 +554,167 @@ pub fn decode_reset_pin_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Rese
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `UpdatePIN` command on cluster `Content Control`.
+pub async fn update_pin(conn: &crate::controller::Connection, endpoint: u16, old_pin: String, new_pin: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_UPDATEPIN, &encode_update_pin(old_pin, new_pin)?).await?;
+    Ok(())
+}
+
+/// Invoke `ResetPIN` command on cluster `Content Control`.
+pub async fn reset_pin(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ResetPINResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_RESETPIN, &[]).await?;
+    decode_reset_pin_response(&tlv)
+}
+
+/// Invoke `Enable` command on cluster `Content Control`.
+pub async fn enable(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_ENABLE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Disable` command on cluster `Content Control`.
+pub async fn disable(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_DISABLE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `AddBonusTime` command on cluster `Content Control`.
+pub async fn add_bonus_time(conn: &crate::controller::Connection, endpoint: u16, pin_code: String, bonus_time: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_ADDBONUSTIME, &encode_add_bonus_time(pin_code, bonus_time)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetScreenDailyTime` command on cluster `Content Control`.
+pub async fn set_screen_daily_time(conn: &crate::controller::Connection, endpoint: u16, screen_time: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_SETSCREENDAILYTIME, &encode_set_screen_daily_time(screen_time)?).await?;
+    Ok(())
+}
+
+/// Invoke `BlockUnratedContent` command on cluster `Content Control`.
+pub async fn block_unrated_content(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_BLOCKUNRATEDCONTENT, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `UnblockUnratedContent` command on cluster `Content Control`.
+pub async fn unblock_unrated_content(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_UNBLOCKUNRATEDCONTENT, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `SetOnDemandRatingThreshold` command on cluster `Content Control`.
+pub async fn set_on_demand_rating_threshold(conn: &crate::controller::Connection, endpoint: u16, rating: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_SETONDEMANDRATINGTHRESHOLD, &encode_set_on_demand_rating_threshold(rating)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetScheduledContentRatingThreshold` command on cluster `Content Control`.
+pub async fn set_scheduled_content_rating_threshold(conn: &crate::controller::Connection, endpoint: u16, rating: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_SETSCHEDULEDCONTENTRATINGTHRESHOLD, &encode_set_scheduled_content_rating_threshold(rating)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddBlockChannels` command on cluster `Content Control`.
+pub async fn add_block_channels(conn: &crate::controller::Connection, endpoint: u16, channels: Vec<BlockChannel>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_ADDBLOCKCHANNELS, &encode_add_block_channels(channels)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveBlockChannels` command on cluster `Content Control`.
+pub async fn remove_block_channels(conn: &crate::controller::Connection, endpoint: u16, channel_indexes: Vec<u16>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_REMOVEBLOCKCHANNELS, &encode_remove_block_channels(channel_indexes)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddBlockApplications` command on cluster `Content Control`.
+pub async fn add_block_applications(conn: &crate::controller::Connection, endpoint: u16, applications: Vec<AppInfo>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_ADDBLOCKAPPLICATIONS, &encode_add_block_applications(applications)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveBlockApplications` command on cluster `Content Control`.
+pub async fn remove_block_applications(conn: &crate::controller::Connection, endpoint: u16, applications: Vec<AppInfo>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_REMOVEBLOCKAPPLICATIONS, &encode_remove_block_applications(applications)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetBlockContentTimeWindow` command on cluster `Content Control`.
+pub async fn set_block_content_time_window(conn: &crate::controller::Connection, endpoint: u16, time_window: TimeWindow) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_SETBLOCKCONTENTTIMEWINDOW, &encode_set_block_content_time_window(time_window)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveBlockContentTimeWindow` command on cluster `Content Control`.
+pub async fn remove_block_content_time_window(conn: &crate::controller::Connection, endpoint: u16, time_window_indexes: Vec<u16>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_REMOVEBLOCKCONTENTTIMEWINDOW, &encode_remove_block_content_time_window(time_window_indexes)?).await?;
+    Ok(())
+}
+
+/// Read `Enabled` attribute from cluster `Content Control`.
+pub async fn read_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_ENABLED).await?;
+    decode_enabled(&tlv)
+}
+
+/// Read `OnDemandRatings` attribute from cluster `Content Control`.
+pub async fn read_on_demand_ratings(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<RatingName>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_ONDEMANDRATINGS).await?;
+    decode_on_demand_ratings(&tlv)
+}
+
+/// Read `OnDemandRatingThreshold` attribute from cluster `Content Control`.
+pub async fn read_on_demand_rating_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_ONDEMANDRATINGTHRESHOLD).await?;
+    decode_on_demand_rating_threshold(&tlv)
+}
+
+/// Read `ScheduledContentRatings` attribute from cluster `Content Control`.
+pub async fn read_scheduled_content_ratings(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<RatingName>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_SCHEDULEDCONTENTRATINGS).await?;
+    decode_scheduled_content_ratings(&tlv)
+}
+
+/// Read `ScheduledContentRatingThreshold` attribute from cluster `Content Control`.
+pub async fn read_scheduled_content_rating_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_SCHEDULEDCONTENTRATINGTHRESHOLD).await?;
+    decode_scheduled_content_rating_threshold(&tlv)
+}
+
+/// Read `ScreenDailyTime` attribute from cluster `Content Control`.
+pub async fn read_screen_daily_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_SCREENDAILYTIME).await?;
+    decode_screen_daily_time(&tlv)
+}
+
+/// Read `RemainingScreenTime` attribute from cluster `Content Control`.
+pub async fn read_remaining_screen_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_REMAININGSCREENTIME).await?;
+    decode_remaining_screen_time(&tlv)
+}
+
+/// Read `BlockUnrated` attribute from cluster `Content Control`.
+pub async fn read_block_unrated(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_BLOCKUNRATED).await?;
+    decode_block_unrated(&tlv)
+}
+
+/// Read `BlockChannelList` attribute from cluster `Content Control`.
+pub async fn read_block_channel_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<BlockChannel>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_BLOCKCHANNELLIST).await?;
+    decode_block_channel_list(&tlv)
+}
+
+/// Read `BlockApplicationList` attribute from cluster `Content Control`.
+pub async fn read_block_application_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<AppInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_BLOCKAPPLICATIONLIST).await?;
+    decode_block_application_list(&tlv)
+}
+
+/// Read `BlockContentTimeWindow` attribute from cluster `Content Control`.
+pub async fn read_block_content_time_window(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TimeWindow>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_ATTR_ID_BLOCKCONTENTTIMEWINDOW).await?;
+    decode_block_content_time_window(&tlv)
+}
+

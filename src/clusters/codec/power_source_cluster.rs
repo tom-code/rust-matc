@@ -1272,6 +1272,200 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `Status` attribute from cluster `Power Source`.
+pub async fn read_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PowerSourceStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_STATUS).await?;
+    decode_status(&tlv)
+}
+
+/// Read `Order` attribute from cluster `Power Source`.
+pub async fn read_order(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_ORDER).await?;
+    decode_order(&tlv)
+}
+
+/// Read `Description` attribute from cluster `Power Source`.
+pub async fn read_description(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_DESCRIPTION).await?;
+    decode_description(&tlv)
+}
+
+/// Read `WiredAssessedInputVoltage` attribute from cluster `Power Source`.
+pub async fn read_wired_assessed_input_voltage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDASSESSEDINPUTVOLTAGE).await?;
+    decode_wired_assessed_input_voltage(&tlv)
+}
+
+/// Read `WiredAssessedInputFrequency` attribute from cluster `Power Source`.
+pub async fn read_wired_assessed_input_frequency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDASSESSEDINPUTFREQUENCY).await?;
+    decode_wired_assessed_input_frequency(&tlv)
+}
+
+/// Read `WiredCurrentType` attribute from cluster `Power Source`.
+pub async fn read_wired_current_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<WiredCurrentType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDCURRENTTYPE).await?;
+    decode_wired_current_type(&tlv)
+}
+
+/// Read `WiredAssessedCurrent` attribute from cluster `Power Source`.
+pub async fn read_wired_assessed_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDASSESSEDCURRENT).await?;
+    decode_wired_assessed_current(&tlv)
+}
+
+/// Read `WiredNominalVoltage` attribute from cluster `Power Source`.
+pub async fn read_wired_nominal_voltage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDNOMINALVOLTAGE).await?;
+    decode_wired_nominal_voltage(&tlv)
+}
+
+/// Read `WiredMaximumCurrent` attribute from cluster `Power Source`.
+pub async fn read_wired_maximum_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDMAXIMUMCURRENT).await?;
+    decode_wired_maximum_current(&tlv)
+}
+
+/// Read `WiredPresent` attribute from cluster `Power Source`.
+pub async fn read_wired_present(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_WIREDPRESENT).await?;
+    decode_wired_present(&tlv)
+}
+
+/// Read `ActiveWiredFaults` attribute from cluster `Power Source`.
+pub async fn read_active_wired_faults(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<WiredFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_ACTIVEWIREDFAULTS).await?;
+    decode_active_wired_faults(&tlv)
+}
+
+/// Read `BatVoltage` attribute from cluster `Power Source`.
+pub async fn read_bat_voltage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATVOLTAGE).await?;
+    decode_bat_voltage(&tlv)
+}
+
+/// Read `BatPercentRemaining` attribute from cluster `Power Source`.
+pub async fn read_bat_percent_remaining(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATPERCENTREMAINING).await?;
+    decode_bat_percent_remaining(&tlv)
+}
+
+/// Read `BatTimeRemaining` attribute from cluster `Power Source`.
+pub async fn read_bat_time_remaining(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATTIMEREMAINING).await?;
+    decode_bat_time_remaining(&tlv)
+}
+
+/// Read `BatChargeLevel` attribute from cluster `Power Source`.
+pub async fn read_bat_charge_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BatChargeLevel> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATCHARGELEVEL).await?;
+    decode_bat_charge_level(&tlv)
+}
+
+/// Read `BatReplacementNeeded` attribute from cluster `Power Source`.
+pub async fn read_bat_replacement_needed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATREPLACEMENTNEEDED).await?;
+    decode_bat_replacement_needed(&tlv)
+}
+
+/// Read `BatReplaceability` attribute from cluster `Power Source`.
+pub async fn read_bat_replaceability(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BatReplaceability> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATREPLACEABILITY).await?;
+    decode_bat_replaceability(&tlv)
+}
+
+/// Read `BatPresent` attribute from cluster `Power Source`.
+pub async fn read_bat_present(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATPRESENT).await?;
+    decode_bat_present(&tlv)
+}
+
+/// Read `ActiveBatFaults` attribute from cluster `Power Source`.
+pub async fn read_active_bat_faults(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<BatFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_ACTIVEBATFAULTS).await?;
+    decode_active_bat_faults(&tlv)
+}
+
+/// Read `BatReplacementDescription` attribute from cluster `Power Source`.
+pub async fn read_bat_replacement_description(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATREPLACEMENTDESCRIPTION).await?;
+    decode_bat_replacement_description(&tlv)
+}
+
+/// Read `BatCommonDesignation` attribute from cluster `Power Source`.
+pub async fn read_bat_common_designation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BatCommonDesignation> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATCOMMONDESIGNATION).await?;
+    decode_bat_common_designation(&tlv)
+}
+
+/// Read `BatANSIDesignation` attribute from cluster `Power Source`.
+pub async fn read_bat_ansi_designation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATANSIDESIGNATION).await?;
+    decode_bat_ansi_designation(&tlv)
+}
+
+/// Read `BatIECDesignation` attribute from cluster `Power Source`.
+pub async fn read_bat_iec_designation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATIECDESIGNATION).await?;
+    decode_bat_iec_designation(&tlv)
+}
+
+/// Read `BatApprovedChemistry` attribute from cluster `Power Source`.
+pub async fn read_bat_approved_chemistry(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BatApprovedChemistry> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATAPPROVEDCHEMISTRY).await?;
+    decode_bat_approved_chemistry(&tlv)
+}
+
+/// Read `BatCapacity` attribute from cluster `Power Source`.
+pub async fn read_bat_capacity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATCAPACITY).await?;
+    decode_bat_capacity(&tlv)
+}
+
+/// Read `BatQuantity` attribute from cluster `Power Source`.
+pub async fn read_bat_quantity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATQUANTITY).await?;
+    decode_bat_quantity(&tlv)
+}
+
+/// Read `BatChargeState` attribute from cluster `Power Source`.
+pub async fn read_bat_charge_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<BatChargeState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATCHARGESTATE).await?;
+    decode_bat_charge_state(&tlv)
+}
+
+/// Read `BatTimeToFullCharge` attribute from cluster `Power Source`.
+pub async fn read_bat_time_to_full_charge(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATTIMETOFULLCHARGE).await?;
+    decode_bat_time_to_full_charge(&tlv)
+}
+
+/// Read `BatFunctionalWhileCharging` attribute from cluster `Power Source`.
+pub async fn read_bat_functional_while_charging(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATFUNCTIONALWHILECHARGING).await?;
+    decode_bat_functional_while_charging(&tlv)
+}
+
+/// Read `BatChargingCurrent` attribute from cluster `Power Source`.
+pub async fn read_bat_charging_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_BATCHARGINGCURRENT).await?;
+    decode_bat_charging_current(&tlv)
+}
+
+/// Read `ActiveBatChargeFaults` attribute from cluster `Power Source`.
+pub async fn read_active_bat_charge_faults(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<BatChargeFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_ACTIVEBATCHARGEFAULTS).await?;
+    decode_active_bat_charge_faults(&tlv)
+}
+
+/// Read `EndpointList` attribute from cluster `Power Source`.
+pub async fn read_endpoint_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE, crate::clusters::defs::CLUSTER_POWER_SOURCE_ATTR_ID_ENDPOINTLIST).await?;
+    decode_endpoint_list(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct WiredFaultChangeEvent {
     pub current: Option<Vec<WiredFault>>,

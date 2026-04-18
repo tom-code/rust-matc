@@ -467,6 +467,98 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `InstantAction` command on cluster `Actions`.
+pub async fn instant_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_INSTANTACTION, &encode_instant_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `InstantActionWithTransition` command on cluster `Actions`.
+pub async fn instant_action_with_transition(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, transition_time: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_INSTANTACTIONWITHTRANSITION, &encode_instant_action_with_transition(action_id, invoke_id, transition_time)?).await?;
+    Ok(())
+}
+
+/// Invoke `StartAction` command on cluster `Actions`.
+pub async fn start_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_STARTACTION, &encode_start_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `StartActionWithDuration` command on cluster `Actions`.
+pub async fn start_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_STARTACTIONWITHDURATION, &encode_start_action_with_duration(action_id, invoke_id, duration)?).await?;
+    Ok(())
+}
+
+/// Invoke `StopAction` command on cluster `Actions`.
+pub async fn stop_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_STOPACTION, &encode_stop_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `PauseAction` command on cluster `Actions`.
+pub async fn pause_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_PAUSEACTION, &encode_pause_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `PauseActionWithDuration` command on cluster `Actions`.
+pub async fn pause_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_PAUSEACTIONWITHDURATION, &encode_pause_action_with_duration(action_id, invoke_id, duration)?).await?;
+    Ok(())
+}
+
+/// Invoke `ResumeAction` command on cluster `Actions`.
+pub async fn resume_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_RESUMEACTION, &encode_resume_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnableAction` command on cluster `Actions`.
+pub async fn enable_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_ENABLEACTION, &encode_enable_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnableActionWithDuration` command on cluster `Actions`.
+pub async fn enable_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_ENABLEACTIONWITHDURATION, &encode_enable_action_with_duration(action_id, invoke_id, duration)?).await?;
+    Ok(())
+}
+
+/// Invoke `DisableAction` command on cluster `Actions`.
+pub async fn disable_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_DISABLEACTION, &encode_disable_action(action_id, invoke_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `DisableActionWithDuration` command on cluster `Actions`.
+pub async fn disable_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_DISABLEACTIONWITHDURATION, &encode_disable_action_with_duration(action_id, invoke_id, duration)?).await?;
+    Ok(())
+}
+
+/// Read `ActionList` attribute from cluster `Actions`.
+pub async fn read_action_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Action>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_ATTR_ID_ACTIONLIST).await?;
+    decode_action_list(&tlv)
+}
+
+/// Read `EndpointLists` attribute from cluster `Actions`.
+pub async fn read_endpoint_lists(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<EndpointList>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_ATTR_ID_ENDPOINTLISTS).await?;
+    decode_endpoint_lists(&tlv)
+}
+
+/// Read `SetupURL` attribute from cluster `Actions`.
+pub async fn read_setup_url(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_ATTR_ID_SETUPURL).await?;
+    decode_setup_url(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct StateChangedEvent {
     pub action_id: Option<u16>,

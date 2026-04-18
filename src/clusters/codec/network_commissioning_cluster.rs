@@ -589,3 +589,107 @@ pub fn decode_connect_network_response(inp: &tlv::TlvItemValue) -> anyhow::Resul
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ScanNetworks` command on cluster `Network Commissioning`.
+pub async fn scan_networks(conn: &crate::controller::Connection, endpoint: u16, ssid: Option<Vec<u8>>, breadcrumb: u64) -> anyhow::Result<ScanNetworksResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_SCANNETWORKS, &encode_scan_networks(ssid, breadcrumb)?).await?;
+    decode_scan_networks_response(&tlv)
+}
+
+/// Invoke `AddOrUpdateWiFiNetwork` command on cluster `Network Commissioning`.
+pub async fn add_or_update_wifi_network(conn: &crate::controller::Connection, endpoint: u16, ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_ADDORUPDATEWIFINETWORK, &encode_add_or_update_wifi_network(ssid, credentials, breadcrumb)?).await?;
+    decode_network_config_response(&tlv)
+}
+
+/// Invoke `AddOrUpdateThreadNetwork` command on cluster `Network Commissioning`.
+pub async fn add_or_update_thread_network(conn: &crate::controller::Connection, endpoint: u16, operational_dataset: Vec<u8>, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_ADDORUPDATETHREADNETWORK, &encode_add_or_update_thread_network(operational_dataset, breadcrumb)?).await?;
+    decode_network_config_response(&tlv)
+}
+
+/// Invoke `RemoveNetwork` command on cluster `Network Commissioning`.
+pub async fn remove_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_REMOVENETWORK, &encode_remove_network(network_id, breadcrumb)?).await?;
+    decode_network_config_response(&tlv)
+}
+
+/// Invoke `ConnectNetwork` command on cluster `Network Commissioning`.
+pub async fn connect_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, breadcrumb: u64) -> anyhow::Result<ConnectNetworkResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_CONNECTNETWORK, &encode_connect_network(network_id, breadcrumb)?).await?;
+    decode_connect_network_response(&tlv)
+}
+
+/// Invoke `ReorderNetwork` command on cluster `Network Commissioning`.
+pub async fn reorder_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, network_index: u8, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_REORDERNETWORK, &encode_reorder_network(network_id, network_index, breadcrumb)?).await?;
+    decode_network_config_response(&tlv)
+}
+
+/// Read `MaxNetworks` attribute from cluster `Network Commissioning`.
+pub async fn read_max_networks(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_MAXNETWORKS).await?;
+    decode_max_networks(&tlv)
+}
+
+/// Read `Networks` attribute from cluster `Network Commissioning`.
+pub async fn read_networks(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NetworkInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_NETWORKS).await?;
+    decode_networks(&tlv)
+}
+
+/// Read `ScanMaxTimeSeconds` attribute from cluster `Network Commissioning`.
+pub async fn read_scan_max_time_seconds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_SCANMAXTIMESECONDS).await?;
+    decode_scan_max_time_seconds(&tlv)
+}
+
+/// Read `ConnectMaxTimeSeconds` attribute from cluster `Network Commissioning`.
+pub async fn read_connect_max_time_seconds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_CONNECTMAXTIMESECONDS).await?;
+    decode_connect_max_time_seconds(&tlv)
+}
+
+/// Read `InterfaceEnabled` attribute from cluster `Network Commissioning`.
+pub async fn read_interface_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_INTERFACEENABLED).await?;
+    decode_interface_enabled(&tlv)
+}
+
+/// Read `LastNetworkingStatus` attribute from cluster `Network Commissioning`.
+pub async fn read_last_networking_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<NetworkCommissioningStatus>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_LASTNETWORKINGSTATUS).await?;
+    decode_last_networking_status(&tlv)
+}
+
+/// Read `LastNetworkID` attribute from cluster `Network Commissioning`.
+pub async fn read_last_network_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_LASTNETWORKID).await?;
+    decode_last_network_id(&tlv)
+}
+
+/// Read `LastConnectErrorValue` attribute from cluster `Network Commissioning`.
+pub async fn read_last_connect_error_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_LASTCONNECTERRORVALUE).await?;
+    decode_last_connect_error_value(&tlv)
+}
+
+/// Read `SupportedWiFiBands` attribute from cluster `Network Commissioning`.
+pub async fn read_supported_wifi_bands(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<WiFiBand>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_SUPPORTEDWIFIBANDS).await?;
+    decode_supported_wifi_bands(&tlv)
+}
+
+/// Read `SupportedThreadFeatures` attribute from cluster `Network Commissioning`.
+pub async fn read_supported_thread_features(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ThreadCapabilities> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_SUPPORTEDTHREADFEATURES).await?;
+    decode_supported_thread_features(&tlv)
+}
+
+/// Read `ThreadVersion` attribute from cluster `Network Commissioning`.
+pub async fn read_thread_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_ATTR_ID_THREADVERSION).await?;
+    decode_thread_version(&tlv)
+}
+

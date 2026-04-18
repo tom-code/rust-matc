@@ -62,3 +62,11 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `Sources` attribute from cluster `Power Source Configuration`.
+pub async fn read_sources(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_SOURCE_CONFIGURATION, crate::clusters::defs::CLUSTER_POWER_SOURCE_CONFIGURATION_ATTR_ID_SOURCES).await?;
+    decode_sources(&tlv)
+}
+

@@ -1095,6 +1095,56 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AllocatePushTransport` command on cluster `Push AV Stream Transport`.
+pub async fn allocate_push_transport(conn: &crate::controller::Connection, endpoint: u16, transport_options: TransportOptions) -> anyhow::Result<AllocatePushTransportResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_ALLOCATEPUSHTRANSPORT, &encode_allocate_push_transport(transport_options)?).await?;
+    decode_allocate_push_transport_response(&tlv)
+}
+
+/// Invoke `DeallocatePushTransport` command on cluster `Push AV Stream Transport`.
+pub async fn deallocate_push_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_DEALLOCATEPUSHTRANSPORT, &encode_deallocate_push_transport(connection_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `ModifyPushTransport` command on cluster `Push AV Stream Transport`.
+pub async fn modify_push_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8, transport_options: TransportOptions) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_MODIFYPUSHTRANSPORT, &encode_modify_push_transport(connection_id, transport_options)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetTransportStatus` command on cluster `Push AV Stream Transport`.
+pub async fn set_transport_status(conn: &crate::controller::Connection, endpoint: u16, connection_id: Option<u8>, transport_status: TransportStatus) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_SETTRANSPORTSTATUS, &encode_set_transport_status(connection_id, transport_status)?).await?;
+    Ok(())
+}
+
+/// Invoke `ManuallyTriggerTransport` command on cluster `Push AV Stream Transport`.
+pub async fn manually_trigger_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8, activation_reason: TriggerActivationReason, time_control: TransportMotionTriggerTimeControl, user_defined: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_MANUALLYTRIGGERTRANSPORT, &encode_manually_trigger_transport(connection_id, activation_reason, time_control, user_defined)?).await?;
+    Ok(())
+}
+
+/// Invoke `FindTransport` command on cluster `Push AV Stream Transport`.
+pub async fn find_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: Option<u8>) -> anyhow::Result<FindTransportResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_FINDTRANSPORT, &encode_find_transport(connection_id)?).await?;
+    decode_find_transport_response(&tlv)
+}
+
+/// Read `SupportedFormats` attribute from cluster `Push AV Stream Transport`.
+pub async fn read_supported_formats(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<SupportedFormat>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_ATTR_ID_SUPPORTEDFORMATS).await?;
+    decode_supported_formats(&tlv)
+}
+
+/// Read `CurrentConnections` attribute from cluster `Push AV Stream Transport`.
+pub async fn read_current_connections(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TransportConfiguration>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_ATTR_ID_CURRENTCONNECTIONS).await?;
+    decode_current_connections(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct PushTransportBeginEvent {
     pub connection_id: Option<u8>,

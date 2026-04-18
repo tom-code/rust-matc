@@ -317,6 +317,86 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Open` command on cluster `Valve Configuration and Control`.
+pub async fn open(conn: &crate::controller::Connection, endpoint: u16, open_duration: Option<u32>, target_level: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_CMD_ID_OPEN, &encode_open(open_duration, target_level)?).await?;
+    Ok(())
+}
+
+/// Invoke `Close` command on cluster `Valve Configuration and Control`.
+pub async fn close(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_CMD_ID_CLOSE, &[]).await?;
+    Ok(())
+}
+
+/// Read `OpenDuration` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_open_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_OPENDURATION).await?;
+    decode_open_duration(&tlv)
+}
+
+/// Read `DefaultOpenDuration` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_default_open_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_DEFAULTOPENDURATION).await?;
+    decode_default_open_duration(&tlv)
+}
+
+/// Read `AutoCloseTime` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_auto_close_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_AUTOCLOSETIME).await?;
+    decode_auto_close_time(&tlv)
+}
+
+/// Read `RemainingDuration` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_remaining_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_REMAININGDURATION).await?;
+    decode_remaining_duration(&tlv)
+}
+
+/// Read `CurrentState` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_current_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ValveState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_CURRENTSTATE).await?;
+    decode_current_state(&tlv)
+}
+
+/// Read `TargetState` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_target_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ValveState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_TARGETSTATE).await?;
+    decode_target_state(&tlv)
+}
+
+/// Read `CurrentLevel` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_current_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_CURRENTLEVEL).await?;
+    decode_current_level(&tlv)
+}
+
+/// Read `TargetLevel` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_target_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_TARGETLEVEL).await?;
+    decode_target_level(&tlv)
+}
+
+/// Read `DefaultOpenLevel` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_default_open_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_DEFAULTOPENLEVEL).await?;
+    decode_default_open_level(&tlv)
+}
+
+/// Read `ValveFault` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_valve_fault(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ValveFault> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_VALVEFAULT).await?;
+    decode_valve_fault(&tlv)
+}
+
+/// Read `LevelStep` attribute from cluster `Valve Configuration and Control`.
+pub async fn read_level_step(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_ATTR_ID_LEVELSTEP).await?;
+    decode_level_step(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ValveStateChangedEvent {
     pub valve_state: Option<ValveState>,

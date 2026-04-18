@@ -144,6 +144,7 @@ enum CommandCommand {
     ListParts {},
     ListBridgedDevices {},
     ListAttributes {},
+    ListDevices {},
     StartCommissioning {
         pin: u32,
 
@@ -453,6 +454,396 @@ async fn all_attributes(connection: &mut controller::Connection) {
     print_endpoint_attributes(connection, 0).await;
 }
 
+struct EndpointInfo {
+    endpoint: u16,
+    device_types: Vec<(u32, String)>,
+    label: Option<String>,
+    product_name: Option<String>,
+    product_label: Option<String>,
+    vendor_name: Option<String>,
+    reachable: Option<bool>,
+    parts: Vec<u16>,
+    on_off: Option<bool>,
+    level: Option<u64>,
+    battery_level: Option<String>,
+    temperature: Option<i64>,
+    occupancy: Option<u64>,
+    illuminance: Option<u64>,
+    rooms: Vec<String>,
+}
+
+async fn collect_endpoint_info(connection: &mut controller::Connection, endpoint: u16) -> EndpointInfo {
+    use clusters::defs::*;
+    let mut info = EndpointInfo {
+        endpoint,
+        device_types: Vec::new(),
+        label: None,
+        product_name: None,
+        product_label: None,
+        vendor_name: None,
+        reachable: None,
+        parts: Vec::new(),
+        on_off: None,
+        level: None,
+        battery_level: None,
+        temperature: None,
+        occupancy: None,
+        illuminance: None,
+        rooms: Vec::new(),
+    };
+
+    if let Ok(tlv::TlvItemValue::List(lst)) = connection.read_request2(
+        endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_DEVICETYPELIST,
+    ).await {
+        for item in &lst {
+            if let Some(dt_id) = item.get_int(&[0]) {
+                let name = clusters::dt_names::get_device_type_name(dt_id as u32)
+                    .unwrap_or("Unknown")
+                    .to_string();
+                info.device_types.push((dt_id as u32, name));
+            }
+        }
+    }
+
+    if let Ok(tlv::TlvItemValue::List(lst)) = connection.read_request2(
+        endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+    ).await {
+        for item in lst {
+            if let tlv::TlvItemValue::Int(v) = item.value {
+                info.parts.push(v as u16);
+            }
+        }
+    }
+
+    let server_clusters: Vec<u32> = if let Ok(tlv::TlvItemValue::List(lst)) = connection.read_request2(
+        endpoint, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
+    ).await {
+        lst.into_iter()
+            .filter_map(|item| if let tlv::TlvItemValue::Int(v) = item.value { Some(v as u32) } else { None })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    if server_clusters.contains(&CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION) {
+        let c = CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION;
+        if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+            CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_VENDORNAME).await {
+            info.vendor_name = Some(s);
+        }
+        if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+            CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTNAME).await {
+            info.product_name = Some(s);
+        }
+        if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+            CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_NODELABEL).await {
+            if !s.is_empty() { info.label = Some(s); }
+        }
+        if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+            CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTLABEL).await {
+            info.product_label = Some(s);
+        }
+        if let Ok(tlv::TlvItemValue::Bool(b)) = connection.read_request2(endpoint, c,
+            CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_REACHABLE).await {
+            info.reachable = Some(b);
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_BASIC_INFORMATION) {
+        let c = CLUSTER_ID_BASIC_INFORMATION;
+        if info.vendor_name.is_none() {
+            if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+                CLUSTER_BASIC_INFORMATION_ATTR_ID_VENDORNAME).await {
+                info.vendor_name = Some(s);
+            }
+        }
+        if info.product_name.is_none() {
+            if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+                CLUSTER_BASIC_INFORMATION_ATTR_ID_PRODUCTNAME).await {
+                info.product_name = Some(s);
+            }
+        }
+        if info.label.is_none() {
+            if let Ok(tlv::TlvItemValue::String(s)) = connection.read_request2(endpoint, c,
+                CLUSTER_BASIC_INFORMATION_ATTR_ID_NODELABEL).await {
+                if !s.is_empty() { info.label = Some(s); }
+            }
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_ON_OFF) {
+        if let Ok(tlv::TlvItemValue::Bool(b)) = connection.read_request2(endpoint,
+            CLUSTER_ID_ON_OFF, CLUSTER_ON_OFF_ATTR_ID_ONOFF).await {
+            info.on_off = Some(b);
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_LEVEL_CONTROL) {
+        if let Ok(tlv::TlvItemValue::Int(v)) = connection.read_request2(endpoint,
+            CLUSTER_ID_LEVEL_CONTROL, CLUSTER_LEVEL_CONTROL_ATTR_ID_CURRENTLEVEL).await {
+            info.level = Some(v);
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_POWER_SOURCE) {
+        let out = connection.read_request2(endpoint,
+            CLUSTER_ID_POWER_SOURCE, CLUSTER_POWER_SOURCE_ATTR_ID_BATCHARGELEVEL).await;
+        if let Ok(ref val) = out {
+            let json = clusters::codec::decode_attribute_json(
+                CLUSTER_ID_POWER_SOURCE, CLUSTER_POWER_SOURCE_ATTR_ID_BATCHARGELEVEL, val);
+            info.battery_level = Some(json.trim_matches('"').to_string());
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_TEMPERATURE_MEASUREMENT) {
+        if let Ok(tlv::TlvItemValue::Int(v)) = connection.read_request2(endpoint,
+            CLUSTER_ID_TEMPERATURE_MEASUREMENT,
+            CLUSTER_TEMPERATURE_MEASUREMENT_ATTR_ID_MEASUREDVALUE).await {
+            info.temperature = Some(v as i64);
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_OCCUPANCY_SENSING) {
+        if let Ok(tlv::TlvItemValue::Int(v)) = connection.read_request2(endpoint,
+            CLUSTER_ID_OCCUPANCY_SENSING, CLUSTER_OCCUPANCY_SENSING_ATTR_ID_OCCUPANCY).await {
+            info.occupancy = Some(v);
+        }
+    }
+
+    if server_clusters.contains(&CLUSTER_ID_ILLUMINANCE_MEASUREMENT) {
+        if let Ok(tlv::TlvItemValue::Int(v)) = connection.read_request2(endpoint,
+            CLUSTER_ID_ILLUMINANCE_MEASUREMENT,
+            CLUSTER_ILLUMINANCE_MEASUREMENT_ATTR_ID_MEASUREDVALUE).await {
+            info.illuminance = Some(v);
+        }
+    }
+
+    info
+}
+
+async fn collect_rooms(connection: &mut controller::Connection) -> Vec<(String, Vec<u16>)> {
+    let out = connection.read_request2(
+        1,
+        clusters::defs::CLUSTER_ID_ACTIONS,
+        clusters::defs::CLUSTER_ACTIONS_ATTR_ID_ENDPOINTLISTS,
+    ).await;
+    if let Ok(ref val) = out {
+        let json_str = clusters::codec::decode_attribute_json(
+            clusters::defs::CLUSTER_ID_ACTIONS,
+            clusters::defs::CLUSTER_ACTIONS_ATTR_ID_ENDPOINTLISTS,
+            val,
+        );
+        if let Ok(arr) = serde_json::from_str::<serde_json::Value>(&json_str) {
+            if let Some(arr) = arr.as_array() {
+                return arr.iter().filter_map(|item| {
+                    let name = item.get("name")?.as_str()?.to_string();
+                    let endpoints: Vec<u16> = item.get("endpoints")?
+                        .as_array()?
+                        .iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u16))
+                        .collect();
+                    Some((name, endpoints))
+                }).collect();
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn format_endpoint_summary(info: &EndpointInfo) -> String {
+    let mut segments: Vec<String> = Vec::new();
+
+    segments.push(format!("ep{:<3}", info.endpoint));
+
+    if let Some(ref label) = info.label {
+        segments.push(format!("\"{}\"", label));
+    }
+
+    // Primary device type: skip Bridged Node (0x13) and Root Node (0x16)
+    let primary_dt = info.device_types.iter()
+        .find(|(id, _)| *id != 0x13 && *id != 0x16)
+        .or_else(|| info.device_types.first());
+    if let Some((_, name)) = primary_dt {
+        segments.push(name.clone());
+    }
+
+    let product = info.product_label.as_deref().or(info.product_name.as_deref());
+    let vendor = info.vendor_name.as_deref();
+    match (product, vendor) {
+        (Some(p), Some(v)) => segments.push(format!("{} ({})", p, v)),
+        (Some(p), None) => segments.push(p.to_string()),
+        _ => {}
+    }
+
+    if let Some(on) = info.on_off {
+        segments.push(if on { "ON".to_string() } else { "off".to_string() });
+    }
+    if let Some(lv) = info.level {
+        segments.push(format!("lv:{}", lv));
+    }
+    if let Some(ref bat) = info.battery_level {
+        segments.push(format!("bat:{}", bat));
+    }
+    if let Some(temp) = info.temperature {
+        segments.push(format!("{:.1}C", temp as f32 / 100.0));
+    }
+    if let Some(occ) = info.occupancy {
+        segments.push(format!("occ:{}", occ));
+    }
+    if let Some(lux) = info.illuminance {
+        segments.push(format!("lux:{}", lux));
+    }
+
+    if !info.rooms.is_empty() {
+        segments.push(format!("[{}]", info.rooms.join(", ")));
+    }
+
+    if info.reachable == Some(false) {
+        segments.push("!unreachable".to_string());
+    }
+
+    segments.join("  ")
+}
+
+fn print_endpoint_tree(
+    infos: &std::collections::HashMap<u16, EndpointInfo>,
+    children_map: &std::collections::HashMap<u16, Vec<u16>>,
+    endpoint: u16,
+    node_prefix: &str,
+    children_prefix: &str,
+) {
+    if let Some(info) = infos.get(&endpoint) {
+        println!("{}{}", node_prefix, format_endpoint_summary(info));
+        if let Some(children) = children_map.get(&endpoint) {
+            let n = children.len();
+            for (i, &child) in children.iter().enumerate() {
+                let is_last = i == n - 1;
+                let child_node_prefix = format!("{}+-- ", children_prefix);
+                let child_children_prefix = if is_last {
+                    format!("{}    ", children_prefix)
+                } else {
+                    format!("{}|   ", children_prefix)
+                };
+                print_endpoint_tree(infos, children_map, child, &child_node_prefix, &child_children_prefix);
+            }
+        }
+    }
+}
+
+async fn list_devices(connection: &mut controller::Connection) {
+    use std::collections::HashMap;
+    use clusters::defs::*;
+
+    let all_eps_tlv = connection.read_request2(
+        0, CLUSTER_ID_DESCRIPTOR, CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+    ).await;
+    let mut all_endpoints: Vec<u16> = vec![0];
+    if let Ok(tlv::TlvItemValue::List(lst)) = all_eps_tlv {
+        for item in lst {
+            if let tlv::TlvItemValue::Int(v) = item.value {
+                all_endpoints.push(v as u16);
+            }
+        }
+    }
+
+    let mut infos: HashMap<u16, EndpointInfo> = HashMap::new();
+    for ep in &all_endpoints {
+        let info = collect_endpoint_info(connection, *ep).await;
+        infos.insert(*ep, info);
+    }
+
+    let rooms = collect_rooms(connection).await;
+
+    let mut ep_to_rooms: HashMap<u16, Vec<String>> = HashMap::new();
+    for (room_name, eps) in &rooms {
+        for &ep in eps {
+            ep_to_rooms.entry(ep).or_default().push(room_name.clone());
+        }
+    }
+    for info in infos.values_mut() {
+        if let Some(room_list) = ep_to_rooms.get(&info.endpoint) {
+            info.rooms = room_list.clone();
+        }
+    }
+
+    // Print bridge info from ep0
+    let sw_ver = connection.read_request2(0, CLUSTER_ID_BASIC_INFORMATION,
+        CLUSTER_BASIC_INFORMATION_ATTR_ID_SOFTWAREVERSIONSTRING).await;
+    let serial = connection.read_request2(0, CLUSTER_ID_BASIC_INFORMATION,
+        CLUSTER_BASIC_INFORMATION_ATTR_ID_SERIALNUMBER).await;
+    let sw_str = if let Ok(tlv::TlvItemValue::String(s)) = sw_ver { s } else { String::new() };
+    let serial_str = if let Ok(tlv::TlvItemValue::String(s)) = serial { s } else { String::new() };
+
+    let bridge_label = infos.get(&0).and_then(|i| i.label.clone());
+    let bridge_product = infos.get(&0).and_then(|i| i.product_name.clone());
+    let bridge_vendor = infos.get(&0).and_then(|i| i.vendor_name.clone());
+    let bridge_display = match (bridge_label, bridge_product, bridge_vendor) {
+        (Some(label), Some(product), Some(vendor)) => format!("{} ({}) by {}", label, product, vendor),
+        (Some(label), Some(product), None) => format!("{} ({})", label, product),
+        (Some(label), None, _) => label,
+        (None, Some(product), Some(vendor)) => format!("{} by {}", product, vendor),
+        (None, Some(product), None) => product,
+        _ => "Unknown".to_string(),
+    };
+    print!("Bridge: {}", bridge_display);
+    if !sw_str.is_empty() { print!("  sw {}", sw_str); }
+    if !serial_str.is_empty() { print!("  serial {}", serial_str); }
+    println!();
+
+    // Print rooms
+    if !rooms.is_empty() {
+        println!("\nRooms:");
+        let max_name_len = rooms.iter().map(|(n, _)| n.len()).max().unwrap_or(0);
+        for (room_name, eps) in &rooms {
+            let device_names: Vec<String> = eps.iter().filter_map(|ep| {
+                let info = infos.get(ep)?;
+                info.label.clone()
+                    .or_else(|| info.product_label.clone())
+                    .or_else(|| info.product_name.clone())
+            }).collect();
+            println!("  {:<width$}  {}", room_name, device_names.join(", "), width = max_name_len);
+        }
+    }
+
+    // Build direct parent map: for each endpoint, find its most specific parent
+    // (the parent that is itself a child of another ancestor)
+    let mut all_parents: HashMap<u16, Vec<u16>> = HashMap::new();
+    for (&ep, info) in &infos {
+        for &part in &info.parts {
+            all_parents.entry(part).or_default().push(ep);
+        }
+    }
+    let mut direct_parent: HashMap<u16, u16> = HashMap::new();
+    for (&ep, parents) in &all_parents {
+        // Pick the deepest ancestor: the parent contained by the most other parents in the set
+        let best = parents.iter().max_by_key(|&&p| {
+            parents.iter().filter(|&&q| q != p && infos.get(&q).map_or(false, |qi| qi.parts.contains(&p))).count()
+        }).copied();
+        if let Some(b) = best {
+            direct_parent.insert(ep, b);
+        }
+    }
+
+    let mut children_map: HashMap<u16, Vec<u16>> = HashMap::new();
+    for (&ep, &parent) in &direct_parent {
+        children_map.entry(parent).or_default().push(ep);
+    }
+    for children in children_map.values_mut() {
+        children.sort();
+    }
+
+    let mut roots: Vec<u16> = all_endpoints.iter()
+        .filter(|&&ep| !direct_parent.contains_key(&ep))
+        .copied()
+        .collect();
+    roots.sort();
+
+    println!("\nDevices:");
+    for &root in &roots {
+        print_endpoint_tree(&infos, &children_map, root, "  ", "  ");
+    }
+}
+
 fn command_cmd(
     command: CommandCommand,
     local_address: &str,
@@ -612,6 +1003,9 @@ fn command_cmd(
             }
             CommandCommand::ListAttributes {} => {
                 all_attributes(&mut connection).await;
+            }
+            CommandCommand::ListDevices {} => {
+                list_devices(&mut connection).await;
             }
             CommandCommand::StartCommissioning { pin, iterations, discriminator, timeout } => {
                 let mut salt = [0; 32];

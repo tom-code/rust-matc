@@ -196,3 +196,23 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `HourFormat` attribute from cluster `Time Format Localization`.
+pub async fn read_hour_format(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<HourFormat> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_FORMAT_LOCALIZATION, crate::clusters::defs::CLUSTER_TIME_FORMAT_LOCALIZATION_ATTR_ID_HOURFORMAT).await?;
+    decode_hour_format(&tlv)
+}
+
+/// Read `ActiveCalendarType` attribute from cluster `Time Format Localization`.
+pub async fn read_active_calendar_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<CalendarType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_FORMAT_LOCALIZATION, crate::clusters::defs::CLUSTER_TIME_FORMAT_LOCALIZATION_ATTR_ID_ACTIVECALENDARTYPE).await?;
+    decode_active_calendar_type(&tlv)
+}
+
+/// Read `SupportedCalendarTypes` attribute from cluster `Time Format Localization`.
+pub async fn read_supported_calendar_types(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<CalendarType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_FORMAT_LOCALIZATION, crate::clusters::defs::CLUSTER_TIME_FORMAT_LOCALIZATION_ATTR_ID_SUPPORTEDCALENDARTYPES).await?;
+    decode_supported_calendar_types(&tlv)
+}
+

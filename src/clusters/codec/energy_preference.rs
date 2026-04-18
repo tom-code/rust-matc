@@ -185,3 +185,35 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `EnergyBalances` attribute from cluster `Energy Preference`.
+pub async fn read_energy_balances(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Balance>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_PREFERENCE, crate::clusters::defs::CLUSTER_ENERGY_PREFERENCE_ATTR_ID_ENERGYBALANCES).await?;
+    decode_energy_balances(&tlv)
+}
+
+/// Read `CurrentEnergyBalance` attribute from cluster `Energy Preference`.
+pub async fn read_current_energy_balance(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_PREFERENCE, crate::clusters::defs::CLUSTER_ENERGY_PREFERENCE_ATTR_ID_CURRENTENERGYBALANCE).await?;
+    decode_current_energy_balance(&tlv)
+}
+
+/// Read `EnergyPriorities` attribute from cluster `Energy Preference`.
+pub async fn read_energy_priorities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<EnergyPriority>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_PREFERENCE, crate::clusters::defs::CLUSTER_ENERGY_PREFERENCE_ATTR_ID_ENERGYPRIORITIES).await?;
+    decode_energy_priorities(&tlv)
+}
+
+/// Read `LowPowerModeSensitivities` attribute from cluster `Energy Preference`.
+pub async fn read_low_power_mode_sensitivities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Balance>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_PREFERENCE, crate::clusters::defs::CLUSTER_ENERGY_PREFERENCE_ATTR_ID_LOWPOWERMODESENSITIVITIES).await?;
+    decode_low_power_mode_sensitivities(&tlv)
+}
+
+/// Read `CurrentLowPowerModeSensitivity` attribute from cluster `Energy Preference`.
+pub async fn read_current_low_power_mode_sensitivity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_PREFERENCE, crate::clusters::defs::CLUSTER_ENERGY_PREFERENCE_ATTR_ID_CURRENTLOWPOWERMODESENSITIVITY).await?;
+    decode_current_low_power_mode_sensitivity(&tlv)
+}
+

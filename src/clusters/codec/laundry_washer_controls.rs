@@ -155,3 +155,29 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `SpinSpeeds` attribute from cluster `Laundry Washer Controls`.
+pub async fn read_spin_speeds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_CONTROLS, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_CONTROLS_ATTR_ID_SPINSPEEDS).await?;
+    decode_spin_speeds(&tlv)
+}
+
+/// Read `SpinSpeedCurrent` attribute from cluster `Laundry Washer Controls`.
+pub async fn read_spin_speed_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_CONTROLS, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_CONTROLS_ATTR_ID_SPINSPEEDCURRENT).await?;
+    decode_spin_speed_current(&tlv)
+}
+
+/// Read `NumberOfRinses` attribute from cluster `Laundry Washer Controls`.
+pub async fn read_number_of_rinses(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<NumberOfRinses> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_CONTROLS, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_CONTROLS_ATTR_ID_NUMBEROFRINSES).await?;
+    decode_number_of_rinses(&tlv)
+}
+
+/// Read `SupportedRinses` attribute from cluster `Laundry Washer Controls`.
+pub async fn read_supported_rinses(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NumberOfRinses>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_LAUNDRY_WASHER_CONTROLS, crate::clusters::defs::CLUSTER_LAUNDRY_WASHER_CONTROLS_ATTR_ID_SUPPORTEDRINSES).await?;
+    decode_supported_rinses(&tlv)
+}
+

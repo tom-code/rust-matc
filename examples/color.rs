@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use matc::clusters::codec::color_control as cc;
 use matc::{certmanager, clusters, controller, transport};
 
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
@@ -273,274 +274,59 @@ async fn create_connection(
 
 
 
-/// Executes a color control command and returns the TLV-encoded response
+/// Executes a color control command via the generated typed facade.
 async fn execute_color_command(
-    connection: &mut controller::Connection,
+    connection: &controller::Connection,
     endpoint: u16,
     command: Commands,
 ) -> Result<()> {
-    let (params, command_id) = match command {
+    let mask = DEFAULT_OPTIONS_MASK;
+    let over = DEFAULT_OPTIONS_OVERRIDE;
+    let ep = endpoint;
 
-        Commands::MoveToHue {
-            hue,
-            direction,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_move_to_hue(
-                hue,
-                direction.into(),
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUE,
-        ),
-        Commands::MoveHue { move_mode, rate } => (
-            clusters::codec::color_control::encode_move_hue(
-                move_mode.into(),
-                rate,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVEHUE,
-        ),
-        Commands::StepHue {
-            step_mode,
-            step_size,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_step_hue(
-                step_mode.into(),
-                step_size,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPHUE,
-        ),
-        Commands::MoveToSaturation {
-            saturation,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_move_to_saturation(
-                saturation,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOSATURATION,
-        ),
-        Commands::MoveSaturation { move_mode, rate } => (
-            clusters::codec::color_control::encode_move_saturation(
-                move_mode.into(),
-                rate,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVESATURATION,
-        ),
-        Commands::StepSaturation {
-            step_mode,
-            step_size,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_step_saturation(
-                step_mode.into(),
-                step_size,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPSATURATION,
-        ),
-        Commands::MoveToHueAndSaturation {
-            hue,
-            saturation,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_move_to_hue_and_saturation(
-                hue,
-                saturation,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUEANDSATURATION,
-        ),
-        Commands::MoveToColor {
-            color_x,
-            color_y,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_move_to_color(
-                color_x,
-                color_y,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOCOLOR,
-        ),
-        Commands::MoveColor { rate_x, rate_y } => (
-            clusters::codec::color_control::encode_move_color(
-                rate_x,
-                rate_y,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVECOLOR,
-        ),
-        Commands::StepColor {
-            step_x,
-            step_y,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_step_color(
-                step_x,
-                step_y,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPCOLOR,
-        ),
-        Commands::MoveToColorTemperature {
-            color_temperature_mireds,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_move_to_color_temperature(
-                color_temperature_mireds,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOCOLORTEMPERATURE,
-        ),
-        Commands::EnhancedMoveToHue {
-            enhanced_hue,
-            direction,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_enhanced_move_to_hue(
-                enhanced_hue,
-                direction.into(),
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDMOVETOHUE,
-        ),
-        Commands::EnhancedMoveHue { move_mode, rate } => (
-            clusters::codec::color_control::encode_enhanced_move_hue(
-                move_mode.into(),
-                rate,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDMOVEHUE,
-        ),
-        Commands::EnhancedStepHue {
-            step_mode,
-            step_size,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_enhanced_step_hue(
-                step_mode.into(),
-                step_size,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDSTEPHUE,
-        ),
-        Commands::EnhancedMoveToHueAndSaturation {
-            enhanced_hue,
-            saturation,
-            transition_time,
-        } => (
-            clusters::codec::color_control::encode_enhanced_move_to_hue_and_saturation(
-                enhanced_hue,
-                saturation,
-                transition_time,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDMOVETOHUEANDSATURATION,
-        ),
-        Commands::ColorLoopSet {
-            update_flags,
-            action,
-            direction,
-            time,
-            start_hue,
-        } => (
-            clusters::codec::color_control::encode_color_loop_set(
-                update_flags,
-                action.into(),
-                direction.into(),
-                time,
-                start_hue,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_COLORLOOPSET,
-        ),
-        Commands::StopMoveStep => (
-            clusters::codec::color_control::encode_stop_move_step(
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STOPMOVESTEP,
-        ),
-        Commands::MoveColorTemperature {
-            move_mode,
-            rate,
-            color_temperature_minimum_mireds,
-            color_temperature_maximum_mireds,
-        } => (
-            clusters::codec::color_control::encode_move_color_temperature(
-                move_mode.into(),
-                rate,
-                color_temperature_minimum_mireds,
-                color_temperature_maximum_mireds,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVECOLORTEMPERATURE,
-        ),
-        Commands::StepColorTemperature {
-            step_mode,
-            step_size,
-            transition_time,
-            color_temperature_minimum_mireds,
-            color_temperature_maximum_mireds,
-        } => (
-            clusters::codec::color_control::encode_step_color_temperature(
-                step_mode.into(),
-                step_size,
-                transition_time,
-                color_temperature_minimum_mireds,
-                color_temperature_maximum_mireds,
-                DEFAULT_OPTIONS_MASK,
-                DEFAULT_OPTIONS_OVERRIDE,
-            )?,
-            clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPCOLORTEMPERATURE,
-        ),
-    };
+    match command {
+        Commands::MoveToHue { hue, direction, transition_time } =>
+            cc::move_to_hue(connection, ep, hue, direction.into(), transition_time, mask, over).await,
+        Commands::MoveHue { move_mode, rate } =>
+            cc::move_hue(connection, ep, move_mode.into(), rate, mask, over).await,
+        Commands::StepHue { step_mode, step_size, transition_time } =>
+            cc::step_hue(connection, ep, step_mode.into(), step_size, transition_time, mask, over).await,
+        Commands::MoveToSaturation { saturation, transition_time } =>
+            cc::move_to_saturation(connection, ep, saturation, transition_time, mask, over).await,
+        Commands::MoveSaturation { move_mode, rate } =>
+            cc::move_saturation(connection, ep, move_mode.into(), rate, mask, over).await,
+        Commands::StepSaturation { step_mode, step_size, transition_time } =>
+            cc::step_saturation(connection, ep, step_mode.into(), step_size, transition_time, mask, over).await,
+        Commands::MoveToHueAndSaturation { hue, saturation, transition_time } =>
+            cc::move_to_hue_and_saturation(connection, ep, hue, saturation, transition_time, mask, over).await,
+        Commands::MoveToColor { color_x, color_y, transition_time } =>
+            cc::move_to_color(connection, ep, color_x, color_y, transition_time, mask, over).await,
+        Commands::MoveColor { rate_x, rate_y } =>
+            cc::move_color(connection, ep, rate_x, rate_y, mask, over).await,
+        Commands::StepColor { step_x, step_y, transition_time } =>
+            cc::step_color(connection, ep, step_x, step_y, transition_time, mask, over).await,
+        Commands::MoveToColorTemperature { color_temperature_mireds, transition_time } =>
+            cc::move_to_color_temperature(connection, ep, color_temperature_mireds, transition_time, mask, over).await,
+        Commands::EnhancedMoveToHue { enhanced_hue, direction, transition_time } =>
+            cc::enhanced_move_to_hue(connection, ep, enhanced_hue, direction.into(), transition_time, mask, over).await,
+        Commands::EnhancedMoveHue { move_mode, rate } =>
+            cc::enhanced_move_hue(connection, ep, move_mode.into(), rate, mask, over).await,
+        Commands::EnhancedStepHue { step_mode, step_size, transition_time } =>
+            cc::enhanced_step_hue(connection, ep, step_mode.into(), step_size, transition_time, mask, over).await,
+        Commands::EnhancedMoveToHueAndSaturation { enhanced_hue, saturation, transition_time } =>
+            cc::enhanced_move_to_hue_and_saturation(connection, ep, enhanced_hue, saturation, transition_time, mask, over).await,
+        Commands::ColorLoopSet { update_flags, action, direction, time, start_hue } =>
+            cc::color_loop_set(connection, ep, update_flags, action.into(), direction.into(), time, start_hue, mask, over).await,
+        Commands::StopMoveStep =>
+            cc::stop_move_step(connection, ep, mask, over).await,
+        Commands::MoveColorTemperature { move_mode, rate, color_temperature_minimum_mireds, color_temperature_maximum_mireds } =>
+            cc::move_color_temperature(connection, ep, move_mode.into(), rate, color_temperature_minimum_mireds, color_temperature_maximum_mireds, mask, over).await,
+        Commands::StepColorTemperature { step_mode, step_size, transition_time, color_temperature_minimum_mireds, color_temperature_maximum_mireds } =>
+            cc::step_color_temperature(connection, ep, step_mode.into(), step_size, transition_time, color_temperature_minimum_mireds, color_temperature_maximum_mireds, mask, over).await,
+    }
+    .context("Failed to invoke color control command")?;
 
-    let res = connection
-        .invoke_request(
-            endpoint,
-            clusters::defs::CLUSTER_ID_COLOR_CONTROL,
-            command_id,
-            &params,
-        )
-        .await
-        .context("Failed to invoke color control command")?;
-
-    println!("Command successful. Response:");
-    res.tlv.dump(1);
-
+    println!("Command successful.");
     Ok(())
 }
 
@@ -568,7 +354,7 @@ async fn main() -> Result<()> {
     setup_logging(cli.verbose);
 
     // Create authenticated connection to device
-    let mut connection = create_connection(
+    let connection = create_connection(
         &cli.local_address,
         &cli.device_address,
         cli.device_id,
@@ -578,7 +364,7 @@ async fn main() -> Result<()> {
     .await?;
 
     // Execute the color control command
-    execute_color_command(&mut connection, cli.endpoint, cli.command).await?;
+    execute_color_command(&connection, cli.endpoint, cli.command).await?;
 
     Ok(())
 }

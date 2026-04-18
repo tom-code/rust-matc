@@ -629,6 +629,158 @@ pub fn decode_playback_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Playb
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Play` command on cluster `Media Playback`.
+pub async fn play(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_PLAY, &[]).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `Pause` command on cluster `Media Playback`.
+pub async fn pause(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_PAUSE, &[]).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `Stop` command on cluster `Media Playback`.
+pub async fn stop(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_STOP, &[]).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `StartOver` command on cluster `Media Playback`.
+pub async fn start_over(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_STARTOVER, &[]).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `Previous` command on cluster `Media Playback`.
+pub async fn previous(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_PREVIOUS, &[]).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `Next` command on cluster `Media Playback`.
+pub async fn next(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_NEXT, &[]).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `Rewind` command on cluster `Media Playback`.
+pub async fn rewind(conn: &crate::controller::Connection, endpoint: u16, audio_advance_unmuted: bool) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_REWIND, &encode_rewind(audio_advance_unmuted)?).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `FastForward` command on cluster `Media Playback`.
+pub async fn fast_forward(conn: &crate::controller::Connection, endpoint: u16, audio_advance_unmuted: bool) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_FASTFORWARD, &encode_fast_forward(audio_advance_unmuted)?).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `SkipForward` command on cluster `Media Playback`.
+pub async fn skip_forward(conn: &crate::controller::Connection, endpoint: u16, delta_position_milliseconds: u64) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_SKIPFORWARD, &encode_skip_forward(delta_position_milliseconds)?).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `SkipBackward` command on cluster `Media Playback`.
+pub async fn skip_backward(conn: &crate::controller::Connection, endpoint: u16, delta_position_milliseconds: u64) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_SKIPBACKWARD, &encode_skip_backward(delta_position_milliseconds)?).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `Seek` command on cluster `Media Playback`.
+pub async fn seek(conn: &crate::controller::Connection, endpoint: u16, position: u64) -> anyhow::Result<PlaybackResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_SEEK, &encode_seek(position)?).await?;
+    decode_playback_response(&tlv)
+}
+
+/// Invoke `ActivateAudioTrack` command on cluster `Media Playback`.
+pub async fn activate_audio_track(conn: &crate::controller::Connection, endpoint: u16, track_id: String, audio_output_index: Option<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_ACTIVATEAUDIOTRACK, &encode_activate_audio_track(track_id, audio_output_index)?).await?;
+    Ok(())
+}
+
+/// Invoke `ActivateTextTrack` command on cluster `Media Playback`.
+pub async fn activate_text_track(conn: &crate::controller::Connection, endpoint: u16, track_id: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_ACTIVATETEXTTRACK, &encode_activate_text_track(track_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `DeactivateTextTrack` command on cluster `Media Playback`.
+pub async fn deactivate_text_track(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_CMD_ID_DEACTIVATETEXTTRACK, &[]).await?;
+    Ok(())
+}
+
+/// Read `CurrentState` attribute from cluster `Media Playback`.
+pub async fn read_current_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PlaybackState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_CURRENTSTATE).await?;
+    decode_current_state(&tlv)
+}
+
+/// Read `StartTime` attribute from cluster `Media Playback`.
+pub async fn read_start_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_STARTTIME).await?;
+    decode_start_time(&tlv)
+}
+
+/// Read `Duration` attribute from cluster `Media Playback`.
+pub async fn read_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_DURATION).await?;
+    decode_duration(&tlv)
+}
+
+/// Read `SampledPosition` attribute from cluster `Media Playback`.
+pub async fn read_sampled_position(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<PlaybackPosition>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_SAMPLEDPOSITION).await?;
+    decode_sampled_position(&tlv)
+}
+
+/// Read `PlaybackSpeed` attribute from cluster `Media Playback`.
+pub async fn read_playback_speed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_PLAYBACKSPEED).await?;
+    decode_playback_speed(&tlv)
+}
+
+/// Read `SeekRangeEnd` attribute from cluster `Media Playback`.
+pub async fn read_seek_range_end(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_SEEKRANGEEND).await?;
+    decode_seek_range_end(&tlv)
+}
+
+/// Read `SeekRangeStart` attribute from cluster `Media Playback`.
+pub async fn read_seek_range_start(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_SEEKRANGESTART).await?;
+    decode_seek_range_start(&tlv)
+}
+
+/// Read `ActiveAudioTrack` attribute from cluster `Media Playback`.
+pub async fn read_active_audio_track(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Track>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_ACTIVEAUDIOTRACK).await?;
+    decode_active_audio_track(&tlv)
+}
+
+/// Read `AvailableAudioTracks` attribute from cluster `Media Playback`.
+pub async fn read_available_audio_tracks(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Track>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_AVAILABLEAUDIOTRACKS).await?;
+    decode_available_audio_tracks(&tlv)
+}
+
+/// Read `ActiveTextTrack` attribute from cluster `Media Playback`.
+pub async fn read_active_text_track(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Track>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_ACTIVETEXTTRACK).await?;
+    decode_active_text_track(&tlv)
+}
+
+/// Read `AvailableTextTracks` attribute from cluster `Media Playback`.
+pub async fn read_available_text_tracks(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Track>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_PLAYBACK, crate::clusters::defs::CLUSTER_MEDIA_PLAYBACK_ATTR_ID_AVAILABLETEXTTRACKS).await?;
+    decode_available_text_tracks(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct StateChangedEvent {
     pub current_state: Option<PlaybackState>,

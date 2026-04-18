@@ -233,3 +233,35 @@ pub fn decode_launcher_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Launc
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `LaunchApp` command on cluster `Application Launcher`.
+pub async fn launch_app(conn: &crate::controller::Connection, endpoint: u16, application: Application, data: Vec<u8>) -> anyhow::Result<LauncherResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_LAUNCHER, crate::clusters::defs::CLUSTER_APPLICATION_LAUNCHER_CMD_ID_LAUNCHAPP, &encode_launch_app(application, data)?).await?;
+    decode_launcher_response(&tlv)
+}
+
+/// Invoke `StopApp` command on cluster `Application Launcher`.
+pub async fn stop_app(conn: &crate::controller::Connection, endpoint: u16, application: Application) -> anyhow::Result<LauncherResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_LAUNCHER, crate::clusters::defs::CLUSTER_APPLICATION_LAUNCHER_CMD_ID_STOPAPP, &encode_stop_app(application)?).await?;
+    decode_launcher_response(&tlv)
+}
+
+/// Invoke `HideApp` command on cluster `Application Launcher`.
+pub async fn hide_app(conn: &crate::controller::Connection, endpoint: u16, application: Application) -> anyhow::Result<LauncherResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_LAUNCHER, crate::clusters::defs::CLUSTER_APPLICATION_LAUNCHER_CMD_ID_HIDEAPP, &encode_hide_app(application)?).await?;
+    decode_launcher_response(&tlv)
+}
+
+/// Read `CatalogList` attribute from cluster `Application Launcher`.
+pub async fn read_catalog_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_LAUNCHER, crate::clusters::defs::CLUSTER_APPLICATION_LAUNCHER_ATTR_ID_CATALOGLIST).await?;
+    decode_catalog_list(&tlv)
+}
+
+/// Read `CurrentApp` attribute from cluster `Application Launcher`.
+pub async fn read_current_app(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ApplicationEP>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_LAUNCHER, crate::clusters::defs::CLUSTER_APPLICATION_LAUNCHER_ATTR_ID_CURRENTAPP).await?;
+    decode_current_app(&tlv)
+}
+

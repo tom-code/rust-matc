@@ -154,6 +154,28 @@ def escape_rust_keyword(name: str) -> str:
     return name
 
 
+def _make_identifier(name: str) -> str:
+    """Normalise a Matter name into a safe Rust identifier fragment.
+
+    Mirrors `gen2.py::make_identifier` so façade emitters reference the same
+    constants that `defs.rs` declares.
+    """
+    if not name:
+        return name
+    if name[0].isdigit():
+        name = '_' + name
+    return name.replace(' ', '_').replace('.', '_').replace('-', '_').replace('/', '_')
+
+
+def upper_ident(name: str) -> str:
+    """Uppercase identifier fragment used in `defs.rs` constants.
+
+    Matches `gen2.py::make_identifier_upper` exactly — e.g. `"On/Off"` → `ON_OFF`,
+    `"MoveToHue"` → `MOVETOHUE`.
+    """
+    return _make_identifier(name).upper()
+
+
 def is_cross_cluster_struct(field_type: str, structs: Optional[Dict] = None) -> bool:
     """
     Check if a field type is a cross-cluster struct reference.

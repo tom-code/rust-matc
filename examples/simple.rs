@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use matc::{certmanager, clusters, controller, tlv::TlvItemValue, transport};
+use matc::{certmanager, clusters::codec::on_off, controller, transport};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,45 +31,14 @@ async fn main() -> Result<()> {
         .commission(&connection, pin, device_id, controller_id)
         .await?;
 
-    // send ON command to device
-    connection
-        .invoke_request(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON,
-            &[],
-        )
-        .await?;
+    // Typed facade: one free function per command / attribute, generated
+    // from the Matter XML spec. Compare with invoke_request / read_request2
+    // calls against raw clusters::defs constants.
+    on_off::on(&connection, 1).await?;
+    assert_eq!(on_off::read_on_off(&connection, 1).await?, true);
 
-    // read ON/OFF state
-    let res = connection
-        .read_request2(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF,
-        )
-        .await?;
-    assert!(res == TlvItemValue::Bool(true));
-
-    // send OFF command to device
-    connection
-        .invoke_request(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_CMD_ID_OFF,
-            &[],
-        )
-        .await?;
-
-    // read ON/OFF state
-    let res = connection
-        .read_request2(
-            1,
-            clusters::defs::CLUSTER_ID_ON_OFF,
-            clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF,
-        )
-        .await?;
-    assert!(res == TlvItemValue::Bool(false));
+    on_off::off(&connection, 1).await?;
+    assert_eq!(on_off::read_on_off(&connection, 1).await?, false);
 
     Ok(())
 }

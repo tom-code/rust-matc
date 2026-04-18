@@ -343,3 +343,53 @@ pub fn decode_key_set_read_all_indices_response(inp: &tlv::TlvItemValue) -> anyh
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `KeySetWrite` command on cluster `Group Key Management`.
+pub async fn key_set_write(conn: &crate::controller::Connection, endpoint: u16, group_key_set: GroupKeySet) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_CMD_ID_KEYSETWRITE, &encode_key_set_write(group_key_set)?).await?;
+    Ok(())
+}
+
+/// Invoke `KeySetRead` command on cluster `Group Key Management`.
+pub async fn key_set_read(conn: &crate::controller::Connection, endpoint: u16, group_key_set_id: u16) -> anyhow::Result<KeySetReadResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_CMD_ID_KEYSETREAD, &encode_key_set_read(group_key_set_id)?).await?;
+    decode_key_set_read_response(&tlv)
+}
+
+/// Invoke `KeySetRemove` command on cluster `Group Key Management`.
+pub async fn key_set_remove(conn: &crate::controller::Connection, endpoint: u16, group_key_set_id: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_CMD_ID_KEYSETREMOVE, &encode_key_set_remove(group_key_set_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `KeySetReadAllIndices` command on cluster `Group Key Management`.
+pub async fn key_set_read_all_indices(conn: &crate::controller::Connection, endpoint: u16, do_not_use: u8) -> anyhow::Result<KeySetReadAllIndicesResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_CMD_ID_KEYSETREADALLINDICES, &encode_key_set_read_all_indices(do_not_use)?).await?;
+    decode_key_set_read_all_indices_response(&tlv)
+}
+
+/// Read `GroupKeyMap` attribute from cluster `Group Key Management`.
+pub async fn read_group_key_map(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<GroupKeyMap>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_ATTR_ID_GROUPKEYMAP).await?;
+    decode_group_key_map(&tlv)
+}
+
+/// Read `GroupTable` attribute from cluster `Group Key Management`.
+pub async fn read_group_table(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<GroupInfoMap>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_ATTR_ID_GROUPTABLE).await?;
+    decode_group_table(&tlv)
+}
+
+/// Read `MaxGroupsPerFabric` attribute from cluster `Group Key Management`.
+pub async fn read_max_groups_per_fabric(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_ATTR_ID_MAXGROUPSPERFABRIC).await?;
+    decode_max_groups_per_fabric(&tlv)
+}
+
+/// Read `MaxGroupKeysPerFabric` attribute from cluster `Group Key Management`.
+pub async fn read_max_group_keys_per_fabric(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_ATTR_ID_MAXGROUPKEYSPERFABRIC).await?;
+    decode_max_group_keys_per_fabric(&tlv)
+}
+

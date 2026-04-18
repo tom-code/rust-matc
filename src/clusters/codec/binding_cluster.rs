@@ -75,3 +75,11 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `Binding` attribute from cluster `Binding`.
+pub async fn read_binding(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Target>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BINDING, crate::clusters::defs::CLUSTER_BINDING_ATTR_ID_BINDING).await?;
+    decode_binding(&tlv)
+}
+

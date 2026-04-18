@@ -158,3 +158,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `DeviceDirectory` attribute from cluster `Ecosystem Information`.
+pub async fn read_device_directory(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<EcosystemDevice>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ECOSYSTEM_INFORMATION, crate::clusters::defs::CLUSTER_ECOSYSTEM_INFORMATION_ATTR_ID_DEVICEDIRECTORY).await?;
+    decode_device_directory(&tlv)
+}
+
+/// Read `LocationDirectory` attribute from cluster `Ecosystem Information`.
+pub async fn read_location_directory(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<EcosystemLocation>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ECOSYSTEM_INFORMATION, crate::clusters::defs::CLUSTER_ECOSYSTEM_INFORMATION_ATTR_ID_LOCATIONDIRECTORY).await?;
+    decode_location_directory(&tlv)
+}
+

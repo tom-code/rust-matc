@@ -186,3 +186,65 @@ pub fn decode_dataset_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Datase
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `GetActiveDatasetRequest` command on cluster `Thread Border Router Management`.
+pub async fn get_active_dataset_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<DatasetResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_CMD_ID_GETACTIVEDATASETREQUEST, &[]).await?;
+    decode_dataset_response(&tlv)
+}
+
+/// Invoke `GetPendingDatasetRequest` command on cluster `Thread Border Router Management`.
+pub async fn get_pending_dataset_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<DatasetResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_CMD_ID_GETPENDINGDATASETREQUEST, &[]).await?;
+    decode_dataset_response(&tlv)
+}
+
+/// Invoke `SetActiveDatasetRequest` command on cluster `Thread Border Router Management`.
+pub async fn set_active_dataset_request(conn: &crate::controller::Connection, endpoint: u16, active_dataset: Vec<u8>, breadcrumb: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_CMD_ID_SETACTIVEDATASETREQUEST, &encode_set_active_dataset_request(active_dataset, breadcrumb)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetPendingDatasetRequest` command on cluster `Thread Border Router Management`.
+pub async fn set_pending_dataset_request(conn: &crate::controller::Connection, endpoint: u16, pending_dataset: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_CMD_ID_SETPENDINGDATASETREQUEST, &encode_set_pending_dataset_request(pending_dataset)?).await?;
+    Ok(())
+}
+
+/// Read `BorderRouterName` attribute from cluster `Thread Border Router Management`.
+pub async fn read_border_router_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_ATTR_ID_BORDERROUTERNAME).await?;
+    decode_border_router_name(&tlv)
+}
+
+/// Read `BorderAgentID` attribute from cluster `Thread Border Router Management`.
+pub async fn read_border_agent_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_ATTR_ID_BORDERAGENTID).await?;
+    decode_border_agent_id(&tlv)
+}
+
+/// Read `ThreadVersion` attribute from cluster `Thread Border Router Management`.
+pub async fn read_thread_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_ATTR_ID_THREADVERSION).await?;
+    decode_thread_version(&tlv)
+}
+
+/// Read `InterfaceEnabled` attribute from cluster `Thread Border Router Management`.
+pub async fn read_interface_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_ATTR_ID_INTERFACEENABLED).await?;
+    decode_interface_enabled(&tlv)
+}
+
+/// Read `ActiveDatasetTimestamp` attribute from cluster `Thread Border Router Management`.
+pub async fn read_active_dataset_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_ATTR_ID_ACTIVEDATASETTIMESTAMP).await?;
+    decode_active_dataset_timestamp(&tlv)
+}
+
+/// Read `PendingDatasetTimestamp` attribute from cluster `Thread Border Router Management`.
+pub async fn read_pending_dataset_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_ATTR_ID_PENDINGDATASETTIMESTAMP).await?;
+    decode_pending_dataset_timestamp(&tlv)
+}
+

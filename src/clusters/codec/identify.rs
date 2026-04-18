@@ -214,3 +214,29 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Identify` command on cluster `Identify`.
+pub async fn identify(conn: &crate::controller::Connection, endpoint: u16, identify_time: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_IDENTIFY, crate::clusters::defs::CLUSTER_IDENTIFY_CMD_ID_IDENTIFY, &encode_identify(identify_time)?).await?;
+    Ok(())
+}
+
+/// Invoke `TriggerEffect` command on cluster `Identify`.
+pub async fn trigger_effect(conn: &crate::controller::Connection, endpoint: u16, effect_identifier: EffectIdentifier, effect_variant: EffectVariant) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_IDENTIFY, crate::clusters::defs::CLUSTER_IDENTIFY_CMD_ID_TRIGGEREFFECT, &encode_trigger_effect(effect_identifier, effect_variant)?).await?;
+    Ok(())
+}
+
+/// Read `IdentifyTime` attribute from cluster `Identify`.
+pub async fn read_identify_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_IDENTIFY, crate::clusters::defs::CLUSTER_IDENTIFY_ATTR_ID_IDENTIFYTIME).await?;
+    decode_identify_time(&tlv)
+}
+
+/// Read `IdentifyType` attribute from cluster `Identify`.
+pub async fn read_identify_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<IdentifyType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_IDENTIFY, crate::clusters::defs::CLUSTER_IDENTIFY_ATTR_ID_IDENTIFYTYPE).await?;
+    decode_identify_type(&tlv)
+}
+

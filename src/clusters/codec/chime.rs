@@ -105,3 +105,29 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `PlayChimeSound` command on cluster `Chime`.
+pub async fn play_chime_sound(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_CMD_ID_PLAYCHIMESOUND, &[]).await?;
+    Ok(())
+}
+
+/// Read `InstalledChimeSounds` attribute from cluster `Chime`.
+pub async fn read_installed_chime_sounds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ChimeSound>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_ATTR_ID_INSTALLEDCHIMESOUNDS).await?;
+    decode_installed_chime_sounds(&tlv)
+}
+
+/// Read `SelectedChime` attribute from cluster `Chime`.
+pub async fn read_selected_chime(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_ATTR_ID_SELECTEDCHIME).await?;
+    decode_selected_chime(&tlv)
+}
+
+/// Read `Enabled` attribute from cluster `Chime`.
+pub async fn read_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_ATTR_ID_ENABLED).await?;
+    decode_enabled(&tlv)
+}
+

@@ -411,6 +411,92 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ResetCounts` command on cluster `Wi-Fi Network Diagnostics`.
+pub async fn reset_counts(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_CMD_ID_RESETCOUNTS, &[]).await?;
+    Ok(())
+}
+
+/// Read `BSSID` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_bssid(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_BSSID).await?;
+    decode_bssid(&tlv)
+}
+
+/// Read `SecurityType` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_security_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<SecurityType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_SECURITYTYPE).await?;
+    decode_security_type(&tlv)
+}
+
+/// Read `WiFiVersion` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_wifi_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<WiFiVersion>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_WIFIVERSION).await?;
+    decode_wifi_version(&tlv)
+}
+
+/// Read `ChannelNumber` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_channel_number(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_CHANNELNUMBER).await?;
+    decode_channel_number(&tlv)
+}
+
+/// Read `RSSI` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_rssi(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_RSSI).await?;
+    decode_rssi(&tlv)
+}
+
+/// Read `BeaconLostCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_beacon_lost_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_BEACONLOSTCOUNT).await?;
+    decode_beacon_lost_count(&tlv)
+}
+
+/// Read `BeaconRxCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_beacon_rx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_BEACONRXCOUNT).await?;
+    decode_beacon_rx_count(&tlv)
+}
+
+/// Read `PacketMulticastRxCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_packet_multicast_rx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_PACKETMULTICASTRXCOUNT).await?;
+    decode_packet_multicast_rx_count(&tlv)
+}
+
+/// Read `PacketMulticastTxCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_packet_multicast_tx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_PACKETMULTICASTTXCOUNT).await?;
+    decode_packet_multicast_tx_count(&tlv)
+}
+
+/// Read `PacketUnicastRxCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_packet_unicast_rx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_PACKETUNICASTRXCOUNT).await?;
+    decode_packet_unicast_rx_count(&tlv)
+}
+
+/// Read `PacketUnicastTxCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_packet_unicast_tx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_PACKETUNICASTTXCOUNT).await?;
+    decode_packet_unicast_tx_count(&tlv)
+}
+
+/// Read `CurrentMaxRate` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_current_max_rate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_CURRENTMAXRATE).await?;
+    decode_current_max_rate(&tlv)
+}
+
+/// Read `OverrunCount` attribute from cluster `Wi-Fi Network Diagnostics`.
+pub async fn read_overrun_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_DIAGNOSTICS_ATTR_ID_OVERRUNCOUNT).await?;
+    decode_overrun_count(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct DisconnectionEvent {
     pub reason_code: Option<u16>,

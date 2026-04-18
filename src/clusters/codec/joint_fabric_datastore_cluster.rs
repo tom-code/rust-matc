@@ -1066,3 +1066,209 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AddKeySet` command on cluster `Joint Fabric Datastore`.
+pub async fn add_key_set(conn: &crate::controller::Connection, endpoint: u16, group_key_set: DatastoreGroupKeySet) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDKEYSET, &encode_add_key_set(group_key_set)?).await?;
+    Ok(())
+}
+
+/// Invoke `UpdateKeySet` command on cluster `Joint Fabric Datastore`.
+pub async fn update_key_set(conn: &crate::controller::Connection, endpoint: u16, group_key_set: DatastoreGroupKeySet) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATEKEYSET, &encode_update_key_set(group_key_set)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveKeySet` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_key_set(conn: &crate::controller::Connection, endpoint: u16, group_key_set_id: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEKEYSET, &encode_remove_key_set(group_key_set_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddGroup` command on cluster `Joint Fabric Datastore`.
+pub async fn add_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, friendly_name: String, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: DatastoreAccessControlEntryPrivilege) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDGROUP, &encode_add_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)?).await?;
+    Ok(())
+}
+
+/// Invoke `UpdateGroup` command on cluster `Joint Fabric Datastore`.
+pub async fn update_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: Option<DatastoreAccessControlEntryPrivilege>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATEGROUP, &encode_update_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveGroup` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEGROUP, &encode_remove_group(group_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddAdmin` command on cluster `Joint Fabric Datastore`.
+pub async fn add_admin(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, friendly_name: String, vendor_id: u16, icac: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDADMIN, &encode_add_admin(node_id, friendly_name, vendor_id, icac)?).await?;
+    Ok(())
+}
+
+/// Invoke `UpdateAdmin` command on cluster `Joint Fabric Datastore`.
+pub async fn update_admin(conn: &crate::controller::Connection, endpoint: u16, node_id: Option<u64>, friendly_name: Option<String>, icac: Option<Vec<u8>>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATEADMIN, &encode_update_admin(node_id, friendly_name, icac)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveAdmin` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_admin(conn: &crate::controller::Connection, endpoint: u16, node_id: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEADMIN, &encode_remove_admin(node_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddPendingNode` command on cluster `Joint Fabric Datastore`.
+pub async fn add_pending_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, friendly_name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDPENDINGNODE, &encode_add_pending_node(node_id, friendly_name)?).await?;
+    Ok(())
+}
+
+/// Invoke `RefreshNode` command on cluster `Joint Fabric Datastore`.
+pub async fn refresh_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REFRESHNODE, &encode_refresh_node(node_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `UpdateNode` command on cluster `Joint Fabric Datastore`.
+pub async fn update_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, friendly_name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATENODE, &encode_update_node(node_id, friendly_name)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveNode` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVENODE, &encode_remove_node(node_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `UpdateEndpointForNode` command on cluster `Joint Fabric Datastore`.
+pub async fn update_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u16, node_id: u64, friendly_name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATEENDPOINTFORNODE, &encode_update_endpoint_for_node(endpoint_id, node_id, friendly_name)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddGroupIDToEndpointForNode` command on cluster `Joint Fabric Datastore`.
+pub async fn add_group_id_to_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, group_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDGROUPIDTOENDPOINTFORNODE, &encode_add_group_id_to_endpoint_for_node(node_id, endpoint_id, group_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveGroupIDFromEndpointForNode` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_group_id_from_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, group_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEGROUPIDFROMENDPOINTFORNODE, &encode_remove_group_id_from_endpoint_for_node(node_id, endpoint_id, group_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddBindingToEndpointForNode` command on cluster `Joint Fabric Datastore`.
+pub async fn add_binding_to_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, binding: DatastoreBindingTarget) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDBINDINGTOENDPOINTFORNODE, &encode_add_binding_to_endpoint_for_node(node_id, endpoint_id, binding)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveBindingFromEndpointForNode` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_binding_from_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, list_id: u16, endpoint_id: u16, node_id: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEBINDINGFROMENDPOINTFORNODE, &encode_remove_binding_from_endpoint_for_node(list_id, endpoint_id, node_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddACLToNode` command on cluster `Joint Fabric Datastore`.
+pub async fn add_acl_to_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, acl_entry: DatastoreAccessControlEntry) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDACLTONODE, &encode_add_acl_to_node(node_id, acl_entry)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveACLFromNode` command on cluster `Joint Fabric Datastore`.
+pub async fn remove_acl_from_node(conn: &crate::controller::Connection, endpoint: u16, list_id: u16, node_id: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEACLFROMNODE, &encode_remove_acl_from_node(list_id, node_id)?).await?;
+    Ok(())
+}
+
+/// Read `AnchorRootCA` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_anchor_root_ca(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_ANCHORROOTCA).await?;
+    decode_anchor_root_ca(&tlv)
+}
+
+/// Read `AnchorNodeID` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_anchor_node_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_ANCHORNODEID).await?;
+    decode_anchor_node_id(&tlv)
+}
+
+/// Read `AnchorVendorID` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_anchor_vendor_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_ANCHORVENDORID).await?;
+    decode_anchor_vendor_id(&tlv)
+}
+
+/// Read `FriendlyName` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_friendly_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_FRIENDLYNAME).await?;
+    decode_friendly_name(&tlv)
+}
+
+/// Read `GroupKeySetList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_group_key_set_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreGroupKeySet>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_GROUPKEYSETLIST).await?;
+    decode_group_key_set_list(&tlv)
+}
+
+/// Read `GroupList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_group_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreGroupInformationEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_GROUPLIST).await?;
+    decode_group_list(&tlv)
+}
+
+/// Read `NodeList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_node_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreNodeInformationEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_NODELIST).await?;
+    decode_node_list(&tlv)
+}
+
+/// Read `AdminList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_admin_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreAdministratorInformationEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_ADMINLIST).await?;
+    decode_admin_list(&tlv)
+}
+
+/// Read `Status` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<DatastoreStatusEntry> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_STATUS).await?;
+    decode_status(&tlv)
+}
+
+/// Read `EndpointGroupIDList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_endpoint_group_id_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreEndpointGroupIDEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_ENDPOINTGROUPIDLIST).await?;
+    decode_endpoint_group_id_list(&tlv)
+}
+
+/// Read `EndpointBindingList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_endpoint_binding_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreEndpointBindingEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_ENDPOINTBINDINGLIST).await?;
+    decode_endpoint_binding_list(&tlv)
+}
+
+/// Read `NodeKeySetList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_node_key_set_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreNodeKeySetEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_NODEKEYSETLIST).await?;
+    decode_node_key_set_list(&tlv)
+}
+
+/// Read `NodeACLList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_node_acl_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreACLEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_NODEACLLIST).await?;
+    decode_node_acl_list(&tlv)
+}
+
+/// Read `NodeEndpointList` attribute from cluster `Joint Fabric Datastore`.
+pub async fn read_node_endpoint_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DatastoreEndpointEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_ATTR_ID_NODEENDPOINTLIST).await?;
+    decode_node_endpoint_list(&tlv)
+}
+

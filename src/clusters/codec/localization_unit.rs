@@ -116,3 +116,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `TemperatureUnit` attribute from cluster `Unit Localization`.
+pub async fn read_temperature_unit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TempUnit> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_UNIT_LOCALIZATION, crate::clusters::defs::CLUSTER_UNIT_LOCALIZATION_ATTR_ID_TEMPERATUREUNIT).await?;
+    decode_temperature_unit(&tlv)
+}
+
+/// Read `SupportedTemperatureUnits` attribute from cluster `Unit Localization`.
+pub async fn read_supported_temperature_units(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TempUnit>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_UNIT_LOCALIZATION, crate::clusters::defs::CLUSTER_UNIT_LOCALIZATION_ATTR_ID_SUPPORTEDTEMPERATUREUNITS).await?;
+    decode_supported_temperature_units(&tlv)
+}
+

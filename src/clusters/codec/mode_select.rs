@@ -185,3 +185,47 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ChangeToMode` command on cluster `Mode Select`.
+pub async fn change_to_mode(conn: &crate::controller::Connection, endpoint: u16, new_mode: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_CMD_ID_CHANGETOMODE, &encode_change_to_mode(new_mode)?).await?;
+    Ok(())
+}
+
+/// Read `Description` attribute from cluster `Mode Select`.
+pub async fn read_description(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_ATTR_ID_DESCRIPTION).await?;
+    decode_description(&tlv)
+}
+
+/// Read `StandardNamespace` attribute from cluster `Mode Select`.
+pub async fn read_standard_namespace(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_ATTR_ID_STANDARDNAMESPACE).await?;
+    decode_standard_namespace(&tlv)
+}
+
+/// Read `SupportedModes` attribute from cluster `Mode Select`.
+pub async fn read_supported_modes(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ModeOption>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_ATTR_ID_SUPPORTEDMODES).await?;
+    decode_supported_modes(&tlv)
+}
+
+/// Read `CurrentMode` attribute from cluster `Mode Select`.
+pub async fn read_current_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_ATTR_ID_CURRENTMODE).await?;
+    decode_current_mode(&tlv)
+}
+
+/// Read `StartUpMode` attribute from cluster `Mode Select`.
+pub async fn read_start_up_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_ATTR_ID_STARTUPMODE).await?;
+    decode_start_up_mode(&tlv)
+}
+
+/// Read `OnMode` attribute from cluster `Mode Select`.
+pub async fn read_on_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MODE_SELECT, crate::clusters::defs::CLUSTER_MODE_SELECT_ATTR_ID_ONMODE).await?;
+    decode_on_mode(&tlv)
+}
+

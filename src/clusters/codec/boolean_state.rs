@@ -58,6 +58,14 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `StateValue` attribute from cluster `Boolean State`.
+pub async fn read_state_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_ATTR_ID_STATEVALUE).await?;
+    decode_state_value(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct StateChangeEvent {
     pub state_value: Option<bool>,

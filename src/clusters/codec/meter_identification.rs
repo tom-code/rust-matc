@@ -158,3 +158,35 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `MeterType` attribute from cluster `Meter Identification`.
+pub async fn read_meter_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<MeterType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_METER_IDENTIFICATION, crate::clusters::defs::CLUSTER_METER_IDENTIFICATION_ATTR_ID_METERTYPE).await?;
+    decode_meter_type(&tlv)
+}
+
+/// Read `PointOfDelivery` attribute from cluster `Meter Identification`.
+pub async fn read_point_of_delivery(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_METER_IDENTIFICATION, crate::clusters::defs::CLUSTER_METER_IDENTIFICATION_ATTR_ID_POINTOFDELIVERY).await?;
+    decode_point_of_delivery(&tlv)
+}
+
+/// Read `MeterSerialNumber` attribute from cluster `Meter Identification`.
+pub async fn read_meter_serial_number(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_METER_IDENTIFICATION, crate::clusters::defs::CLUSTER_METER_IDENTIFICATION_ATTR_ID_METERSERIALNUMBER).await?;
+    decode_meter_serial_number(&tlv)
+}
+
+/// Read `ProtocolVersion` attribute from cluster `Meter Identification`.
+pub async fn read_protocol_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_METER_IDENTIFICATION, crate::clusters::defs::CLUSTER_METER_IDENTIFICATION_ATTR_ID_PROTOCOLVERSION).await?;
+    decode_protocol_version(&tlv)
+}
+
+/// Read `PowerThreshold` attribute from cluster `Meter Identification`.
+pub async fn read_power_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_METER_IDENTIFICATION, crate::clusters::defs::CLUSTER_METER_IDENTIFICATION_ATTR_ID_POWERTHRESHOLD).await?;
+    decode_power_threshold(&tlv)
+}
+

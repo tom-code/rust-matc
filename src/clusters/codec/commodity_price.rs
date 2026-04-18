@@ -316,6 +316,44 @@ pub fn decode_get_detailed_forecast_response(inp: &tlv::TlvItemValue) -> anyhow:
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `GetDetailedPriceRequest` command on cluster `Commodity Price`.
+pub async fn get_detailed_price_request(conn: &crate::controller::Connection, endpoint: u16, details: CommodityPriceDetail) -> anyhow::Result<GetDetailedPriceResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_PRICE, crate::clusters::defs::CLUSTER_COMMODITY_PRICE_CMD_ID_GETDETAILEDPRICEREQUEST, &encode_get_detailed_price_request(details)?).await?;
+    decode_get_detailed_price_response(&tlv)
+}
+
+/// Invoke `GetDetailedForecastRequest` command on cluster `Commodity Price`.
+pub async fn get_detailed_forecast_request(conn: &crate::controller::Connection, endpoint: u16, details: CommodityPriceDetail) -> anyhow::Result<GetDetailedForecastResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_PRICE, crate::clusters::defs::CLUSTER_COMMODITY_PRICE_CMD_ID_GETDETAILEDFORECASTREQUEST, &encode_get_detailed_forecast_request(details)?).await?;
+    decode_get_detailed_forecast_response(&tlv)
+}
+
+/// Read `TariffUnit` attribute from cluster `Commodity Price`.
+pub async fn read_tariff_unit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_PRICE, crate::clusters::defs::CLUSTER_COMMODITY_PRICE_ATTR_ID_TARIFFUNIT).await?;
+    decode_tariff_unit(&tlv)
+}
+
+/// Read `Currency` attribute from cluster `Commodity Price`.
+pub async fn read_currency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_PRICE, crate::clusters::defs::CLUSTER_COMMODITY_PRICE_ATTR_ID_CURRENCY).await?;
+    decode_currency(&tlv)
+}
+
+/// Read `CurrentPrice` attribute from cluster `Commodity Price`.
+pub async fn read_current_price(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<CommodityPrice>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_PRICE, crate::clusters::defs::CLUSTER_COMMODITY_PRICE_ATTR_ID_CURRENTPRICE).await?;
+    decode_current_price(&tlv)
+}
+
+/// Read `PriceForecast` attribute from cluster `Commodity Price`.
+pub async fn read_price_forecast(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<CommodityPrice>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_PRICE, crate::clusters::defs::CLUSTER_COMMODITY_PRICE_ATTR_ID_PRICEFORECAST).await?;
+    decode_price_forecast(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct PriceChangeEvent {
     pub current_price: Option<CommodityPrice>,

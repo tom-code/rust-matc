@@ -7,3 +7,11 @@
 
 // Command encoders
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Sleep` command on cluster `Low Power`.
+pub async fn sleep(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_LOW_POWER, crate::clusters::defs::CLUSTER_LOW_POWER_CMD_ID_SLEEP, &[]).await?;
+    Ok(())
+}
+

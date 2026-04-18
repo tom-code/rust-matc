@@ -63,6 +63,26 @@ pub fn decode_get_setup_pin_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `GetSetupPIN` command on cluster `Account Login`.
+pub async fn get_setup_pin(conn: &crate::controller::Connection, endpoint: u16, temp_account_identifier: String) -> anyhow::Result<GetSetupPINResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCOUNT_LOGIN, crate::clusters::defs::CLUSTER_ACCOUNT_LOGIN_CMD_ID_GETSETUPPIN, &encode_get_setup_pin(temp_account_identifier)?).await?;
+    decode_get_setup_pin_response(&tlv)
+}
+
+/// Invoke `Login` command on cluster `Account Login`.
+pub async fn login(conn: &crate::controller::Connection, endpoint: u16, temp_account_identifier: String, setup_pin: String, node: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACCOUNT_LOGIN, crate::clusters::defs::CLUSTER_ACCOUNT_LOGIN_CMD_ID_LOGIN, &encode_login(temp_account_identifier, setup_pin, node)?).await?;
+    Ok(())
+}
+
+/// Invoke `Logout` command on cluster `Account Login`.
+pub async fn logout(conn: &crate::controller::Connection, endpoint: u16, node: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACCOUNT_LOGIN, crate::clusters::defs::CLUSTER_ACCOUNT_LOGIN_CMD_ID_LOGOUT, &encode_logout(node)?).await?;
+    Ok(())
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct LoggedOutEvent {
     pub node: Option<u64>,

@@ -597,6 +597,158 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `KeepActive` command on cluster `Bridged Device Basic Information`.
+pub async fn keep_active(conn: &crate::controller::Connection, endpoint: u16, stay_active_duration: u32, timeout_ms: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_CMD_ID_KEEPACTIVE, &encode_keep_active(stay_active_duration, timeout_ms)?).await?;
+    Ok(())
+}
+
+/// Read `DataModelRevision` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_data_model_revision(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_DATAMODELREVISION).await?;
+    decode_data_model_revision(&tlv)
+}
+
+/// Read `VendorName` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_vendor_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_VENDORNAME).await?;
+    decode_vendor_name(&tlv)
+}
+
+/// Read `VendorID` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_vendor_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_VENDORID).await?;
+    decode_vendor_id(&tlv)
+}
+
+/// Read `ProductName` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_product_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTNAME).await?;
+    decode_product_name(&tlv)
+}
+
+/// Read `ProductID` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_product_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTID).await?;
+    decode_product_id(&tlv)
+}
+
+/// Read `NodeLabel` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_node_label(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_NODELABEL).await?;
+    decode_node_label(&tlv)
+}
+
+/// Read `Location` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_location(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_LOCATION).await?;
+    decode_location(&tlv)
+}
+
+/// Read `HardwareVersion` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_hardware_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_HARDWAREVERSION).await?;
+    decode_hardware_version(&tlv)
+}
+
+/// Read `HardwareVersionString` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_hardware_version_string(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_HARDWAREVERSIONSTRING).await?;
+    decode_hardware_version_string(&tlv)
+}
+
+/// Read `SoftwareVersion` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_software_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_SOFTWAREVERSION).await?;
+    decode_software_version(&tlv)
+}
+
+/// Read `SoftwareVersionString` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_software_version_string(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_SOFTWAREVERSIONSTRING).await?;
+    decode_software_version_string(&tlv)
+}
+
+/// Read `ManufacturingDate` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_manufacturing_date(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_MANUFACTURINGDATE).await?;
+    decode_manufacturing_date(&tlv)
+}
+
+/// Read `PartNumber` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_part_number(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PARTNUMBER).await?;
+    decode_part_number(&tlv)
+}
+
+/// Read `ProductURL` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_product_url(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTURL).await?;
+    decode_product_url(&tlv)
+}
+
+/// Read `ProductLabel` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_product_label(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTLABEL).await?;
+    decode_product_label(&tlv)
+}
+
+/// Read `SerialNumber` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_serial_number(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_SERIALNUMBER).await?;
+    decode_serial_number(&tlv)
+}
+
+/// Read `LocalConfigDisabled` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_local_config_disabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_LOCALCONFIGDISABLED).await?;
+    decode_local_config_disabled(&tlv)
+}
+
+/// Read `Reachable` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_reachable(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_REACHABLE).await?;
+    decode_reachable(&tlv)
+}
+
+/// Read `UniqueID` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_unique_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_UNIQUEID).await?;
+    decode_unique_id(&tlv)
+}
+
+/// Read `CapabilityMinima` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_capability_minima(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<CapabilityMinima> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_CAPABILITYMINIMA).await?;
+    decode_capability_minima(&tlv)
+}
+
+/// Read `ProductAppearance` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_product_appearance(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ProductAppearance> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_PRODUCTAPPEARANCE).await?;
+    decode_product_appearance(&tlv)
+}
+
+/// Read `SpecificationVersion` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_specification_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_SPECIFICATIONVERSION).await?;
+    decode_specification_version(&tlv)
+}
+
+/// Read `MaxPathsPerInvoke` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_max_paths_per_invoke(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_MAXPATHSPERINVOKE).await?;
+    decode_max_paths_per_invoke(&tlv)
+}
+
+/// Read `ConfigurationVersion` attribute from cluster `Bridged Device Basic Information`.
+pub async fn read_configuration_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BRIDGED_DEVICE_BASIC_INFORMATION, crate::clusters::defs::CLUSTER_BRIDGED_DEVICE_BASIC_INFORMATION_ATTR_ID_CONFIGURATIONVERSION).await?;
+    decode_configuration_version(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct StartUpEvent {
     pub software_version: Option<u32>,

@@ -343,3 +343,71 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `MeasuredValue` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MEASUREDVALUE).await?;
+    decode_measured_value(&tlv)
+}
+
+/// Read `MinMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_min_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MINMEASUREDVALUE).await?;
+    decode_min_measured_value(&tlv)
+}
+
+/// Read `MaxMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_max_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MAXMEASUREDVALUE).await?;
+    decode_max_measured_value(&tlv)
+}
+
+/// Read `PeakMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_peak_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_PEAKMEASUREDVALUE).await?;
+    decode_peak_measured_value(&tlv)
+}
+
+/// Read `PeakMeasuredValueWindow` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_peak_measured_value_window(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_PEAKMEASUREDVALUEWINDOW).await?;
+    decode_peak_measured_value_window(&tlv)
+}
+
+/// Read `AverageMeasuredValue` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_average_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_AVERAGEMEASUREDVALUE).await?;
+    decode_average_measured_value(&tlv)
+}
+
+/// Read `AverageMeasuredValueWindow` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_average_measured_value_window(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_AVERAGEMEASUREDVALUEWINDOW).await?;
+    decode_average_measured_value_window(&tlv)
+}
+
+/// Read `Uncertainty` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_uncertainty(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_UNCERTAINTY).await?;
+    decode_uncertainty(&tlv)
+}
+
+/// Read `MeasurementUnit` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_measurement_unit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<MeasurementUnit> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MEASUREMENTUNIT).await?;
+    decode_measurement_unit(&tlv)
+}
+
+/// Read `MeasurementMedium` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_measurement_medium(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<MeasurementMedium> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_MEASUREMENTMEDIUM).await?;
+    decode_measurement_medium(&tlv)
+}
+
+/// Read `LevelValue` attribute from cluster `Radon Concentration Measurement`.
+pub async fn read_level_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<LevelValue> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_RADON_CONCENTRATION_MEASUREMENT, crate::clusters::defs::CLUSTER_RADON_CONCENTRATION_MEASUREMENT_ATTR_ID_LEVELVALUE).await?;
+    decode_level_value(&tlv)
+}
+

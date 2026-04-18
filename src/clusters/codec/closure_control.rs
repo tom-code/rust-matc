@@ -384,6 +384,62 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Stop` command on cluster `Closure Control`.
+pub async fn stop(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_CMD_ID_STOP, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `MoveTo` command on cluster `Closure Control`.
+pub async fn move_to(conn: &crate::controller::Connection, endpoint: u16, position: TargetPosition, latch: bool, speed: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_CMD_ID_MOVETO, &encode_move_to(position, latch, speed)?).await?;
+    Ok(())
+}
+
+/// Invoke `Calibrate` command on cluster `Closure Control`.
+pub async fn calibrate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_CMD_ID_CALIBRATE, &[]).await?;
+    Ok(())
+}
+
+/// Read `CountdownTime` attribute from cluster `Closure Control`.
+pub async fn read_countdown_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_ATTR_ID_COUNTDOWNTIME).await?;
+    decode_countdown_time(&tlv)
+}
+
+/// Read `MainState` attribute from cluster `Closure Control`.
+pub async fn read_main_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<MainState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_ATTR_ID_MAINSTATE).await?;
+    decode_main_state(&tlv)
+}
+
+/// Read `CurrentErrorList` attribute from cluster `Closure Control`.
+pub async fn read_current_error_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ClosureError>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_ATTR_ID_CURRENTERRORLIST).await?;
+    decode_current_error_list(&tlv)
+}
+
+/// Read `OverallCurrentState` attribute from cluster `Closure Control`.
+pub async fn read_overall_current_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<OverallCurrentState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_ATTR_ID_OVERALLCURRENTSTATE).await?;
+    decode_overall_current_state(&tlv)
+}
+
+/// Read `OverallTargetState` attribute from cluster `Closure Control`.
+pub async fn read_overall_target_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<OverallTargetState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_ATTR_ID_OVERALLTARGETSTATE).await?;
+    decode_overall_target_state(&tlv)
+}
+
+/// Read `LatchControlModes` attribute from cluster `Closure Control`.
+pub async fn read_latch_control_modes(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<LatchControlModes> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_ATTR_ID_LATCHCONTROLMODES).await?;
+    decode_latch_control_modes(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct OperationalErrorEvent {
     pub error_state: Option<Vec<ClosureError>>,

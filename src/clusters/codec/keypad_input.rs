@@ -272,3 +272,11 @@ pub fn decode_send_key_response(inp: &tlv::TlvItemValue) -> anyhow::Result<SendK
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SendKey` command on cluster `Keypad Input`.
+pub async fn send_key(conn: &crate::controller::Connection, endpoint: u16, key_code: CecKeyCode) -> anyhow::Result<SendKeyResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_KEYPAD_INPUT, crate::clusters::defs::CLUSTER_KEYPAD_INPUT_CMD_ID_SENDKEY, &encode_send_key(key_code)?).await?;
+    decode_send_key_response(&tlv)
+}
+

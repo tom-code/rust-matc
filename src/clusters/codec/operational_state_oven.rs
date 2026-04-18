@@ -7,3 +7,35 @@
 
 // Command encoders
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Pause` command on cluster `Oven Cavity Operational State`.
+pub async fn pause(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OVEN_CAVITY_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OVEN_CAVITY_OPERATIONAL_STATE_CMD_ID_PAUSE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Stop` command on cluster `Oven Cavity Operational State`.
+pub async fn stop(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OVEN_CAVITY_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OVEN_CAVITY_OPERATIONAL_STATE_CMD_ID_STOP, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Start` command on cluster `Oven Cavity Operational State`.
+pub async fn start(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OVEN_CAVITY_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OVEN_CAVITY_OPERATIONAL_STATE_CMD_ID_START, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Resume` command on cluster `Oven Cavity Operational State`.
+pub async fn resume(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OVEN_CAVITY_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OVEN_CAVITY_OPERATIONAL_STATE_CMD_ID_RESUME, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `OperationalCommandResponse` command on cluster `Oven Cavity Operational State`.
+pub async fn operational_command_response(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OVEN_CAVITY_OPERATIONAL_STATE, crate::clusters::defs::CLUSTER_OVEN_CAVITY_OPERATIONAL_STATE_CMD_ID_OPERATIONALCOMMANDRESPONSE, &[]).await?;
+    Ok(())
+}
+

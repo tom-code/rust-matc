@@ -457,3 +457,71 @@ pub fn decode_copy_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Cop
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AddScene` command on cluster `Scenes Management`.
+pub async fn add_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8, transition_time: u32, scene_name: String, extension_field_set_structs: Vec<ExtensionFieldSet>) -> anyhow::Result<AddSceneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_ADDSCENE, &encode_add_scene(group_id, scene_id, transition_time, scene_name, extension_field_set_structs)?).await?;
+    decode_add_scene_response(&tlv)
+}
+
+/// Invoke `ViewScene` command on cluster `Scenes Management`.
+pub async fn view_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8) -> anyhow::Result<ViewSceneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_VIEWSCENE, &encode_view_scene(group_id, scene_id)?).await?;
+    decode_view_scene_response(&tlv)
+}
+
+/// Invoke `RemoveScene` command on cluster `Scenes Management`.
+pub async fn remove_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8) -> anyhow::Result<RemoveSceneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_REMOVESCENE, &encode_remove_scene(group_id, scene_id)?).await?;
+    decode_remove_scene_response(&tlv)
+}
+
+/// Invoke `RemoveAllScenes` command on cluster `Scenes Management`.
+pub async fn remove_all_scenes(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<RemoveAllScenesResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_REMOVEALLSCENES, &encode_remove_all_scenes(group_id)?).await?;
+    decode_remove_all_scenes_response(&tlv)
+}
+
+/// Invoke `StoreScene` command on cluster `Scenes Management`.
+pub async fn store_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8) -> anyhow::Result<StoreSceneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_STORESCENE, &encode_store_scene(group_id, scene_id)?).await?;
+    decode_store_scene_response(&tlv)
+}
+
+/// Invoke `RecallScene` command on cluster `Scenes Management`.
+pub async fn recall_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8, transition_time: Option<u32>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_RECALLSCENE, &encode_recall_scene(group_id, scene_id, transition_time)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetSceneMembership` command on cluster `Scenes Management`.
+pub async fn get_scene_membership(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<GetSceneMembershipResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_GETSCENEMEMBERSHIP, &encode_get_scene_membership(group_id)?).await?;
+    decode_get_scene_membership_response(&tlv)
+}
+
+/// Invoke `CopyScene` command on cluster `Scenes Management`.
+pub async fn copy_scene(conn: &crate::controller::Connection, endpoint: u16, mode: CopyMode, group_identifier_from: u8, scene_identifier_from: u8, group_identifier_to: u8, scene_identifier_to: u8) -> anyhow::Result<CopySceneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_COPYSCENE, &encode_copy_scene(mode, group_identifier_from, scene_identifier_from, group_identifier_to, scene_identifier_to)?).await?;
+    decode_copy_scene_response(&tlv)
+}
+
+/// Read `DoNotUse` attribute from cluster `Scenes Management`.
+pub async fn read_do_not_use(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_ATTR_ID_DONOTUSE).await?;
+    decode_do_not_use(&tlv)
+}
+
+/// Read `SceneTableSize` attribute from cluster `Scenes Management`.
+pub async fn read_scene_table_size(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_ATTR_ID_SCENETABLESIZE).await?;
+    decode_scene_table_size(&tlv)
+}
+
+/// Read `FabricSceneInfo` attribute from cluster `Scenes Management`.
+pub async fn read_fabric_scene_info(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<SceneInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_ATTR_ID_FABRICSCENEINFO).await?;
+    decode_fabric_scene_info(&tlv)
+}
+

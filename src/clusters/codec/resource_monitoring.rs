@@ -260,3 +260,47 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ResetCondition` command on cluster `Water Tank Level Monitoring`.
+pub async fn reset_condition(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_CMD_ID_RESETCONDITION, &[]).await?;
+    Ok(())
+}
+
+/// Read `Condition` attribute from cluster `Water Tank Level Monitoring`.
+pub async fn read_condition(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_ATTR_ID_CONDITION).await?;
+    decode_condition(&tlv)
+}
+
+/// Read `DegradationDirection` attribute from cluster `Water Tank Level Monitoring`.
+pub async fn read_degradation_direction(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<DegradationDirection> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_ATTR_ID_DEGRADATIONDIRECTION).await?;
+    decode_degradation_direction(&tlv)
+}
+
+/// Read `ChangeIndication` attribute from cluster `Water Tank Level Monitoring`.
+pub async fn read_change_indication(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ChangeIndication> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_ATTR_ID_CHANGEINDICATION).await?;
+    decode_change_indication(&tlv)
+}
+
+/// Read `InPlaceIndicator` attribute from cluster `Water Tank Level Monitoring`.
+pub async fn read_in_place_indicator(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_ATTR_ID_INPLACEINDICATOR).await?;
+    decode_in_place_indicator(&tlv)
+}
+
+/// Read `LastChangedTime` attribute from cluster `Water Tank Level Monitoring`.
+pub async fn read_last_changed_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_ATTR_ID_LASTCHANGEDTIME).await?;
+    decode_last_changed_time(&tlv)
+}
+
+/// Read `ReplacementProductList` attribute from cluster `Water Tank Level Monitoring`.
+pub async fn read_replacement_product_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ReplacementProduct>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WATER_TANK_LEVEL_MONITORING, crate::clusters::defs::CLUSTER_WATER_TANK_LEVEL_MONITORING_ATTR_ID_REPLACEMENTPRODUCTLIST).await?;
+    decode_replacement_product_list(&tlv)
+}
+

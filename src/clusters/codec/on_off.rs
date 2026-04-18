@@ -289,3 +289,71 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Off` command on cluster `On/Off`.
+pub async fn off(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_CMD_ID_OFF, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `On` command on cluster `On/Off`.
+pub async fn on(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `Toggle` command on cluster `On/Off`.
+pub async fn toggle(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_CMD_ID_TOGGLE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `OffWithEffect` command on cluster `On/Off`.
+pub async fn off_with_effect(conn: &crate::controller::Connection, endpoint: u16, effect_identifier: EffectIdentifier, effect_variant: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_CMD_ID_OFFWITHEFFECT, &encode_off_with_effect(effect_identifier, effect_variant)?).await?;
+    Ok(())
+}
+
+/// Invoke `OnWithRecallGlobalScene` command on cluster `On/Off`.
+pub async fn on_with_recall_global_scene(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_CMD_ID_ONWITHRECALLGLOBALSCENE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `OnWithTimedOff` command on cluster `On/Off`.
+pub async fn on_with_timed_off(conn: &crate::controller::Connection, endpoint: u16, on_off_control: OnOffControl, on_time: u16, off_wait_time: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_CMD_ID_ONWITHTIMEDOFF, &encode_on_with_timed_off(on_off_control, on_time, off_wait_time)?).await?;
+    Ok(())
+}
+
+/// Read `OnOff` attribute from cluster `On/Off`.
+pub async fn read_on_off(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONOFF).await?;
+    decode_on_off(&tlv)
+}
+
+/// Read `GlobalSceneControl` attribute from cluster `On/Off`.
+pub async fn read_global_scene_control(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_ATTR_ID_GLOBALSCENECONTROL).await?;
+    decode_global_scene_control(&tlv)
+}
+
+/// Read `OnTime` attribute from cluster `On/Off`.
+pub async fn read_on_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_ATTR_ID_ONTIME).await?;
+    decode_on_time(&tlv)
+}
+
+/// Read `OffWaitTime` attribute from cluster `On/Off`.
+pub async fn read_off_wait_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_ATTR_ID_OFFWAITTIME).await?;
+    decode_off_wait_time(&tlv)
+}
+
+/// Read `StartUpOnOff` attribute from cluster `On/Off`.
+pub async fn read_start_up_on_off(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<StartUpOnOff>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ON_OFF, crate::clusters::defs::CLUSTER_ON_OFF_ATTR_ID_STARTUPONOFF).await?;
+    decode_start_up_on_off(&tlv)
+}
+

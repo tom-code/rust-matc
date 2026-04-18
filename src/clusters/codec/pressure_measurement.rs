@@ -186,3 +186,59 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `MeasuredValue` attribute from cluster `Pressure Measurement`.
+pub async fn read_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_MEASUREDVALUE).await?;
+    decode_measured_value(&tlv)
+}
+
+/// Read `MinMeasuredValue` attribute from cluster `Pressure Measurement`.
+pub async fn read_min_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_MINMEASUREDVALUE).await?;
+    decode_min_measured_value(&tlv)
+}
+
+/// Read `MaxMeasuredValue` attribute from cluster `Pressure Measurement`.
+pub async fn read_max_measured_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_MAXMEASUREDVALUE).await?;
+    decode_max_measured_value(&tlv)
+}
+
+/// Read `Tolerance` attribute from cluster `Pressure Measurement`.
+pub async fn read_tolerance(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_TOLERANCE).await?;
+    decode_tolerance(&tlv)
+}
+
+/// Read `ScaledValue` attribute from cluster `Pressure Measurement`.
+pub async fn read_scaled_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_SCALEDVALUE).await?;
+    decode_scaled_value(&tlv)
+}
+
+/// Read `MinScaledValue` attribute from cluster `Pressure Measurement`.
+pub async fn read_min_scaled_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_MINSCALEDVALUE).await?;
+    decode_min_scaled_value(&tlv)
+}
+
+/// Read `MaxScaledValue` attribute from cluster `Pressure Measurement`.
+pub async fn read_max_scaled_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_MAXSCALEDVALUE).await?;
+    decode_max_scaled_value(&tlv)
+}
+
+/// Read `ScaledTolerance` attribute from cluster `Pressure Measurement`.
+pub async fn read_scaled_tolerance(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_SCALEDTOLERANCE).await?;
+    decode_scaled_tolerance(&tlv)
+}
+
+/// Read `Scale` attribute from cluster `Pressure Measurement`.
+pub async fn read_scale(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PRESSURE_MEASUREMENT, crate::clusters::defs::CLUSTER_PRESSURE_MEASUREMENT_ATTR_ID_SCALE).await?;
+    decode_scale(&tlv)
+}
+

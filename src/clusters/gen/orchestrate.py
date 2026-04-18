@@ -12,9 +12,10 @@ import glob
 import re
 from typing import Dict, List
 
-from .naming import convert_to_snake_case
+from .naming import convert_to_snake_case, upper_ident
 from .xml_parser import ClusterParser
 from .models import MatterStruct, AttributeField, MatterField
+from .models.facade import emit_command_facade, emit_attribute_facade
 
 
 def generate_json_dispatcher_function(cluster_id: str, attributes: List[AttributeField], structs: Dict[str, MatterStruct]) -> str:
@@ -357,6 +358,53 @@ use crate::clusters::helpers::{{{helpers_import}}};
             if func_name not in generated_functions:
                 code += response.generate_decode_function(structs, enums, bitmaps) + "\n\n"
                 generated_functions.add(func_name)
+
+    # Generate typed facade (invokes + reads). Matches defs.rs constant naming
+    # by using the <clusterIds><clusterId name=...> attribute, not the root
+    # element's name attribute (which often has a " Cluster" suffix). When an
+    # XML defines multiple clusters (e.g. ResourceMonitoring), gen2.py only
+    # emits CLUSTER_{name}_ATTR_ID_ / CMD_ID_ constants for the LAST cluster,
+    # so the facade must use the last clusterId too. Abstract/base clusters
+    # (AlarmBase, ModeBase, ...) have <clusterId> with no id attribute and get
+    # no defs constants - skip facade emission for those files.
+    facade_cluster_name = None
+    cluster_ids_elem = parser.root.find('clusterIds')
+    if cluster_ids_elem is not None:
+        concrete_ids = [ci for ci in cluster_ids_elem.findall('clusterId') if ci.get('id')]
+        if concrete_ids:
+            facade_cluster_name = concrete_ids[-1].get('name')
+
+    if facade_cluster_name:
+        cluster_upper = upper_ident(facade_cluster_name)
+
+        response_by_name = {resp.name: resp for resp in response_commands}
+
+        facade_code = ""
+        emitted_fns = set()
+        for command in commands:
+            fn_name = f"cmd:{command.name}"
+            if fn_name in emitted_fns:
+                continue
+            emitted_fns.add(fn_name)
+            facade_code += emit_command_facade(
+                command, cluster_upper, facade_cluster_name,
+                structs, enums, bitmaps, response_by_name,
+            )
+
+        emitted_attr_fns = set()
+        for attribute in attributes:
+            key = f"attr:{attribute.name}"
+            if key in emitted_attr_fns:
+                continue
+            emitted_attr_fns.add(key)
+            facade_code += emit_attribute_facade(
+                attribute, cluster_upper, facade_cluster_name,
+                structs, enums, bitmaps,
+            )
+
+        if facade_code:
+            code += "// Typed facade (invokes + reads)\n\n"
+            code += facade_code
 
     # Generate event decoders
     if events:

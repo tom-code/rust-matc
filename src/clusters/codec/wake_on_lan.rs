@@ -74,3 +74,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `MACAddress` attribute from cluster `Wake On LAN`.
+pub async fn read_mac_address(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WAKE_ON_LAN, crate::clusters::defs::CLUSTER_WAKE_ON_LAN_ATTR_ID_MACADDRESS).await?;
+    decode_mac_address(&tlv)
+}
+
+/// Read `LinkLocalAddress` attribute from cluster `Wake On LAN`.
+pub async fn read_link_local_address(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WAKE_ON_LAN, crate::clusters::defs::CLUSTER_WAKE_ON_LAN_ATTR_ID_LINKLOCALADDRESS).await?;
+    decode_link_local_address(&tlv)
+}
+

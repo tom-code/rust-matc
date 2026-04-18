@@ -160,6 +160,26 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `LocalGenerationAvailable` attribute from cluster `Electrical Grid Conditions`.
+pub async fn read_local_generation_available(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<bool>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_GRID_CONDITIONS, crate::clusters::defs::CLUSTER_ELECTRICAL_GRID_CONDITIONS_ATTR_ID_LOCALGENERATIONAVAILABLE).await?;
+    decode_local_generation_available(&tlv)
+}
+
+/// Read `CurrentConditions` attribute from cluster `Electrical Grid Conditions`.
+pub async fn read_current_conditions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ElectricalGridConditions>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_GRID_CONDITIONS, crate::clusters::defs::CLUSTER_ELECTRICAL_GRID_CONDITIONS_ATTR_ID_CURRENTCONDITIONS).await?;
+    decode_current_conditions(&tlv)
+}
+
+/// Read `ForecastConditions` attribute from cluster `Electrical Grid Conditions`.
+pub async fn read_forecast_conditions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ElectricalGridConditions>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_GRID_CONDITIONS, crate::clusters::defs::CLUSTER_ELECTRICAL_GRID_CONDITIONS_ATTR_ID_FORECASTCONDITIONS).await?;
+    decode_forecast_conditions(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct CurrentConditionsChangedEvent {
     pub current_conditions: Option<ElectricalGridConditions>,

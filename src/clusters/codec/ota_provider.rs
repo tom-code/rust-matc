@@ -230,3 +230,23 @@ pub fn decode_apply_update_response(inp: &tlv::TlvItemValue) -> anyhow::Result<A
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `QueryImage` command on cluster `OTA Software Update Provider`.
+pub async fn query_image(conn: &crate::controller::Connection, endpoint: u16, params: QueryImageParams) -> anyhow::Result<QueryImageResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_PROVIDER, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_PROVIDER_CMD_ID_QUERYIMAGE, &encode_query_image(params)?).await?;
+    decode_query_image_response(&tlv)
+}
+
+/// Invoke `ApplyUpdateRequest` command on cluster `OTA Software Update Provider`.
+pub async fn apply_update_request(conn: &crate::controller::Connection, endpoint: u16, update_token: Vec<u8>, new_version: u32) -> anyhow::Result<ApplyUpdateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_PROVIDER, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_PROVIDER_CMD_ID_APPLYUPDATEREQUEST, &encode_apply_update_request(update_token, new_version)?).await?;
+    decode_apply_update_response(&tlv)
+}
+
+/// Invoke `NotifyUpdateApplied` command on cluster `OTA Software Update Provider`.
+pub async fn notify_update_applied(conn: &crate::controller::Connection, endpoint: u16, update_token: Vec<u8>, software_version: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_PROVIDER, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_PROVIDER_CMD_ID_NOTIFYUPDATEAPPLIED, &encode_notify_update_applied(update_token, software_version)?).await?;
+    Ok(())
+}
+

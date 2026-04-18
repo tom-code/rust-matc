@@ -158,3 +158,11 @@ pub fn decode_retrieve_logs_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `RetrieveLogsRequest` command on cluster `Diagnostic Logs`.
+pub async fn retrieve_logs_request(conn: &crate::controller::Connection, endpoint: u16, intent: Intent, requested_protocol: TransferProtocol, transfer_file_designator: String) -> anyhow::Result<RetrieveLogsResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DIAGNOSTIC_LOGS, crate::clusters::defs::CLUSTER_DIAGNOSTIC_LOGS_CMD_ID_RETRIEVELOGSREQUEST, &encode_retrieve_logs_request(intent, requested_protocol, transfer_file_designator)?).await?;
+    decode_retrieve_logs_response(&tlv)
+}
+

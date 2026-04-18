@@ -394,3 +394,83 @@ pub fn decode_lookup_client_certificate_response(inp: &tlv::TlvItemValue) -> any
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ProvisionRootCertificate` command on cluster `TLS Certificate Management`.
+pub async fn provision_root_certificate(conn: &crate::controller::Connection, endpoint: u16, certificate: Vec<u8>, caid: Option<u8>) -> anyhow::Result<ProvisionRootCertificateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_PROVISIONROOTCERTIFICATE, &encode_provision_root_certificate(certificate, caid)?).await?;
+    decode_provision_root_certificate_response(&tlv)
+}
+
+/// Invoke `FindRootCertificate` command on cluster `TLS Certificate Management`.
+pub async fn find_root_certificate(conn: &crate::controller::Connection, endpoint: u16, caid: Option<u8>) -> anyhow::Result<FindRootCertificateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_FINDROOTCERTIFICATE, &encode_find_root_certificate(caid)?).await?;
+    decode_find_root_certificate_response(&tlv)
+}
+
+/// Invoke `LookupRootCertificate` command on cluster `TLS Certificate Management`.
+pub async fn lookup_root_certificate(conn: &crate::controller::Connection, endpoint: u16, fingerprint: Vec<u8>) -> anyhow::Result<LookupRootCertificateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_LOOKUPROOTCERTIFICATE, &encode_lookup_root_certificate(fingerprint)?).await?;
+    decode_lookup_root_certificate_response(&tlv)
+}
+
+/// Invoke `RemoveRootCertificate` command on cluster `TLS Certificate Management`.
+pub async fn remove_root_certificate(conn: &crate::controller::Connection, endpoint: u16, caid: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_REMOVEROOTCERTIFICATE, &encode_remove_root_certificate(caid)?).await?;
+    Ok(())
+}
+
+/// Invoke `ClientCSR` command on cluster `TLS Certificate Management`.
+pub async fn client_csr(conn: &crate::controller::Connection, endpoint: u16, nonce: Vec<u8>, ccdid: Option<u8>) -> anyhow::Result<ClientCSRResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_CLIENTCSR, &encode_client_csr(nonce, ccdid)?).await?;
+    decode_client_csr_response(&tlv)
+}
+
+/// Invoke `ProvisionClientCertificate` command on cluster `TLS Certificate Management`.
+pub async fn provision_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: u8, client_certificate: Vec<u8>, intermediate_certificates: Vec<Vec<u8>>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_PROVISIONCLIENTCERTIFICATE, &encode_provision_client_certificate(ccdid, client_certificate, intermediate_certificates)?).await?;
+    Ok(())
+}
+
+/// Invoke `FindClientCertificate` command on cluster `TLS Certificate Management`.
+pub async fn find_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: Option<u8>) -> anyhow::Result<FindClientCertificateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_FINDCLIENTCERTIFICATE, &encode_find_client_certificate(ccdid)?).await?;
+    decode_find_client_certificate_response(&tlv)
+}
+
+/// Invoke `LookupClientCertificate` command on cluster `TLS Certificate Management`.
+pub async fn lookup_client_certificate(conn: &crate::controller::Connection, endpoint: u16, fingerprint: Vec<u8>) -> anyhow::Result<LookupClientCertificateResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_LOOKUPCLIENTCERTIFICATE, &encode_lookup_client_certificate(fingerprint)?).await?;
+    decode_lookup_client_certificate_response(&tlv)
+}
+
+/// Invoke `RemoveClientCertificate` command on cluster `TLS Certificate Management`.
+pub async fn remove_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_REMOVECLIENTCERTIFICATE, &encode_remove_client_certificate(ccdid)?).await?;
+    Ok(())
+}
+
+/// Read `MaxRootCertificates` attribute from cluster `TLS Certificate Management`.
+pub async fn read_max_root_certificates(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_ATTR_ID_MAXROOTCERTIFICATES).await?;
+    decode_max_root_certificates(&tlv)
+}
+
+/// Read `ProvisionedRootCertificates` attribute from cluster `TLS Certificate Management`.
+pub async fn read_provisioned_root_certificates(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TLSCert>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_ATTR_ID_PROVISIONEDROOTCERTIFICATES).await?;
+    decode_provisioned_root_certificates(&tlv)
+}
+
+/// Read `MaxClientCertificates` attribute from cluster `TLS Certificate Management`.
+pub async fn read_max_client_certificates(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_ATTR_ID_MAXCLIENTCERTIFICATES).await?;
+    decode_max_client_certificates(&tlv)
+}
+
+/// Read `ProvisionedClientCertificates` attribute from cluster `TLS Certificate Management`.
+pub async fn read_provisioned_client_certificates(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TLSClientCertificateDetail>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_ATTR_ID_PROVISIONEDCLIENTCERTIFICATES).await?;
+    decode_provisioned_client_certificates(&tlv)
+}
+

@@ -130,6 +130,38 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ResetWatermarks` command on cluster `Software Diagnostics`.
+pub async fn reset_watermarks(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_SOFTWARE_DIAGNOSTICS, crate::clusters::defs::CLUSTER_SOFTWARE_DIAGNOSTICS_CMD_ID_RESETWATERMARKS, &[]).await?;
+    Ok(())
+}
+
+/// Read `ThreadMetrics` attribute from cluster `Software Diagnostics`.
+pub async fn read_thread_metrics(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ThreadMetrics>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SOFTWARE_DIAGNOSTICS, crate::clusters::defs::CLUSTER_SOFTWARE_DIAGNOSTICS_ATTR_ID_THREADMETRICS).await?;
+    decode_thread_metrics(&tlv)
+}
+
+/// Read `CurrentHeapFree` attribute from cluster `Software Diagnostics`.
+pub async fn read_current_heap_free(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SOFTWARE_DIAGNOSTICS, crate::clusters::defs::CLUSTER_SOFTWARE_DIAGNOSTICS_ATTR_ID_CURRENTHEAPFREE).await?;
+    decode_current_heap_free(&tlv)
+}
+
+/// Read `CurrentHeapUsed` attribute from cluster `Software Diagnostics`.
+pub async fn read_current_heap_used(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SOFTWARE_DIAGNOSTICS, crate::clusters::defs::CLUSTER_SOFTWARE_DIAGNOSTICS_ATTR_ID_CURRENTHEAPUSED).await?;
+    decode_current_heap_used(&tlv)
+}
+
+/// Read `CurrentHeapHighWatermark` attribute from cluster `Software Diagnostics`.
+pub async fn read_current_heap_high_watermark(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SOFTWARE_DIAGNOSTICS, crate::clusters::defs::CLUSTER_SOFTWARE_DIAGNOSTICS_ATTR_ID_CURRENTHEAPHIGHWATERMARK).await?;
+    decode_current_heap_high_watermark(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SoftwareFaultEvent {
     pub id: Option<u64>,

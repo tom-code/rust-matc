@@ -611,3 +611,89 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SetTarget` command on cluster `Closure Dimension`.
+pub async fn set_target(conn: &crate::controller::Connection, endpoint: u16, position: u8, latch: bool, speed: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_CMD_ID_SETTARGET, &encode_set_target(position, latch, speed)?).await?;
+    Ok(())
+}
+
+/// Invoke `Step` command on cluster `Closure Dimension`.
+pub async fn step(conn: &crate::controller::Connection, endpoint: u16, direction: StepDirection, number_of_steps: u16, speed: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_CMD_ID_STEP, &encode_step(direction, number_of_steps, speed)?).await?;
+    Ok(())
+}
+
+/// Read `CurrentState` attribute from cluster `Closure Dimension`.
+pub async fn read_current_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DimensionState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_CURRENTSTATE).await?;
+    decode_current_state(&tlv)
+}
+
+/// Read `TargetState` attribute from cluster `Closure Dimension`.
+pub async fn read_target_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DimensionState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_TARGETSTATE).await?;
+    decode_target_state(&tlv)
+}
+
+/// Read `Resolution` attribute from cluster `Closure Dimension`.
+pub async fn read_resolution(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_RESOLUTION).await?;
+    decode_resolution(&tlv)
+}
+
+/// Read `StepValue` attribute from cluster `Closure Dimension`.
+pub async fn read_step_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_STEPVALUE).await?;
+    decode_step_value(&tlv)
+}
+
+/// Read `Unit` attribute from cluster `Closure Dimension`.
+pub async fn read_unit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ClosureUnit> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_UNIT).await?;
+    decode_unit(&tlv)
+}
+
+/// Read `UnitRange` attribute from cluster `Closure Dimension`.
+pub async fn read_unit_range(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<UnitRange>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_UNITRANGE).await?;
+    decode_unit_range(&tlv)
+}
+
+/// Read `LimitRange` attribute from cluster `Closure Dimension`.
+pub async fn read_limit_range(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<RangePercent> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_LIMITRANGE).await?;
+    decode_limit_range(&tlv)
+}
+
+/// Read `TranslationDirection` attribute from cluster `Closure Dimension`.
+pub async fn read_translation_direction(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TranslationDirection> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_TRANSLATIONDIRECTION).await?;
+    decode_translation_direction(&tlv)
+}
+
+/// Read `RotationAxis` attribute from cluster `Closure Dimension`.
+pub async fn read_rotation_axis(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<RotationAxis> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_ROTATIONAXIS).await?;
+    decode_rotation_axis(&tlv)
+}
+
+/// Read `Overflow` attribute from cluster `Closure Dimension`.
+pub async fn read_overflow(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Overflow> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_OVERFLOW).await?;
+    decode_overflow(&tlv)
+}
+
+/// Read `ModulationType` attribute from cluster `Closure Dimension`.
+pub async fn read_modulation_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ModulationType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_MODULATIONTYPE).await?;
+    decode_modulation_type(&tlv)
+}
+
+/// Read `LatchControlModes` attribute from cluster `Closure Dimension`.
+pub async fn read_latch_control_modes(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<LatchControlModes> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_LATCHCONTROLMODES).await?;
+    decode_latch_control_modes(&tlv)
+}
+

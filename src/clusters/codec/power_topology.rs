@@ -91,3 +91,17 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `AvailableEndpoints` attribute from cluster `Power Topology`.
+pub async fn read_available_endpoints(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_TOPOLOGY, crate::clusters::defs::CLUSTER_POWER_TOPOLOGY_ATTR_ID_AVAILABLEENDPOINTS).await?;
+    decode_available_endpoints(&tlv)
+}
+
+/// Read `ActiveEndpoints` attribute from cluster `Power Topology`.
+pub async fn read_active_endpoints(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_POWER_TOPOLOGY, crate::clusters::defs::CLUSTER_POWER_TOPOLOGY_ATTR_ID_ACTIVEENDPOINTS).await?;
+    decode_active_endpoints(&tlv)
+}
+

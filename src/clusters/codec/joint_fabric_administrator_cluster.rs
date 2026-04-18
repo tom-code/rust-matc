@@ -264,3 +264,47 @@ pub fn decode_transfer_anchor_response(inp: &tlv::TlvItemValue) -> anyhow::Resul
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ICACCSRRequest` command on cluster `Joint Fabric Administrator`.
+pub async fn icaccsr_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ICACCSRResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_CMD_ID_ICACCSRREQUEST, &[]).await?;
+    decode_icaccsr_response(&tlv)
+}
+
+/// Invoke `AddICAC` command on cluster `Joint Fabric Administrator`.
+pub async fn add_icac(conn: &crate::controller::Connection, endpoint: u16, icac_value: Vec<u8>) -> anyhow::Result<ICACResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_CMD_ID_ADDICAC, &encode_add_icac(icac_value)?).await?;
+    decode_icac_response(&tlv)
+}
+
+/// Invoke `OpenJointCommissioningWindow` command on cluster `Joint Fabric Administrator`.
+pub async fn open_joint_commissioning_window(conn: &crate::controller::Connection, endpoint: u16, commissioning_timeout: u16, pake_passcode_verifier: Vec<u8>, discriminator: u16, iterations: u32, salt: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_CMD_ID_OPENJOINTCOMMISSIONINGWINDOW, &encode_open_joint_commissioning_window(commissioning_timeout, pake_passcode_verifier, discriminator, iterations, salt)?).await?;
+    Ok(())
+}
+
+/// Invoke `TransferAnchorRequest` command on cluster `Joint Fabric Administrator`.
+pub async fn transfer_anchor_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TransferAnchorResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_CMD_ID_TRANSFERANCHORREQUEST, &[]).await?;
+    decode_transfer_anchor_response(&tlv)
+}
+
+/// Invoke `TransferAnchorComplete` command on cluster `Joint Fabric Administrator`.
+pub async fn transfer_anchor_complete(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_CMD_ID_TRANSFERANCHORCOMPLETE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `AnnounceJointFabricAdministrator` command on cluster `Joint Fabric Administrator`.
+pub async fn announce_joint_fabric_administrator(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_CMD_ID_ANNOUNCEJOINTFABRICADMINISTRATOR, &encode_announce_joint_fabric_administrator(endpoint_id)?).await?;
+    Ok(())
+}
+
+/// Read `AdministratorFabricIndex` attribute from cluster `Joint Fabric Administrator`.
+pub async fn read_administrator_fabric_index(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_ADMINISTRATOR, crate::clusters::defs::CLUSTER_JOINT_FABRIC_ADMINISTRATOR_ATTR_ID_ADMINISTRATORFABRICINDEX).await?;
+    decode_administrator_fabric_index(&tlv)
+}
+

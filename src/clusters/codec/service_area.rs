@@ -422,3 +422,53 @@ pub fn decode_skip_area_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Skip
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SelectAreas` command on cluster `Service Area`.
+pub async fn select_areas(conn: &crate::controller::Connection, endpoint: u16, new_areas: Vec<u32>) -> anyhow::Result<SelectAreasResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_CMD_ID_SELECTAREAS, &encode_select_areas(new_areas)?).await?;
+    decode_select_areas_response(&tlv)
+}
+
+/// Invoke `SkipArea` command on cluster `Service Area`.
+pub async fn skip_area(conn: &crate::controller::Connection, endpoint: u16, skipped_area: u32) -> anyhow::Result<SkipAreaResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_CMD_ID_SKIPAREA, &encode_skip_area(skipped_area)?).await?;
+    decode_skip_area_response(&tlv)
+}
+
+/// Read `SupportedAreas` attribute from cluster `Service Area`.
+pub async fn read_supported_areas(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Area>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_ATTR_ID_SUPPORTEDAREAS).await?;
+    decode_supported_areas(&tlv)
+}
+
+/// Read `SupportedMaps` attribute from cluster `Service Area`.
+pub async fn read_supported_maps(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Map>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_ATTR_ID_SUPPORTEDMAPS).await?;
+    decode_supported_maps(&tlv)
+}
+
+/// Read `SelectedAreas` attribute from cluster `Service Area`.
+pub async fn read_selected_areas(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_ATTR_ID_SELECTEDAREAS).await?;
+    decode_selected_areas(&tlv)
+}
+
+/// Read `CurrentArea` attribute from cluster `Service Area`.
+pub async fn read_current_area(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_ATTR_ID_CURRENTAREA).await?;
+    decode_current_area(&tlv)
+}
+
+/// Read `EstimatedEndTime` attribute from cluster `Service Area`.
+pub async fn read_estimated_end_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_ATTR_ID_ESTIMATEDENDTIME).await?;
+    decode_estimated_end_time(&tlv)
+}
+
+/// Read `Progress` attribute from cluster `Service Area`.
+pub async fn read_progress(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Progress>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SERVICE_AREA, crate::clusters::defs::CLUSTER_SERVICE_AREA_ATTR_ID_PROGRESS).await?;
+    decode_progress(&tlv)
+}
+

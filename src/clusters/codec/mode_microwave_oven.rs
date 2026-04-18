@@ -169,3 +169,41 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ChangeToMode` command on cluster `Microwave Oven Mode`.
+pub async fn change_to_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_MODE, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_MODE_CMD_ID_CHANGETOMODE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `ChangeToModeResponse` command on cluster `Microwave Oven Mode`.
+pub async fn change_to_mode_response(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_MODE, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_MODE_CMD_ID_CHANGETOMODERESPONSE, &[]).await?;
+    Ok(())
+}
+
+/// Read `SupportedModes` attribute from cluster `Microwave Oven Mode`.
+pub async fn read_supported_modes(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_MODE, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_MODE_ATTR_ID_SUPPORTEDMODES).await?;
+    decode_supported_modes(&tlv)
+}
+
+/// Read `CurrentMode` attribute from cluster `Microwave Oven Mode`.
+pub async fn read_current_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_MODE, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_MODE_ATTR_ID_CURRENTMODE).await?;
+    decode_current_mode(&tlv)
+}
+
+/// Read `StartUpMode` attribute from cluster `Microwave Oven Mode`.
+pub async fn read_start_up_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_MODE, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_MODE_ATTR_ID_STARTUPMODE).await?;
+    decode_start_up_mode(&tlv)
+}
+
+/// Read `OnMode` attribute from cluster `Microwave Oven Mode`.
+pub async fn read_on_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_MODE, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_MODE_ATTR_ID_ONMODE).await?;
+    decode_on_mode(&tlv)
+}
+

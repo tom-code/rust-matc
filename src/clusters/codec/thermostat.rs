@@ -1726,3 +1726,365 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SetpointRaiseLower` command on cluster `Thermostat`.
+pub async fn setpoint_raise_lower(conn: &crate::controller::Connection, endpoint: u16, mode: SetpointRaiseLowerMode, amount: i8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_CMD_ID_SETPOINTRAISELOWER, &encode_setpoint_raise_lower(mode, amount)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetActiveScheduleRequest` command on cluster `Thermostat`.
+pub async fn set_active_schedule_request(conn: &crate::controller::Connection, endpoint: u16, schedule_handle: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_CMD_ID_SETACTIVESCHEDULEREQUEST, &encode_set_active_schedule_request(schedule_handle)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetActivePresetRequest` command on cluster `Thermostat`.
+pub async fn set_active_preset_request(conn: &crate::controller::Connection, endpoint: u16, preset_handle: Option<Vec<u8>>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_CMD_ID_SETACTIVEPRESETREQUEST, &encode_set_active_preset_request(preset_handle)?).await?;
+    Ok(())
+}
+
+/// Read `LocalTemperature` attribute from cluster `Thermostat`.
+pub async fn read_local_temperature(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_LOCALTEMPERATURE).await?;
+    decode_local_temperature(&tlv)
+}
+
+/// Read `OutdoorTemperature` attribute from cluster `Thermostat`.
+pub async fn read_outdoor_temperature(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OUTDOORTEMPERATURE).await?;
+    decode_outdoor_temperature(&tlv)
+}
+
+/// Read `Occupancy` attribute from cluster `Thermostat`.
+pub async fn read_occupancy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Occupancy> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OCCUPANCY).await?;
+    decode_occupancy(&tlv)
+}
+
+/// Read `AbsMinHeatSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_abs_min_heat_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ABSMINHEATSETPOINTLIMIT).await?;
+    decode_abs_min_heat_setpoint_limit(&tlv)
+}
+
+/// Read `AbsMaxHeatSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_abs_max_heat_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ABSMAXHEATSETPOINTLIMIT).await?;
+    decode_abs_max_heat_setpoint_limit(&tlv)
+}
+
+/// Read `AbsMinCoolSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_abs_min_cool_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ABSMINCOOLSETPOINTLIMIT).await?;
+    decode_abs_min_cool_setpoint_limit(&tlv)
+}
+
+/// Read `AbsMaxCoolSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_abs_max_cool_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ABSMAXCOOLSETPOINTLIMIT).await?;
+    decode_abs_max_cool_setpoint_limit(&tlv)
+}
+
+/// Read `PICoolingDemand` attribute from cluster `Thermostat`.
+pub async fn read_pi_cooling_demand(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_PICOOLINGDEMAND).await?;
+    decode_pi_cooling_demand(&tlv)
+}
+
+/// Read `PIHeatingDemand` attribute from cluster `Thermostat`.
+pub async fn read_pi_heating_demand(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_PIHEATINGDEMAND).await?;
+    decode_pi_heating_demand(&tlv)
+}
+
+/// Read `HVACSystemTypeConfiguration` attribute from cluster `Thermostat`.
+pub async fn read_hvac_system_type_configuration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_HVACSYSTEMTYPECONFIGURATION).await?;
+    decode_hvac_system_type_configuration(&tlv)
+}
+
+/// Read `LocalTemperatureCalibration` attribute from cluster `Thermostat`.
+pub async fn read_local_temperature_calibration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_LOCALTEMPERATURECALIBRATION).await?;
+    decode_local_temperature_calibration(&tlv)
+}
+
+/// Read `OccupiedCoolingSetpoint` attribute from cluster `Thermostat`.
+pub async fn read_occupied_cooling_setpoint(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OCCUPIEDCOOLINGSETPOINT).await?;
+    decode_occupied_cooling_setpoint(&tlv)
+}
+
+/// Read `OccupiedHeatingSetpoint` attribute from cluster `Thermostat`.
+pub async fn read_occupied_heating_setpoint(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OCCUPIEDHEATINGSETPOINT).await?;
+    decode_occupied_heating_setpoint(&tlv)
+}
+
+/// Read `UnoccupiedCoolingSetpoint` attribute from cluster `Thermostat`.
+pub async fn read_unoccupied_cooling_setpoint(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_UNOCCUPIEDCOOLINGSETPOINT).await?;
+    decode_unoccupied_cooling_setpoint(&tlv)
+}
+
+/// Read `UnoccupiedHeatingSetpoint` attribute from cluster `Thermostat`.
+pub async fn read_unoccupied_heating_setpoint(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_UNOCCUPIEDHEATINGSETPOINT).await?;
+    decode_unoccupied_heating_setpoint(&tlv)
+}
+
+/// Read `MinHeatSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_min_heat_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MINHEATSETPOINTLIMIT).await?;
+    decode_min_heat_setpoint_limit(&tlv)
+}
+
+/// Read `MaxHeatSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_max_heat_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MAXHEATSETPOINTLIMIT).await?;
+    decode_max_heat_setpoint_limit(&tlv)
+}
+
+/// Read `MinCoolSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_min_cool_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MINCOOLSETPOINTLIMIT).await?;
+    decode_min_cool_setpoint_limit(&tlv)
+}
+
+/// Read `MaxCoolSetpointLimit` attribute from cluster `Thermostat`.
+pub async fn read_max_cool_setpoint_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MAXCOOLSETPOINTLIMIT).await?;
+    decode_max_cool_setpoint_limit(&tlv)
+}
+
+/// Read `MinSetpointDeadBand` attribute from cluster `Thermostat`.
+pub async fn read_min_setpoint_dead_band(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MINSETPOINTDEADBAND).await?;
+    decode_min_setpoint_dead_band(&tlv)
+}
+
+/// Read `RemoteSensing` attribute from cluster `Thermostat`.
+pub async fn read_remote_sensing(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<RemoteSensing> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_REMOTESENSING).await?;
+    decode_remote_sensing(&tlv)
+}
+
+/// Read `ControlSequenceOfOperation` attribute from cluster `Thermostat`.
+pub async fn read_control_sequence_of_operation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ControlSequenceOfOperation> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_CONTROLSEQUENCEOFOPERATION).await?;
+    decode_control_sequence_of_operation(&tlv)
+}
+
+/// Read `SystemMode` attribute from cluster `Thermostat`.
+pub async fn read_system_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SystemMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SYSTEMMODE).await?;
+    decode_system_mode(&tlv)
+}
+
+/// Read `ThermostatRunningMode` attribute from cluster `Thermostat`.
+pub async fn read_thermostat_running_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ThermostatRunningMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_THERMOSTATRUNNINGMODE).await?;
+    decode_thermostat_running_mode(&tlv)
+}
+
+/// Read `TemperatureSetpointHold` attribute from cluster `Thermostat`.
+pub async fn read_temperature_setpoint_hold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TemperatureSetpointHold> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_TEMPERATURESETPOINTHOLD).await?;
+    decode_temperature_setpoint_hold(&tlv)
+}
+
+/// Read `TemperatureSetpointHoldDuration` attribute from cluster `Thermostat`.
+pub async fn read_temperature_setpoint_hold_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_TEMPERATURESETPOINTHOLDDURATION).await?;
+    decode_temperature_setpoint_hold_duration(&tlv)
+}
+
+/// Read `ThermostatProgrammingOperationMode` attribute from cluster `Thermostat`.
+pub async fn read_thermostat_programming_operation_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ProgrammingOperationMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_THERMOSTATPROGRAMMINGOPERATIONMODE).await?;
+    decode_thermostat_programming_operation_mode(&tlv)
+}
+
+/// Read `ThermostatRunningState` attribute from cluster `Thermostat`.
+pub async fn read_thermostat_running_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<RelayState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_THERMOSTATRUNNINGSTATE).await?;
+    decode_thermostat_running_state(&tlv)
+}
+
+/// Read `SetpointChangeSource` attribute from cluster `Thermostat`.
+pub async fn read_setpoint_change_source(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SetpointChangeSource> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SETPOINTCHANGESOURCE).await?;
+    decode_setpoint_change_source(&tlv)
+}
+
+/// Read `SetpointChangeAmount` attribute from cluster `Thermostat`.
+pub async fn read_setpoint_change_amount(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SETPOINTCHANGEAMOUNT).await?;
+    decode_setpoint_change_amount(&tlv)
+}
+
+/// Read `SetpointChangeSourceTimestamp` attribute from cluster `Thermostat`.
+pub async fn read_setpoint_change_source_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SETPOINTCHANGESOURCETIMESTAMP).await?;
+    decode_setpoint_change_source_timestamp(&tlv)
+}
+
+/// Read `OccupiedSetback` attribute from cluster `Thermostat`.
+pub async fn read_occupied_setback(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OCCUPIEDSETBACK).await?;
+    decode_occupied_setback(&tlv)
+}
+
+/// Read `OccupiedSetbackMin` attribute from cluster `Thermostat`.
+pub async fn read_occupied_setback_min(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OCCUPIEDSETBACKMIN).await?;
+    decode_occupied_setback_min(&tlv)
+}
+
+/// Read `OccupiedSetbackMax` attribute from cluster `Thermostat`.
+pub async fn read_occupied_setback_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_OCCUPIEDSETBACKMAX).await?;
+    decode_occupied_setback_max(&tlv)
+}
+
+/// Read `UnoccupiedSetback` attribute from cluster `Thermostat`.
+pub async fn read_unoccupied_setback(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_UNOCCUPIEDSETBACK).await?;
+    decode_unoccupied_setback(&tlv)
+}
+
+/// Read `UnoccupiedSetbackMin` attribute from cluster `Thermostat`.
+pub async fn read_unoccupied_setback_min(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_UNOCCUPIEDSETBACKMIN).await?;
+    decode_unoccupied_setback_min(&tlv)
+}
+
+/// Read `UnoccupiedSetbackMax` attribute from cluster `Thermostat`.
+pub async fn read_unoccupied_setback_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_UNOCCUPIEDSETBACKMAX).await?;
+    decode_unoccupied_setback_max(&tlv)
+}
+
+/// Read `EmergencyHeatDelta` attribute from cluster `Thermostat`.
+pub async fn read_emergency_heat_delta(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_EMERGENCYHEATDELTA).await?;
+    decode_emergency_heat_delta(&tlv)
+}
+
+/// Read `ACType` attribute from cluster `Thermostat`.
+pub async fn read_ac_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ACType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACTYPE).await?;
+    decode_ac_type(&tlv)
+}
+
+/// Read `ACCapacity` attribute from cluster `Thermostat`.
+pub async fn read_ac_capacity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACCAPACITY).await?;
+    decode_ac_capacity(&tlv)
+}
+
+/// Read `ACRefrigerantType` attribute from cluster `Thermostat`.
+pub async fn read_ac_refrigerant_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ACRefrigerantType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACREFRIGERANTTYPE).await?;
+    decode_ac_refrigerant_type(&tlv)
+}
+
+/// Read `ACCompressorType` attribute from cluster `Thermostat`.
+pub async fn read_ac_compressor_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ACCompressorType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACCOMPRESSORTYPE).await?;
+    decode_ac_compressor_type(&tlv)
+}
+
+/// Read `ACErrorCode` attribute from cluster `Thermostat`.
+pub async fn read_ac_error_code(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ACErrorCode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACERRORCODE).await?;
+    decode_ac_error_code(&tlv)
+}
+
+/// Read `ACLouverPosition` attribute from cluster `Thermostat`.
+pub async fn read_aclouver_position(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ACLouverPosition> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACLOUVERPOSITION).await?;
+    decode_aclouver_position(&tlv)
+}
+
+/// Read `ACCoilTemperature` attribute from cluster `Thermostat`.
+pub async fn read_ac_coil_temperature(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACCOILTEMPERATURE).await?;
+    decode_ac_coil_temperature(&tlv)
+}
+
+/// Read `ACCapacityFormat` attribute from cluster `Thermostat`.
+pub async fn read_ac_capacity_format(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ACCapacityFormat> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACCAPACITYFORMAT).await?;
+    decode_ac_capacity_format(&tlv)
+}
+
+/// Read `PresetTypes` attribute from cluster `Thermostat`.
+pub async fn read_preset_types(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<PresetType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_PRESETTYPES).await?;
+    decode_preset_types(&tlv)
+}
+
+/// Read `ScheduleTypes` attribute from cluster `Thermostat`.
+pub async fn read_schedule_types(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ScheduleType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SCHEDULETYPES).await?;
+    decode_schedule_types(&tlv)
+}
+
+/// Read `NumberOfPresets` attribute from cluster `Thermostat`.
+pub async fn read_number_of_presets(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_NUMBEROFPRESETS).await?;
+    decode_number_of_presets(&tlv)
+}
+
+/// Read `NumberOfSchedules` attribute from cluster `Thermostat`.
+pub async fn read_number_of_schedules(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_NUMBEROFSCHEDULES).await?;
+    decode_number_of_schedules(&tlv)
+}
+
+/// Read `NumberOfScheduleTransitions` attribute from cluster `Thermostat`.
+pub async fn read_number_of_schedule_transitions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_NUMBEROFSCHEDULETRANSITIONS).await?;
+    decode_number_of_schedule_transitions(&tlv)
+}
+
+/// Read `NumberOfScheduleTransitionPerDay` attribute from cluster `Thermostat`.
+pub async fn read_number_of_schedule_transition_per_day(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_NUMBEROFSCHEDULETRANSITIONPERDAY).await?;
+    decode_number_of_schedule_transition_per_day(&tlv)
+}
+
+/// Read `ActivePresetHandle` attribute from cluster `Thermostat`.
+pub async fn read_active_preset_handle(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACTIVEPRESETHANDLE).await?;
+    decode_active_preset_handle(&tlv)
+}
+
+/// Read `ActiveScheduleHandle` attribute from cluster `Thermostat`.
+pub async fn read_active_schedule_handle(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_ACTIVESCHEDULEHANDLE).await?;
+    decode_active_schedule_handle(&tlv)
+}
+
+/// Read `Presets` attribute from cluster `Thermostat`.
+pub async fn read_presets(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Preset>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_PRESETS).await?;
+    decode_presets(&tlv)
+}
+
+/// Read `Schedules` attribute from cluster `Thermostat`.
+pub async fn read_schedules(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Schedule>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SCHEDULES).await?;
+    decode_schedules(&tlv)
+}
+
+/// Read `SetpointHoldExpiryTimestamp` attribute from cluster `Thermostat`.
+pub async fn read_setpoint_hold_expiry_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SETPOINTHOLDEXPIRYTIMESTAMP).await?;
+    decode_setpoint_hold_expiry_timestamp(&tlv)
+}
+

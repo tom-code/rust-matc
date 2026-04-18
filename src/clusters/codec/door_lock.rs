@@ -2146,6 +2146,416 @@ pub fn decode_get_credential_status_response(inp: &tlv::TlvItemValue) -> anyhow:
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `LockDoor` command on cluster `Door Lock`.
+pub async fn lock_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_LOCKDOOR, &encode_lock_door(pin_code)?).await?;
+    Ok(())
+}
+
+/// Invoke `UnlockDoor` command on cluster `Door Lock`.
+pub async fn unlock_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_UNLOCKDOOR, &encode_unlock_door(pin_code)?).await?;
+    Ok(())
+}
+
+/// Invoke `Toggle` command on cluster `Door Lock`.
+pub async fn toggle(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_TOGGLE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `UnlockWithTimeout` command on cluster `Door Lock`.
+pub async fn unlock_with_timeout(conn: &crate::controller::Connection, endpoint: u16, timeout: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_UNLOCKWITHTIMEOUT, &encode_unlock_with_timeout(timeout, pin_code)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetWeekDaySchedule` command on cluster `Door Lock`.
+pub async fn set_week_day_schedule(conn: &crate::controller::Connection, endpoint: u16, week_day_index: u8, user_index: u16, days_mask: DaysMask, start_hour: u8, start_minute: u8, end_hour: u8, end_minute: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_SETWEEKDAYSCHEDULE, &encode_set_week_day_schedule(week_day_index, user_index, days_mask, start_hour, start_minute, end_hour, end_minute)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetWeekDaySchedule` command on cluster `Door Lock`.
+pub async fn get_week_day_schedule(conn: &crate::controller::Connection, endpoint: u16, week_day_index: u8, user_index: u16) -> anyhow::Result<GetWeekDayScheduleResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_GETWEEKDAYSCHEDULE, &encode_get_week_day_schedule(week_day_index, user_index)?).await?;
+    decode_get_week_day_schedule_response(&tlv)
+}
+
+/// Invoke `ClearWeekDaySchedule` command on cluster `Door Lock`.
+pub async fn clear_week_day_schedule(conn: &crate::controller::Connection, endpoint: u16, week_day_index: u8, user_index: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_CLEARWEEKDAYSCHEDULE, &encode_clear_week_day_schedule(week_day_index, user_index)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetYearDaySchedule` command on cluster `Door Lock`.
+pub async fn set_year_day_schedule(conn: &crate::controller::Connection, endpoint: u16, year_day_index: u8, user_index: u16, local_start_time: u64, local_end_time: u64) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_SETYEARDAYSCHEDULE, &encode_set_year_day_schedule(year_day_index, user_index, local_start_time, local_end_time)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetYearDaySchedule` command on cluster `Door Lock`.
+pub async fn get_year_day_schedule(conn: &crate::controller::Connection, endpoint: u16, year_day_index: u8, user_index: u16) -> anyhow::Result<GetYearDayScheduleResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_GETYEARDAYSCHEDULE, &encode_get_year_day_schedule(year_day_index, user_index)?).await?;
+    decode_get_year_day_schedule_response(&tlv)
+}
+
+/// Invoke `ClearYearDaySchedule` command on cluster `Door Lock`.
+pub async fn clear_year_day_schedule(conn: &crate::controller::Connection, endpoint: u16, year_day_index: u8, user_index: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_CLEARYEARDAYSCHEDULE, &encode_clear_year_day_schedule(year_day_index, user_index)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetHolidaySchedule` command on cluster `Door Lock`.
+pub async fn set_holiday_schedule(conn: &crate::controller::Connection, endpoint: u16, holiday_index: u8, local_start_time: u64, local_end_time: u64, operating_mode: OperatingMode) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_SETHOLIDAYSCHEDULE, &encode_set_holiday_schedule(holiday_index, local_start_time, local_end_time, operating_mode)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetHolidaySchedule` command on cluster `Door Lock`.
+pub async fn get_holiday_schedule(conn: &crate::controller::Connection, endpoint: u16, holiday_index: u8) -> anyhow::Result<GetHolidayScheduleResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_GETHOLIDAYSCHEDULE, &encode_get_holiday_schedule(holiday_index)?).await?;
+    decode_get_holiday_schedule_response(&tlv)
+}
+
+/// Invoke `ClearHolidaySchedule` command on cluster `Door Lock`.
+pub async fn clear_holiday_schedule(conn: &crate::controller::Connection, endpoint: u16, holiday_index: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_CLEARHOLIDAYSCHEDULE, &encode_clear_holiday_schedule(holiday_index)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetUser` command on cluster `Door Lock`.
+pub async fn set_user(conn: &crate::controller::Connection, endpoint: u16, operation_type: DataOperationType, user_index: u16, user_name: Option<String>, user_unique_id: Option<u32>, user_status: Option<UserStatus>, user_type: Option<UserType>, credential_rule: Option<CredentialRule>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_SETUSER, &encode_set_user(operation_type, user_index, user_name, user_unique_id, user_status, user_type, credential_rule)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetUser` command on cluster `Door Lock`.
+pub async fn get_user(conn: &crate::controller::Connection, endpoint: u16, user_index: u16) -> anyhow::Result<GetUserResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_GETUSER, &encode_get_user(user_index)?).await?;
+    decode_get_user_response(&tlv)
+}
+
+/// Invoke `ClearUser` command on cluster `Door Lock`.
+pub async fn clear_user(conn: &crate::controller::Connection, endpoint: u16, user_index: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_CLEARUSER, &encode_clear_user(user_index)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetCredential` command on cluster `Door Lock`.
+pub async fn set_credential(conn: &crate::controller::Connection, endpoint: u16, operation_type: DataOperationType, credential: Credential, credential_data: Vec<u8>, user_index: Option<u16>, user_status: Option<UserStatus>, user_type: Option<UserType>) -> anyhow::Result<SetCredentialResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_SETCREDENTIAL, &encode_set_credential(operation_type, credential, credential_data, user_index, user_status, user_type)?).await?;
+    decode_set_credential_response(&tlv)
+}
+
+/// Invoke `GetCredentialStatus` command on cluster `Door Lock`.
+pub async fn get_credential_status(conn: &crate::controller::Connection, endpoint: u16, credential: Credential) -> anyhow::Result<GetCredentialStatusResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_GETCREDENTIALSTATUS, &encode_get_credential_status(credential)?).await?;
+    decode_get_credential_status_response(&tlv)
+}
+
+/// Invoke `ClearCredential` command on cluster `Door Lock`.
+pub async fn clear_credential(conn: &crate::controller::Connection, endpoint: u16, credential: Option<Credential>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_CLEARCREDENTIAL, &encode_clear_credential(credential)?).await?;
+    Ok(())
+}
+
+/// Invoke `UnboltDoor` command on cluster `Door Lock`.
+pub async fn unbolt_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_UNBOLTDOOR, &encode_unbolt_door(pin_code)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetAliroReaderConfig` command on cluster `Door Lock`.
+pub async fn set_aliro_reader_config(conn: &crate::controller::Connection, endpoint: u16, signing_key: Vec<u8>, verification_key: Vec<u8>, group_identifier: Vec<u8>, group_resolving_key: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_SETALIROREADERCONFIG, &encode_set_aliro_reader_config(signing_key, verification_key, group_identifier, group_resolving_key)?).await?;
+    Ok(())
+}
+
+/// Invoke `ClearAliroReaderConfig` command on cluster `Door Lock`.
+pub async fn clear_aliro_reader_config(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_CLEARALIROREADERCONFIG, &[]).await?;
+    Ok(())
+}
+
+/// Read `LockState` attribute from cluster `Door Lock`.
+pub async fn read_lock_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<LockState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_LOCKSTATE).await?;
+    decode_lock_state(&tlv)
+}
+
+/// Read `LockType` attribute from cluster `Door Lock`.
+pub async fn read_lock_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<LockType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_LOCKTYPE).await?;
+    decode_lock_type(&tlv)
+}
+
+/// Read `ActuatorEnabled` attribute from cluster `Door Lock`.
+pub async fn read_actuator_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ACTUATORENABLED).await?;
+    decode_actuator_enabled(&tlv)
+}
+
+/// Read `DoorState` attribute from cluster `Door Lock`.
+pub async fn read_door_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DoorState>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_DOORSTATE).await?;
+    decode_door_state(&tlv)
+}
+
+/// Read `DoorOpenEvents` attribute from cluster `Door Lock`.
+pub async fn read_door_open_events(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_DOOROPENEVENTS).await?;
+    decode_door_open_events(&tlv)
+}
+
+/// Read `DoorClosedEvents` attribute from cluster `Door Lock`.
+pub async fn read_door_closed_events(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_DOORCLOSEDEVENTS).await?;
+    decode_door_closed_events(&tlv)
+}
+
+/// Read `OpenPeriod` attribute from cluster `Door Lock`.
+pub async fn read_open_period(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_OPENPERIOD).await?;
+    decode_open_period(&tlv)
+}
+
+/// Read `NumberOfTotalUsersSupported` attribute from cluster `Door Lock`.
+pub async fn read_number_of_total_users_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFTOTALUSERSSUPPORTED).await?;
+    decode_number_of_total_users_supported(&tlv)
+}
+
+/// Read `NumberOfPINUsersSupported` attribute from cluster `Door Lock`.
+pub async fn read_number_of_pin_users_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFPINUSERSSUPPORTED).await?;
+    decode_number_of_pin_users_supported(&tlv)
+}
+
+/// Read `NumberOfRFIDUsersSupported` attribute from cluster `Door Lock`.
+pub async fn read_number_of_rfid_users_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFRFIDUSERSSUPPORTED).await?;
+    decode_number_of_rfid_users_supported(&tlv)
+}
+
+/// Read `NumberOfWeekDaySchedulesSupportedPerUser` attribute from cluster `Door Lock`.
+pub async fn read_number_of_week_day_schedules_supported_per_user(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFWEEKDAYSCHEDULESSUPPORTEDPERUSER).await?;
+    decode_number_of_week_day_schedules_supported_per_user(&tlv)
+}
+
+/// Read `NumberOfYearDaySchedulesSupportedPerUser` attribute from cluster `Door Lock`.
+pub async fn read_number_of_year_day_schedules_supported_per_user(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFYEARDAYSCHEDULESSUPPORTEDPERUSER).await?;
+    decode_number_of_year_day_schedules_supported_per_user(&tlv)
+}
+
+/// Read `NumberOfHolidaySchedulesSupported` attribute from cluster `Door Lock`.
+pub async fn read_number_of_holiday_schedules_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFHOLIDAYSCHEDULESSUPPORTED).await?;
+    decode_number_of_holiday_schedules_supported(&tlv)
+}
+
+/// Read `MaxPINCodeLength` attribute from cluster `Door Lock`.
+pub async fn read_max_pin_code_length(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_MAXPINCODELENGTH).await?;
+    decode_max_pin_code_length(&tlv)
+}
+
+/// Read `MinPINCodeLength` attribute from cluster `Door Lock`.
+pub async fn read_min_pin_code_length(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_MINPINCODELENGTH).await?;
+    decode_min_pin_code_length(&tlv)
+}
+
+/// Read `MaxRFIDCodeLength` attribute from cluster `Door Lock`.
+pub async fn read_max_rfid_code_length(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_MAXRFIDCODELENGTH).await?;
+    decode_max_rfid_code_length(&tlv)
+}
+
+/// Read `MinRFIDCodeLength` attribute from cluster `Door Lock`.
+pub async fn read_min_rfid_code_length(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_MINRFIDCODELENGTH).await?;
+    decode_min_rfid_code_length(&tlv)
+}
+
+/// Read `CredentialRulesSupport` attribute from cluster `Door Lock`.
+pub async fn read_credential_rules_support(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<CredentialRules> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_CREDENTIALRULESSUPPORT).await?;
+    decode_credential_rules_support(&tlv)
+}
+
+/// Read `NumberOfCredentialsSupportedPerUser` attribute from cluster `Door Lock`.
+pub async fn read_number_of_credentials_supported_per_user(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFCREDENTIALSSUPPORTEDPERUSER).await?;
+    decode_number_of_credentials_supported_per_user(&tlv)
+}
+
+/// Read `Language` attribute from cluster `Door Lock`.
+pub async fn read_language(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_LANGUAGE).await?;
+    decode_language(&tlv)
+}
+
+/// Read `LEDSettings` attribute from cluster `Door Lock`.
+pub async fn read_led_settings(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<LEDSetting> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_LEDSETTINGS).await?;
+    decode_led_settings(&tlv)
+}
+
+/// Read `AutoRelockTime` attribute from cluster `Door Lock`.
+pub async fn read_auto_relock_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_AUTORELOCKTIME).await?;
+    decode_auto_relock_time(&tlv)
+}
+
+/// Read `SoundVolume` attribute from cluster `Door Lock`.
+pub async fn read_sound_volume(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SoundVolume> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_SOUNDVOLUME).await?;
+    decode_sound_volume(&tlv)
+}
+
+/// Read `OperatingMode` attribute from cluster `Door Lock`.
+pub async fn read_operating_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperatingMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_OPERATINGMODE).await?;
+    decode_operating_mode(&tlv)
+}
+
+/// Read `SupportedOperatingModes` attribute from cluster `Door Lock`.
+pub async fn read_supported_operating_modes(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperatingModes> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_SUPPORTEDOPERATINGMODES).await?;
+    decode_supported_operating_modes(&tlv)
+}
+
+/// Read `DefaultConfigurationRegister` attribute from cluster `Door Lock`.
+pub async fn read_default_configuration_register(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ConfigurationRegister> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_DEFAULTCONFIGURATIONREGISTER).await?;
+    decode_default_configuration_register(&tlv)
+}
+
+/// Read `EnableLocalProgramming` attribute from cluster `Door Lock`.
+pub async fn read_enable_local_programming(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ENABLELOCALPROGRAMMING).await?;
+    decode_enable_local_programming(&tlv)
+}
+
+/// Read `EnableOneTouchLocking` attribute from cluster `Door Lock`.
+pub async fn read_enable_one_touch_locking(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ENABLEONETOUCHLOCKING).await?;
+    decode_enable_one_touch_locking(&tlv)
+}
+
+/// Read `EnableInsideStatusLED` attribute from cluster `Door Lock`.
+pub async fn read_enable_inside_status_led(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ENABLEINSIDESTATUSLED).await?;
+    decode_enable_inside_status_led(&tlv)
+}
+
+/// Read `EnablePrivacyModeButton` attribute from cluster `Door Lock`.
+pub async fn read_enable_privacy_mode_button(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ENABLEPRIVACYMODEBUTTON).await?;
+    decode_enable_privacy_mode_button(&tlv)
+}
+
+/// Read `LocalProgrammingFeatures` attribute from cluster `Door Lock`.
+pub async fn read_local_programming_features(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<LocalProgrammingFeatures> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_LOCALPROGRAMMINGFEATURES).await?;
+    decode_local_programming_features(&tlv)
+}
+
+/// Read `WrongCodeEntryLimit` attribute from cluster `Door Lock`.
+pub async fn read_wrong_code_entry_limit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_WRONGCODEENTRYLIMIT).await?;
+    decode_wrong_code_entry_limit(&tlv)
+}
+
+/// Read `UserCodeTemporaryDisableTime` attribute from cluster `Door Lock`.
+pub async fn read_user_code_temporary_disable_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_USERCODETEMPORARYDISABLETIME).await?;
+    decode_user_code_temporary_disable_time(&tlv)
+}
+
+/// Read `SendPINOverTheAir` attribute from cluster `Door Lock`.
+pub async fn read_send_pin_over_the_air(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_SENDPINOVERTHEAIR).await?;
+    decode_send_pin_over_the_air(&tlv)
+}
+
+/// Read `RequirePINforRemoteOperation` attribute from cluster `Door Lock`.
+pub async fn read_require_pinfor_remote_operation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_REQUIREPINFORREMOTEOPERATION).await?;
+    decode_require_pinfor_remote_operation(&tlv)
+}
+
+/// Read `SecurityLevel` attribute from cluster `Door Lock`.
+pub async fn read_security_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_SECURITYLEVEL).await?;
+    decode_security_level(&tlv)
+}
+
+/// Read `ExpiringUserTimeout` attribute from cluster `Door Lock`.
+pub async fn read_expiring_user_timeout(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_EXPIRINGUSERTIMEOUT).await?;
+    decode_expiring_user_timeout(&tlv)
+}
+
+/// Read `AliroReaderVerificationKey` attribute from cluster `Door Lock`.
+pub async fn read_aliro_reader_verification_key(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROREADERVERIFICATIONKEY).await?;
+    decode_aliro_reader_verification_key(&tlv)
+}
+
+/// Read `AliroReaderGroupIdentifier` attribute from cluster `Door Lock`.
+pub async fn read_aliro_reader_group_identifier(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROREADERGROUPIDENTIFIER).await?;
+    decode_aliro_reader_group_identifier(&tlv)
+}
+
+/// Read `AliroReaderGroupSubIdentifier` attribute from cluster `Door Lock`.
+pub async fn read_aliro_reader_group_sub_identifier(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROREADERGROUPSUBIDENTIFIER).await?;
+    decode_aliro_reader_group_sub_identifier(&tlv)
+}
+
+/// Read `AliroExpeditedTransactionSupportedProtocolVersions` attribute from cluster `Door Lock`.
+pub async fn read_aliro_expedited_transaction_supported_protocol_versions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROEXPEDITEDTRANSACTIONSUPPORTEDPROTOCOLVERSIONS).await?;
+    decode_aliro_expedited_transaction_supported_protocol_versions(&tlv)
+}
+
+/// Read `AliroGroupResolvingKey` attribute from cluster `Door Lock`.
+pub async fn read_aliro_group_resolving_key(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROGROUPRESOLVINGKEY).await?;
+    decode_aliro_group_resolving_key(&tlv)
+}
+
+/// Read `AliroSupportedBLEUWBProtocolVersions` attribute from cluster `Door Lock`.
+pub async fn read_aliro_supported_bleuwb_protocol_versions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROSUPPORTEDBLEUWBPROTOCOLVERSIONS).await?;
+    decode_aliro_supported_bleuwb_protocol_versions(&tlv)
+}
+
+/// Read `AliroBLEAdvertisingVersion` attribute from cluster `Door Lock`.
+pub async fn read_aliro_ble_advertising_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_ALIROBLEADVERTISINGVERSION).await?;
+    decode_aliro_ble_advertising_version(&tlv)
+}
+
+/// Read `NumberOfAliroCredentialIssuerKeysSupported` attribute from cluster `Door Lock`.
+pub async fn read_number_of_aliro_credential_issuer_keys_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFALIROCREDENTIALISSUERKEYSSUPPORTED).await?;
+    decode_number_of_aliro_credential_issuer_keys_supported(&tlv)
+}
+
+/// Read `NumberOfAliroEndpointKeysSupported` attribute from cluster `Door Lock`.
+pub async fn read_number_of_aliro_endpoint_keys_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_ATTR_ID_NUMBEROFALIROENDPOINTKEYSSUPPORTED).await?;
+    decode_number_of_aliro_endpoint_keys_supported(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct DoorLockAlarmEvent {
     pub alarm_code: Option<AlarmCode>,

@@ -1480,3 +1480,431 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `MoveToHue` command on cluster `Color Control`.
+pub async fn move_to_hue(conn: &crate::controller::Connection, endpoint: u16, hue: u8, direction: Direction, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUE, &encode_move_to_hue(hue, direction, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveHue` command on cluster `Color Control`.
+pub async fn move_hue(conn: &crate::controller::Connection, endpoint: u16, move_mode: MoveMode, rate: u8, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVEHUE, &encode_move_hue(move_mode, rate, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StepHue` command on cluster `Color Control`.
+pub async fn step_hue(conn: &crate::controller::Connection, endpoint: u16, step_mode: StepMode, step_size: u8, transition_time: u8, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPHUE, &encode_step_hue(step_mode, step_size, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveToSaturation` command on cluster `Color Control`.
+pub async fn move_to_saturation(conn: &crate::controller::Connection, endpoint: u16, saturation: u8, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOSATURATION, &encode_move_to_saturation(saturation, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveSaturation` command on cluster `Color Control`.
+pub async fn move_saturation(conn: &crate::controller::Connection, endpoint: u16, move_mode: MoveMode, rate: u8, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVESATURATION, &encode_move_saturation(move_mode, rate, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StepSaturation` command on cluster `Color Control`.
+pub async fn step_saturation(conn: &crate::controller::Connection, endpoint: u16, step_mode: StepMode, step_size: u8, transition_time: u8, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPSATURATION, &encode_step_saturation(step_mode, step_size, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveToHueAndSaturation` command on cluster `Color Control`.
+pub async fn move_to_hue_and_saturation(conn: &crate::controller::Connection, endpoint: u16, hue: u8, saturation: u8, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOHUEANDSATURATION, &encode_move_to_hue_and_saturation(hue, saturation, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveToColor` command on cluster `Color Control`.
+pub async fn move_to_color(conn: &crate::controller::Connection, endpoint: u16, color_x: u16, color_y: u16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOCOLOR, &encode_move_to_color(color_x, color_y, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveColor` command on cluster `Color Control`.
+pub async fn move_color(conn: &crate::controller::Connection, endpoint: u16, rate_x: i16, rate_y: i16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVECOLOR, &encode_move_color(rate_x, rate_y, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StepColor` command on cluster `Color Control`.
+pub async fn step_color(conn: &crate::controller::Connection, endpoint: u16, step_x: i16, step_y: i16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPCOLOR, &encode_step_color(step_x, step_y, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveToColorTemperature` command on cluster `Color Control`.
+pub async fn move_to_color_temperature(conn: &crate::controller::Connection, endpoint: u16, color_temperature_mireds: u16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVETOCOLORTEMPERATURE, &encode_move_to_color_temperature(color_temperature_mireds, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnhancedMoveToHue` command on cluster `Color Control`.
+pub async fn enhanced_move_to_hue(conn: &crate::controller::Connection, endpoint: u16, enhanced_hue: u16, direction: Direction, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDMOVETOHUE, &encode_enhanced_move_to_hue(enhanced_hue, direction, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnhancedMoveHue` command on cluster `Color Control`.
+pub async fn enhanced_move_hue(conn: &crate::controller::Connection, endpoint: u16, move_mode: MoveMode, rate: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDMOVEHUE, &encode_enhanced_move_hue(move_mode, rate, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnhancedStepHue` command on cluster `Color Control`.
+pub async fn enhanced_step_hue(conn: &crate::controller::Connection, endpoint: u16, step_mode: StepMode, step_size: u16, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDSTEPHUE, &encode_enhanced_step_hue(step_mode, step_size, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnhancedMoveToHueAndSaturation` command on cluster `Color Control`.
+pub async fn enhanced_move_to_hue_and_saturation(conn: &crate::controller::Connection, endpoint: u16, enhanced_hue: u16, saturation: u8, transition_time: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_ENHANCEDMOVETOHUEANDSATURATION, &encode_enhanced_move_to_hue_and_saturation(enhanced_hue, saturation, transition_time, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `ColorLoopSet` command on cluster `Color Control`.
+pub async fn color_loop_set(conn: &crate::controller::Connection, endpoint: u16, update_flags: UpdateFlags, action: ColorLoopAction, direction: ColorLoopDirection, time: u16, start_hue: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_COLORLOOPSET, &encode_color_loop_set(update_flags, action, direction, time, start_hue, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StopMoveStep` command on cluster `Color Control`.
+pub async fn stop_move_step(conn: &crate::controller::Connection, endpoint: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STOPMOVESTEP, &encode_stop_move_step(options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `MoveColorTemperature` command on cluster `Color Control`.
+pub async fn move_color_temperature(conn: &crate::controller::Connection, endpoint: u16, move_mode: MoveMode, rate: u16, color_temperature_minimum_mireds: u16, color_temperature_maximum_mireds: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_MOVECOLORTEMPERATURE, &encode_move_color_temperature(move_mode, rate, color_temperature_minimum_mireds, color_temperature_maximum_mireds, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Invoke `StepColorTemperature` command on cluster `Color Control`.
+pub async fn step_color_temperature(conn: &crate::controller::Connection, endpoint: u16, step_mode: StepMode, step_size: u16, transition_time: u16, color_temperature_minimum_mireds: u16, color_temperature_maximum_mireds: u16, options_mask: Options, options_override: Options) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_CMD_ID_STEPCOLORTEMPERATURE, &encode_step_color_temperature(step_mode, step_size, transition_time, color_temperature_minimum_mireds, color_temperature_maximum_mireds, options_mask, options_override)?).await?;
+    Ok(())
+}
+
+/// Read `CurrentHue` attribute from cluster `Color Control`.
+pub async fn read_current_hue(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE).await?;
+    decode_current_hue(&tlv)
+}
+
+/// Read `CurrentSaturation` attribute from cluster `Color Control`.
+pub async fn read_current_saturation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION).await?;
+    decode_current_saturation(&tlv)
+}
+
+/// Read `RemainingTime` attribute from cluster `Color Control`.
+pub async fn read_remaining_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_REMAININGTIME).await?;
+    decode_remaining_time(&tlv)
+}
+
+/// Read `CurrentX` attribute from cluster `Color Control`.
+pub async fn read_current_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX).await?;
+    decode_current_x(&tlv)
+}
+
+/// Read `CurrentY` attribute from cluster `Color Control`.
+pub async fn read_current_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY).await?;
+    decode_current_y(&tlv)
+}
+
+/// Read `DriftCompensation` attribute from cluster `Color Control`.
+pub async fn read_drift_compensation(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<DriftCompensation> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_DRIFTCOMPENSATION).await?;
+    decode_drift_compensation(&tlv)
+}
+
+/// Read `CompensationText` attribute from cluster `Color Control`.
+pub async fn read_compensation_text(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COMPENSATIONTEXT).await?;
+    decode_compensation_text(&tlv)
+}
+
+/// Read `ColorTemperatureMireds` attribute from cluster `Color Control`.
+pub async fn read_color_temperature_mireds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS).await?;
+    decode_color_temperature_mireds(&tlv)
+}
+
+/// Read `ColorMode` attribute from cluster `Color Control`.
+pub async fn read_color_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ColorMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE).await?;
+    decode_color_mode(&tlv)
+}
+
+/// Read `Options` attribute from cluster `Color Control`.
+pub async fn read_options(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Options> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_OPTIONS).await?;
+    decode_options(&tlv)
+}
+
+/// Read `NumberOfPrimaries` attribute from cluster `Color Control`.
+pub async fn read_number_of_primaries(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_NUMBEROFPRIMARIES).await?;
+    decode_number_of_primaries(&tlv)
+}
+
+/// Read `Primary1X` attribute from cluster `Color Control`.
+pub async fn read_primary1_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY1X).await?;
+    decode_primary1_x(&tlv)
+}
+
+/// Read `Primary1Y` attribute from cluster `Color Control`.
+pub async fn read_primary1_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY1Y).await?;
+    decode_primary1_y(&tlv)
+}
+
+/// Read `Primary1Intensity` attribute from cluster `Color Control`.
+pub async fn read_primary1_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY1INTENSITY).await?;
+    decode_primary1_intensity(&tlv)
+}
+
+/// Read `Primary2X` attribute from cluster `Color Control`.
+pub async fn read_primary2_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY2X).await?;
+    decode_primary2_x(&tlv)
+}
+
+/// Read `Primary2Y` attribute from cluster `Color Control`.
+pub async fn read_primary2_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY2Y).await?;
+    decode_primary2_y(&tlv)
+}
+
+/// Read `Primary2Intensity` attribute from cluster `Color Control`.
+pub async fn read_primary2_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY2INTENSITY).await?;
+    decode_primary2_intensity(&tlv)
+}
+
+/// Read `Primary3X` attribute from cluster `Color Control`.
+pub async fn read_primary3_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY3X).await?;
+    decode_primary3_x(&tlv)
+}
+
+/// Read `Primary3Y` attribute from cluster `Color Control`.
+pub async fn read_primary3_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY3Y).await?;
+    decode_primary3_y(&tlv)
+}
+
+/// Read `Primary3Intensity` attribute from cluster `Color Control`.
+pub async fn read_primary3_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY3INTENSITY).await?;
+    decode_primary3_intensity(&tlv)
+}
+
+/// Read `Primary4X` attribute from cluster `Color Control`.
+pub async fn read_primary4_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY4X).await?;
+    decode_primary4_x(&tlv)
+}
+
+/// Read `Primary4Y` attribute from cluster `Color Control`.
+pub async fn read_primary4_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY4Y).await?;
+    decode_primary4_y(&tlv)
+}
+
+/// Read `Primary4Intensity` attribute from cluster `Color Control`.
+pub async fn read_primary4_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY4INTENSITY).await?;
+    decode_primary4_intensity(&tlv)
+}
+
+/// Read `Primary5X` attribute from cluster `Color Control`.
+pub async fn read_primary5_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY5X).await?;
+    decode_primary5_x(&tlv)
+}
+
+/// Read `Primary5Y` attribute from cluster `Color Control`.
+pub async fn read_primary5_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY5Y).await?;
+    decode_primary5_y(&tlv)
+}
+
+/// Read `Primary5Intensity` attribute from cluster `Color Control`.
+pub async fn read_primary5_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY5INTENSITY).await?;
+    decode_primary5_intensity(&tlv)
+}
+
+/// Read `Primary6X` attribute from cluster `Color Control`.
+pub async fn read_primary6_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY6X).await?;
+    decode_primary6_x(&tlv)
+}
+
+/// Read `Primary6Y` attribute from cluster `Color Control`.
+pub async fn read_primary6_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY6Y).await?;
+    decode_primary6_y(&tlv)
+}
+
+/// Read `Primary6Intensity` attribute from cluster `Color Control`.
+pub async fn read_primary6_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_PRIMARY6INTENSITY).await?;
+    decode_primary6_intensity(&tlv)
+}
+
+/// Read `WhitePointX` attribute from cluster `Color Control`.
+pub async fn read_white_point_x(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_WHITEPOINTX).await?;
+    decode_white_point_x(&tlv)
+}
+
+/// Read `WhitePointY` attribute from cluster `Color Control`.
+pub async fn read_white_point_y(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_WHITEPOINTY).await?;
+    decode_white_point_y(&tlv)
+}
+
+/// Read `ColorPointRX` attribute from cluster `Color Control`.
+pub async fn read_color_point_rx(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTRX).await?;
+    decode_color_point_rx(&tlv)
+}
+
+/// Read `ColorPointRY` attribute from cluster `Color Control`.
+pub async fn read_color_point_ry(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTRY).await?;
+    decode_color_point_ry(&tlv)
+}
+
+/// Read `ColorPointRIntensity` attribute from cluster `Color Control`.
+pub async fn read_color_point_r_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTRINTENSITY).await?;
+    decode_color_point_r_intensity(&tlv)
+}
+
+/// Read `ColorPointGX` attribute from cluster `Color Control`.
+pub async fn read_color_point_gx(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTGX).await?;
+    decode_color_point_gx(&tlv)
+}
+
+/// Read `ColorPointGY` attribute from cluster `Color Control`.
+pub async fn read_color_point_gy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTGY).await?;
+    decode_color_point_gy(&tlv)
+}
+
+/// Read `ColorPointGIntensity` attribute from cluster `Color Control`.
+pub async fn read_color_point_g_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTGINTENSITY).await?;
+    decode_color_point_g_intensity(&tlv)
+}
+
+/// Read `ColorPointBX` attribute from cluster `Color Control`.
+pub async fn read_color_point_bx(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTBX).await?;
+    decode_color_point_bx(&tlv)
+}
+
+/// Read `ColorPointBY` attribute from cluster `Color Control`.
+pub async fn read_color_point_by(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTBY).await?;
+    decode_color_point_by(&tlv)
+}
+
+/// Read `ColorPointBIntensity` attribute from cluster `Color Control`.
+pub async fn read_color_point_b_intensity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORPOINTBINTENSITY).await?;
+    decode_color_point_b_intensity(&tlv)
+}
+
+/// Read `EnhancedCurrentHue` attribute from cluster `Color Control`.
+pub async fn read_enhanced_current_hue(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_ENHANCEDCURRENTHUE).await?;
+    decode_enhanced_current_hue(&tlv)
+}
+
+/// Read `EnhancedColorMode` attribute from cluster `Color Control`.
+pub async fn read_enhanced_color_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<EnhancedColorMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_ENHANCEDCOLORMODE).await?;
+    decode_enhanced_color_mode(&tlv)
+}
+
+/// Read `ColorLoopActive` attribute from cluster `Color Control`.
+pub async fn read_color_loop_active(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORLOOPACTIVE).await?;
+    decode_color_loop_active(&tlv)
+}
+
+/// Read `ColorLoopDirection` attribute from cluster `Color Control`.
+pub async fn read_color_loop_direction(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ColorLoopDirection> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORLOOPDIRECTION).await?;
+    decode_color_loop_direction(&tlv)
+}
+
+/// Read `ColorLoopTime` attribute from cluster `Color Control`.
+pub async fn read_color_loop_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORLOOPTIME).await?;
+    decode_color_loop_time(&tlv)
+}
+
+/// Read `ColorLoopStartEnhancedHue` attribute from cluster `Color Control`.
+pub async fn read_color_loop_start_enhanced_hue(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORLOOPSTARTENHANCEDHUE).await?;
+    decode_color_loop_start_enhanced_hue(&tlv)
+}
+
+/// Read `ColorLoopStoredEnhancedHue` attribute from cluster `Color Control`.
+pub async fn read_color_loop_stored_enhanced_hue(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORLOOPSTOREDENHANCEDHUE).await?;
+    decode_color_loop_stored_enhanced_hue(&tlv)
+}
+
+/// Read `ColorCapabilities` attribute from cluster `Color Control`.
+pub async fn read_color_capabilities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ColorCapabilities> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORCAPABILITIES).await?;
+    decode_color_capabilities(&tlv)
+}
+
+/// Read `ColorTempPhysicalMinMireds` attribute from cluster `Color Control`.
+pub async fn read_color_temp_physical_min_mireds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMINMIREDS).await?;
+    decode_color_temp_physical_min_mireds(&tlv)
+}
+
+/// Read `ColorTempPhysicalMaxMireds` attribute from cluster `Color Control`.
+pub async fn read_color_temp_physical_max_mireds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMAXMIREDS).await?;
+    decode_color_temp_physical_max_mireds(&tlv)
+}
+
+/// Read `CoupleColorTempToLevelMinMireds` attribute from cluster `Color Control`.
+pub async fn read_couple_color_temp_to_level_min_mireds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COUPLECOLORTEMPTOLEVELMINMIREDS).await?;
+    decode_couple_color_temp_to_level_min_mireds(&tlv)
+}
+
+/// Read `StartUpColorTemperatureMireds` attribute from cluster `Color Control`.
+pub async fn read_start_up_color_temperature_mireds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COLOR_CONTROL, crate::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_STARTUPCOLORTEMPERATUREMIREDS).await?;
+    decode_start_up_color_temperature_mireds(&tlv)
+}
+

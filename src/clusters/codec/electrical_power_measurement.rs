@@ -551,6 +551,122 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `PowerMode` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_power_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<PowerMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_POWERMODE).await?;
+    decode_power_mode(&tlv)
+}
+
+/// Read `NumberOfMeasurementTypes` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_number_of_measurement_types(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_NUMBEROFMEASUREMENTTYPES).await?;
+    decode_number_of_measurement_types(&tlv)
+}
+
+/// Read `Accuracy` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_accuracy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<MeasurementAccuracy>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_ACCURACY).await?;
+    decode_accuracy(&tlv)
+}
+
+/// Read `Ranges` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_ranges(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<MeasurementRange>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RANGES).await?;
+    decode_ranges(&tlv)
+}
+
+/// Read `Voltage` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_voltage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_VOLTAGE).await?;
+    decode_voltage(&tlv)
+}
+
+/// Read `ActiveCurrent` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_active_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_ACTIVECURRENT).await?;
+    decode_active_current(&tlv)
+}
+
+/// Read `ReactiveCurrent` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_reactive_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_REACTIVECURRENT).await?;
+    decode_reactive_current(&tlv)
+}
+
+/// Read `ApparentCurrent` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_apparent_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_APPARENTCURRENT).await?;
+    decode_apparent_current(&tlv)
+}
+
+/// Read `ActivePower` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_active_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_ACTIVEPOWER).await?;
+    decode_active_power(&tlv)
+}
+
+/// Read `ReactivePower` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_reactive_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_REACTIVEPOWER).await?;
+    decode_reactive_power(&tlv)
+}
+
+/// Read `ApparentPower` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_apparent_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_APPARENTPOWER).await?;
+    decode_apparent_power(&tlv)
+}
+
+/// Read `RMSVoltage` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_rms_voltage(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RMSVOLTAGE).await?;
+    decode_rms_voltage(&tlv)
+}
+
+/// Read `RMSCurrent` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_rms_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RMSCURRENT).await?;
+    decode_rms_current(&tlv)
+}
+
+/// Read `RMSPower` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_rms_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RMSPOWER).await?;
+    decode_rms_power(&tlv)
+}
+
+/// Read `Frequency` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_frequency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_FREQUENCY).await?;
+    decode_frequency(&tlv)
+}
+
+/// Read `HarmonicCurrents` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_harmonic_currents(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<HarmonicMeasurement>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_HARMONICCURRENTS).await?;
+    decode_harmonic_currents(&tlv)
+}
+
+/// Read `HarmonicPhases` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_harmonic_phases(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<HarmonicMeasurement>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_HARMONICPHASES).await?;
+    decode_harmonic_phases(&tlv)
+}
+
+/// Read `PowerFactor` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_power_factor(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_POWERFACTOR).await?;
+    decode_power_factor(&tlv)
+}
+
+/// Read `NeutralCurrent` attribute from cluster `Electrical Power Measurement`.
+pub async fn read_neutral_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_NEUTRALCURRENT).await?;
+    decode_neutral_current(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct MeasurementPeriodRangesEvent {
     pub ranges: Option<Vec<MeasurementRange>>,

@@ -402,3 +402,83 @@ pub fn decode_stay_active_response(inp: &tlv::TlvItemValue) -> anyhow::Result<St
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `RegisterClient` command on cluster `ICD Management`.
+pub async fn register_client(conn: &crate::controller::Connection, endpoint: u16, check_in_node_id: u64, monitored_subject: u64, key: Vec<u8>, verification_key: Vec<u8>, client_type: ClientType) -> anyhow::Result<RegisterClientResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_CMD_ID_REGISTERCLIENT, &encode_register_client(check_in_node_id, monitored_subject, key, verification_key, client_type)?).await?;
+    decode_register_client_response(&tlv)
+}
+
+/// Invoke `UnregisterClient` command on cluster `ICD Management`.
+pub async fn unregister_client(conn: &crate::controller::Connection, endpoint: u16, check_in_node_id: u64, verification_key: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_CMD_ID_UNREGISTERCLIENT, &encode_unregister_client(check_in_node_id, verification_key)?).await?;
+    Ok(())
+}
+
+/// Invoke `StayActiveRequest` command on cluster `ICD Management`.
+pub async fn stay_active_request(conn: &crate::controller::Connection, endpoint: u16, stay_active_duration: u32) -> anyhow::Result<StayActiveResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_CMD_ID_STAYACTIVEREQUEST, &encode_stay_active_request(stay_active_duration)?).await?;
+    decode_stay_active_response(&tlv)
+}
+
+/// Read `IdleModeDuration` attribute from cluster `ICD Management`.
+pub async fn read_idle_mode_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_IDLEMODEDURATION).await?;
+    decode_idle_mode_duration(&tlv)
+}
+
+/// Read `ActiveModeDuration` attribute from cluster `ICD Management`.
+pub async fn read_active_mode_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_ACTIVEMODEDURATION).await?;
+    decode_active_mode_duration(&tlv)
+}
+
+/// Read `ActiveModeThreshold` attribute from cluster `ICD Management`.
+pub async fn read_active_mode_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_ACTIVEMODETHRESHOLD).await?;
+    decode_active_mode_threshold(&tlv)
+}
+
+/// Read `RegisteredClients` attribute from cluster `ICD Management`.
+pub async fn read_registered_clients(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<MonitoringRegistration>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_REGISTEREDCLIENTS).await?;
+    decode_registered_clients(&tlv)
+}
+
+/// Read `ICDCounter` attribute from cluster `ICD Management`.
+pub async fn read_icd_counter(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_ICDCOUNTER).await?;
+    decode_icd_counter(&tlv)
+}
+
+/// Read `ClientsSupportedPerFabric` attribute from cluster `ICD Management`.
+pub async fn read_clients_supported_per_fabric(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_CLIENTSSUPPORTEDPERFABRIC).await?;
+    decode_clients_supported_per_fabric(&tlv)
+}
+
+/// Read `UserActiveModeTriggerHint` attribute from cluster `ICD Management`.
+pub async fn read_user_active_mode_trigger_hint(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<UserActiveModeTrigger> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_USERACTIVEMODETRIGGERHINT).await?;
+    decode_user_active_mode_trigger_hint(&tlv)
+}
+
+/// Read `UserActiveModeTriggerInstruction` attribute from cluster `ICD Management`.
+pub async fn read_user_active_mode_trigger_instruction(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_USERACTIVEMODETRIGGERINSTRUCTION).await?;
+    decode_user_active_mode_trigger_instruction(&tlv)
+}
+
+/// Read `OperatingMode` attribute from cluster `ICD Management`.
+pub async fn read_operating_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OperatingMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_OPERATINGMODE).await?;
+    decode_operating_mode(&tlv)
+}
+
+/// Read `MaximumCheckInBackoff` attribute from cluster `ICD Management`.
+pub async fn read_maximum_check_in_backoff(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_ATTR_ID_MAXIMUMCHECKINBACKOFF).await?;
+    decode_maximum_check_in_backoff(&tlv)
+}
+

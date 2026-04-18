@@ -505,6 +505,80 @@ pub fn decode_create_two_d_cartesian_zone_response(inp: &tlv::TlvItemValue) -> a
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `CreateTwoDCartesianZone` command on cluster `Zone Management`.
+pub async fn create_two_d_cartesian_zone(conn: &crate::controller::Connection, endpoint: u16, zone: TwoDCartesianZone) -> anyhow::Result<CreateTwoDCartesianZoneResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_CREATETWODCARTESIANZONE, &encode_create_two_d_cartesian_zone(zone)?).await?;
+    decode_create_two_d_cartesian_zone_response(&tlv)
+}
+
+/// Invoke `UpdateTwoDCartesianZone` command on cluster `Zone Management`.
+pub async fn update_two_d_cartesian_zone(conn: &crate::controller::Connection, endpoint: u16, zone_id: u8, zone: TwoDCartesianZone) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_UPDATETWODCARTESIANZONE, &encode_update_two_d_cartesian_zone(zone_id, zone)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveZone` command on cluster `Zone Management`.
+pub async fn remove_zone(conn: &crate::controller::Connection, endpoint: u16, zone_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_REMOVEZONE, &encode_remove_zone(zone_id)?).await?;
+    Ok(())
+}
+
+/// Invoke `CreateOrUpdateTrigger` command on cluster `Zone Management`.
+pub async fn create_or_update_trigger(conn: &crate::controller::Connection, endpoint: u16, trigger: ZoneTriggerControl) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_CREATEORUPDATETRIGGER, &encode_create_or_update_trigger(trigger)?).await?;
+    Ok(())
+}
+
+/// Invoke `RemoveTrigger` command on cluster `Zone Management`.
+pub async fn remove_trigger(conn: &crate::controller::Connection, endpoint: u16, zone_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_REMOVETRIGGER, &encode_remove_trigger(zone_id)?).await?;
+    Ok(())
+}
+
+/// Read `MaxUserDefinedZones` attribute from cluster `Zone Management`.
+pub async fn read_max_user_defined_zones(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_MAXUSERDEFINEDZONES).await?;
+    decode_max_user_defined_zones(&tlv)
+}
+
+/// Read `MaxZones` attribute from cluster `Zone Management`.
+pub async fn read_max_zones(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_MAXZONES).await?;
+    decode_max_zones(&tlv)
+}
+
+/// Read `Zones` attribute from cluster `Zone Management`.
+pub async fn read_zones(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ZoneInformation>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_ZONES).await?;
+    decode_zones(&tlv)
+}
+
+/// Read `Triggers` attribute from cluster `Zone Management`.
+pub async fn read_triggers(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ZoneTriggerControl>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_TRIGGERS).await?;
+    decode_triggers(&tlv)
+}
+
+/// Read `SensitivityMax` attribute from cluster `Zone Management`.
+pub async fn read_sensitivity_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_SENSITIVITYMAX).await?;
+    decode_sensitivity_max(&tlv)
+}
+
+/// Read `Sensitivity` attribute from cluster `Zone Management`.
+pub async fn read_sensitivity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_SENSITIVITY).await?;
+    decode_sensitivity(&tlv)
+}
+
+/// Read `TwoDCartesianMax` attribute from cluster `Zone Management`.
+pub async fn read_two_d_cartesian_max(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<TwoDCartesianVertex> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_ATTR_ID_TWODCARTESIANMAX).await?;
+    decode_two_d_cartesian_max(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ZoneTriggeredEvent {
     pub zone: Option<u8>,

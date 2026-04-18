@@ -126,3 +126,29 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `MeteredQuantity` attribute from cluster `Commodity Metering`.
+pub async fn read_metered_quantity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<MeteredQuantity>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_METERING, crate::clusters::defs::CLUSTER_COMMODITY_METERING_ATTR_ID_METEREDQUANTITY).await?;
+    decode_metered_quantity(&tlv)
+}
+
+/// Read `MeteredQuantityTimestamp` attribute from cluster `Commodity Metering`.
+pub async fn read_metered_quantity_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_METERING, crate::clusters::defs::CLUSTER_COMMODITY_METERING_ATTR_ID_METEREDQUANTITYTIMESTAMP).await?;
+    decode_metered_quantity_timestamp(&tlv)
+}
+
+/// Read `TariffUnit` attribute from cluster `Commodity Metering`.
+pub async fn read_tariff_unit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_METERING, crate::clusters::defs::CLUSTER_COMMODITY_METERING_ATTR_ID_TARIFFUNIT).await?;
+    decode_tariff_unit(&tlv)
+}
+
+/// Read `MaximumMeteredQuantities` attribute from cluster `Commodity Metering`.
+pub async fn read_maximum_metered_quantities(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_METERING, crate::clusters::defs::CLUSTER_COMMODITY_METERING_ATTR_ID_MAXIMUMMETEREDQUANTITIES).await?;
+    decode_maximum_metered_quantities(&tlv)
+}
+

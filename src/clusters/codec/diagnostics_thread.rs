@@ -1320,6 +1320,404 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ResetCounts` command on cluster `Thread Network Diagnostics`.
+pub async fn reset_counts(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_CMD_ID_RESETCOUNTS, &[]).await?;
+    Ok(())
+}
+
+/// Read `Channel` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_channel(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_CHANNEL).await?;
+    decode_channel(&tlv)
+}
+
+/// Read `RoutingRole` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_routing_role(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<RoutingRole>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_ROUTINGROLE).await?;
+    decode_routing_role(&tlv)
+}
+
+/// Read `NetworkName` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_network_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_NETWORKNAME).await?;
+    decode_network_name(&tlv)
+}
+
+/// Read `PanId` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_pan_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_PANID).await?;
+    decode_pan_id(&tlv)
+}
+
+/// Read `ExtendedPanId` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_extended_pan_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_EXTENDEDPANID).await?;
+    decode_extended_pan_id(&tlv)
+}
+
+/// Read `MeshLocalPrefix` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_mesh_local_prefix(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_MESHLOCALPREFIX).await?;
+    decode_mesh_local_prefix(&tlv)
+}
+
+/// Read `OverrunCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_overrun_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_OVERRUNCOUNT).await?;
+    decode_overrun_count(&tlv)
+}
+
+/// Read `NeighborTable` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_neighbor_table(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NeighborTable>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_NEIGHBORTABLE).await?;
+    decode_neighbor_table(&tlv)
+}
+
+/// Read `RouteTable` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_route_table(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<RouteTable>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_ROUTETABLE).await?;
+    decode_route_table(&tlv)
+}
+
+/// Read `PartitionId` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_partition_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_PARTITIONID).await?;
+    decode_partition_id(&tlv)
+}
+
+/// Read `Weighting` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_weighting(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_WEIGHTING).await?;
+    decode_weighting(&tlv)
+}
+
+/// Read `DataVersion` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_data_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_DATAVERSION).await?;
+    decode_data_version(&tlv)
+}
+
+/// Read `StableDataVersion` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_stable_data_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_STABLEDATAVERSION).await?;
+    decode_stable_data_version(&tlv)
+}
+
+/// Read `LeaderRouterId` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_leader_router_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_LEADERROUTERID).await?;
+    decode_leader_router_id(&tlv)
+}
+
+/// Read `DetachedRoleCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_detached_role_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_DETACHEDROLECOUNT).await?;
+    decode_detached_role_count(&tlv)
+}
+
+/// Read `ChildRoleCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_child_role_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_CHILDROLECOUNT).await?;
+    decode_child_role_count(&tlv)
+}
+
+/// Read `RouterRoleCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_router_role_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_ROUTERROLECOUNT).await?;
+    decode_router_role_count(&tlv)
+}
+
+/// Read `LeaderRoleCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_leader_role_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_LEADERROLECOUNT).await?;
+    decode_leader_role_count(&tlv)
+}
+
+/// Read `AttachAttemptCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_attach_attempt_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_ATTACHATTEMPTCOUNT).await?;
+    decode_attach_attempt_count(&tlv)
+}
+
+/// Read `PartitionIdChangeCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_partition_id_change_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_PARTITIONIDCHANGECOUNT).await?;
+    decode_partition_id_change_count(&tlv)
+}
+
+/// Read `BetterPartitionAttachAttemptCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_better_partition_attach_attempt_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_BETTERPARTITIONATTACHATTEMPTCOUNT).await?;
+    decode_better_partition_attach_attempt_count(&tlv)
+}
+
+/// Read `ParentChangeCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_parent_change_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_PARENTCHANGECOUNT).await?;
+    decode_parent_change_count(&tlv)
+}
+
+/// Read `TxTotalCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_total_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXTOTALCOUNT).await?;
+    decode_tx_total_count(&tlv)
+}
+
+/// Read `TxUnicastCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_unicast_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXUNICASTCOUNT).await?;
+    decode_tx_unicast_count(&tlv)
+}
+
+/// Read `TxBroadcastCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_broadcast_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXBROADCASTCOUNT).await?;
+    decode_tx_broadcast_count(&tlv)
+}
+
+/// Read `TxAckRequestedCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_ack_requested_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXACKREQUESTEDCOUNT).await?;
+    decode_tx_ack_requested_count(&tlv)
+}
+
+/// Read `TxAckedCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_acked_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXACKEDCOUNT).await?;
+    decode_tx_acked_count(&tlv)
+}
+
+/// Read `TxNoAckRequestedCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_no_ack_requested_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXNOACKREQUESTEDCOUNT).await?;
+    decode_tx_no_ack_requested_count(&tlv)
+}
+
+/// Read `TxDataCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_data_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXDATACOUNT).await?;
+    decode_tx_data_count(&tlv)
+}
+
+/// Read `TxDataPollCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_data_poll_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXDATAPOLLCOUNT).await?;
+    decode_tx_data_poll_count(&tlv)
+}
+
+/// Read `TxBeaconCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_beacon_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXBEACONCOUNT).await?;
+    decode_tx_beacon_count(&tlv)
+}
+
+/// Read `TxBeaconRequestCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_beacon_request_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXBEACONREQUESTCOUNT).await?;
+    decode_tx_beacon_request_count(&tlv)
+}
+
+/// Read `TxOtherCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_other_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXOTHERCOUNT).await?;
+    decode_tx_other_count(&tlv)
+}
+
+/// Read `TxRetryCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_retry_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXRETRYCOUNT).await?;
+    decode_tx_retry_count(&tlv)
+}
+
+/// Read `TxDirectMaxRetryExpiryCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_direct_max_retry_expiry_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXDIRECTMAXRETRYEXPIRYCOUNT).await?;
+    decode_tx_direct_max_retry_expiry_count(&tlv)
+}
+
+/// Read `TxIndirectMaxRetryExpiryCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_indirect_max_retry_expiry_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXINDIRECTMAXRETRYEXPIRYCOUNT).await?;
+    decode_tx_indirect_max_retry_expiry_count(&tlv)
+}
+
+/// Read `TxErrCcaCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_err_cca_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXERRCCACOUNT).await?;
+    decode_tx_err_cca_count(&tlv)
+}
+
+/// Read `TxErrAbortCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_err_abort_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXERRABORTCOUNT).await?;
+    decode_tx_err_abort_count(&tlv)
+}
+
+/// Read `TxErrBusyChannelCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_tx_err_busy_channel_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_TXERRBUSYCHANNELCOUNT).await?;
+    decode_tx_err_busy_channel_count(&tlv)
+}
+
+/// Read `RxTotalCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_total_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXTOTALCOUNT).await?;
+    decode_rx_total_count(&tlv)
+}
+
+/// Read `RxUnicastCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_unicast_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXUNICASTCOUNT).await?;
+    decode_rx_unicast_count(&tlv)
+}
+
+/// Read `RxBroadcastCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_broadcast_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXBROADCASTCOUNT).await?;
+    decode_rx_broadcast_count(&tlv)
+}
+
+/// Read `RxDataCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_data_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXDATACOUNT).await?;
+    decode_rx_data_count(&tlv)
+}
+
+/// Read `RxDataPollCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_data_poll_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXDATAPOLLCOUNT).await?;
+    decode_rx_data_poll_count(&tlv)
+}
+
+/// Read `RxBeaconCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_beacon_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXBEACONCOUNT).await?;
+    decode_rx_beacon_count(&tlv)
+}
+
+/// Read `RxBeaconRequestCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_beacon_request_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXBEACONREQUESTCOUNT).await?;
+    decode_rx_beacon_request_count(&tlv)
+}
+
+/// Read `RxOtherCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_other_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXOTHERCOUNT).await?;
+    decode_rx_other_count(&tlv)
+}
+
+/// Read `RxAddressFilteredCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_address_filtered_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXADDRESSFILTEREDCOUNT).await?;
+    decode_rx_address_filtered_count(&tlv)
+}
+
+/// Read `RxDestAddrFilteredCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_dest_addr_filtered_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXDESTADDRFILTEREDCOUNT).await?;
+    decode_rx_dest_addr_filtered_count(&tlv)
+}
+
+/// Read `RxDuplicatedCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_duplicated_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXDUPLICATEDCOUNT).await?;
+    decode_rx_duplicated_count(&tlv)
+}
+
+/// Read `RxErrNoFrameCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_err_no_frame_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXERRNOFRAMECOUNT).await?;
+    decode_rx_err_no_frame_count(&tlv)
+}
+
+/// Read `RxErrUnknownNeighborCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_err_unknown_neighbor_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXERRUNKNOWNNEIGHBORCOUNT).await?;
+    decode_rx_err_unknown_neighbor_count(&tlv)
+}
+
+/// Read `RxErrInvalidSrcAddrCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_err_invalid_src_addr_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXERRINVALIDSRCADDRCOUNT).await?;
+    decode_rx_err_invalid_src_addr_count(&tlv)
+}
+
+/// Read `RxErrSecCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_err_sec_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXERRSECCOUNT).await?;
+    decode_rx_err_sec_count(&tlv)
+}
+
+/// Read `RxErrFcsCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_err_fcs_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXERRFCSCOUNT).await?;
+    decode_rx_err_fcs_count(&tlv)
+}
+
+/// Read `RxErrOtherCount` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rx_err_other_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RXERROTHERCOUNT).await?;
+    decode_rx_err_other_count(&tlv)
+}
+
+/// Read `ActiveTimestamp` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_active_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_ACTIVETIMESTAMP).await?;
+    decode_active_timestamp(&tlv)
+}
+
+/// Read `PendingTimestamp` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_pending_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_PENDINGTIMESTAMP).await?;
+    decode_pending_timestamp(&tlv)
+}
+
+/// Read `Delay` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_DELAY).await?;
+    decode_delay(&tlv)
+}
+
+/// Read `SecurityPolicy` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_security_policy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<SecurityPolicy>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_SECURITYPOLICY).await?;
+    decode_security_policy(&tlv)
+}
+
+/// Read `ChannelPage0Mask` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_channel_page0_mask(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_CHANNELPAGE0MASK).await?;
+    decode_channel_page0_mask(&tlv)
+}
+
+/// Read `OperationalDatasetComponents` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_operational_dataset_components(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<OperationalDatasetComponents>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_OPERATIONALDATASETCOMPONENTS).await?;
+    decode_operational_dataset_components(&tlv)
+}
+
+/// Read `ActiveNetworkFaultsList` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_active_network_faults_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NetworkFault>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_ACTIVENETWORKFAULTSLIST).await?;
+    decode_active_network_faults_list(&tlv)
+}
+
+/// Read `ExtAddress` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_ext_address(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_EXTADDRESS).await?;
+    decode_ext_address(&tlv)
+}
+
+/// Read `Rloc16` attribute from cluster `Thread Network Diagnostics`.
+pub async fn read_rloc16(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_THREAD_NETWORK_DIAGNOSTICS_ATTR_ID_RLOC16).await?;
+    decode_rloc16(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ConnectionStatusEvent {
     pub connection_status: Option<ConnectionStatus>,

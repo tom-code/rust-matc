@@ -234,3 +234,35 @@ pub fn decode_find_endpoint_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ProvisionEndpoint` command on cluster `TLS Client Management`.
+pub async fn provision_endpoint(conn: &crate::controller::Connection, endpoint: u16, hostname: Vec<u8>, port: u16, caid: u8, ccdid: Option<u8>, endpoint_id: Option<u8>) -> anyhow::Result<ProvisionEndpointResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_CMD_ID_PROVISIONENDPOINT, &encode_provision_endpoint(hostname, port, caid, ccdid, endpoint_id)?).await?;
+    decode_provision_endpoint_response(&tlv)
+}
+
+/// Invoke `FindEndpoint` command on cluster `TLS Client Management`.
+pub async fn find_endpoint(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u8) -> anyhow::Result<FindEndpointResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_CMD_ID_FINDENDPOINT, &encode_find_endpoint(endpoint_id)?).await?;
+    decode_find_endpoint_response(&tlv)
+}
+
+/// Invoke `RemoveEndpoint` command on cluster `TLS Client Management`.
+pub async fn remove_endpoint(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_CMD_ID_REMOVEENDPOINT, &encode_remove_endpoint(endpoint_id)?).await?;
+    Ok(())
+}
+
+/// Read `MaxProvisioned` attribute from cluster `TLS Client Management`.
+pub async fn read_max_provisioned(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_ATTR_ID_MAXPROVISIONED).await?;
+    decode_max_provisioned(&tlv)
+}
+
+/// Read `ProvisionedEndpoints` attribute from cluster `TLS Client Management`.
+pub async fn read_provisioned_endpoints(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TLSEndpoint>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_ATTR_ID_PROVISIONEDENDPOINTS).await?;
+    decode_provisioned_endpoints(&tlv)
+}
+

@@ -462,6 +462,56 @@ pub fn decode_review_fabric_restrictions_response(inp: &tlv::TlvItemValue) -> an
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ReviewFabricRestrictions` command on cluster `Access Control`.
+pub async fn review_fabric_restrictions(conn: &crate::controller::Connection, endpoint: u16, arl: Vec<CommissioningAccessRestrictionEntry>) -> anyhow::Result<ReviewFabricRestrictionsResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_CMD_ID_REVIEWFABRICRESTRICTIONS, &encode_review_fabric_restrictions(arl)?).await?;
+    decode_review_fabric_restrictions_response(&tlv)
+}
+
+/// Read `ACL` attribute from cluster `Access Control`.
+pub async fn read_acl(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<AccessControlEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_ACL).await?;
+    decode_acl(&tlv)
+}
+
+/// Read `Extension` attribute from cluster `Access Control`.
+pub async fn read_extension(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<AccessControlExtension>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_EXTENSION).await?;
+    decode_extension(&tlv)
+}
+
+/// Read `SubjectsPerAccessControlEntry` attribute from cluster `Access Control`.
+pub async fn read_subjects_per_access_control_entry(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_SUBJECTSPERACCESSCONTROLENTRY).await?;
+    decode_subjects_per_access_control_entry(&tlv)
+}
+
+/// Read `TargetsPerAccessControlEntry` attribute from cluster `Access Control`.
+pub async fn read_targets_per_access_control_entry(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_TARGETSPERACCESSCONTROLENTRY).await?;
+    decode_targets_per_access_control_entry(&tlv)
+}
+
+/// Read `AccessControlEntriesPerFabric` attribute from cluster `Access Control`.
+pub async fn read_access_control_entries_per_fabric(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_ACCESSCONTROLENTRIESPERFABRIC).await?;
+    decode_access_control_entries_per_fabric(&tlv)
+}
+
+/// Read `CommissioningARL` attribute from cluster `Access Control`.
+pub async fn read_commissioning_arl(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<CommissioningAccessRestrictionEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_COMMISSIONINGARL).await?;
+    decode_commissioning_arl(&tlv)
+}
+
+/// Read `ARL` attribute from cluster `Access Control`.
+pub async fn read_arl(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<AccessRestrictionEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_ARL).await?;
+    decode_arl(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AccessControlEntryChangedEvent {
     pub admin_node_id: Option<u64>,

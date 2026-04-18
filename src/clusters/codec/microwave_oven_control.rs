@@ -218,3 +218,71 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SetCookingParameters` command on cluster `Microwave Oven Control`.
+pub async fn set_cooking_parameters(conn: &crate::controller::Connection, endpoint: u16, cook_mode: u8, cook_time: u32, power_setting: u8, watt_setting_index: u8, start_after_setting: bool) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_CMD_ID_SETCOOKINGPARAMETERS, &encode_set_cooking_parameters(cook_mode, cook_time, power_setting, watt_setting_index, start_after_setting)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddMoreTime` command on cluster `Microwave Oven Control`.
+pub async fn add_more_time(conn: &crate::controller::Connection, endpoint: u16, time_to_add: u32) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_CMD_ID_ADDMORETIME, &encode_add_more_time(time_to_add)?).await?;
+    Ok(())
+}
+
+/// Read `CookTime` attribute from cluster `Microwave Oven Control`.
+pub async fn read_cook_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_COOKTIME).await?;
+    decode_cook_time(&tlv)
+}
+
+/// Read `MaxCookTime` attribute from cluster `Microwave Oven Control`.
+pub async fn read_max_cook_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_MAXCOOKTIME).await?;
+    decode_max_cook_time(&tlv)
+}
+
+/// Read `PowerSetting` attribute from cluster `Microwave Oven Control`.
+pub async fn read_power_setting(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_POWERSETTING).await?;
+    decode_power_setting(&tlv)
+}
+
+/// Read `MinPower` attribute from cluster `Microwave Oven Control`.
+pub async fn read_min_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_MINPOWER).await?;
+    decode_min_power(&tlv)
+}
+
+/// Read `MaxPower` attribute from cluster `Microwave Oven Control`.
+pub async fn read_max_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_MAXPOWER).await?;
+    decode_max_power(&tlv)
+}
+
+/// Read `PowerStep` attribute from cluster `Microwave Oven Control`.
+pub async fn read_power_step(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_POWERSTEP).await?;
+    decode_power_step(&tlv)
+}
+
+/// Read `SupportedWatts` attribute from cluster `Microwave Oven Control`.
+pub async fn read_supported_watts(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_SUPPORTEDWATTS).await?;
+    decode_supported_watts(&tlv)
+}
+
+/// Read `SelectedWattIndex` attribute from cluster `Microwave Oven Control`.
+pub async fn read_selected_watt_index(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_SELECTEDWATTINDEX).await?;
+    decode_selected_watt_index(&tlv)
+}
+
+/// Read `WattRating` attribute from cluster `Microwave Oven Control`.
+pub async fn read_watt_rating(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_ATTR_ID_WATTRATING).await?;
+    decode_watt_rating(&tlv)
+}
+

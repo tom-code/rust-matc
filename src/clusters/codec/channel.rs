@@ -599,3 +599,59 @@ pub fn decode_program_guide_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ChangeChannel` command on cluster `Channel`.
+pub async fn change_channel(conn: &crate::controller::Connection, endpoint: u16, match_: String) -> anyhow::Result<ChangeChannelResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_CHANGECHANNEL, &encode_change_channel(match_)?).await?;
+    decode_change_channel_response(&tlv)
+}
+
+/// Invoke `ChangeChannelByNumber` command on cluster `Channel`.
+pub async fn change_channel_by_number(conn: &crate::controller::Connection, endpoint: u16, major_number: u16, minor_number: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_CHANGECHANNELBYNUMBER, &encode_change_channel_by_number(major_number, minor_number)?).await?;
+    Ok(())
+}
+
+/// Invoke `SkipChannel` command on cluster `Channel`.
+pub async fn skip_channel(conn: &crate::controller::Connection, endpoint: u16, count: i16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_SKIPCHANNEL, &encode_skip_channel(count)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetProgramGuide` command on cluster `Channel`.
+pub async fn get_program_guide(conn: &crate::controller::Connection, endpoint: u16, start_time: u64, end_time: u64, channel_list: Vec<ChannelInfo>, page_token: Option<PageToken>, recording_flag: Option<RecordingFlag>, data: Vec<u8>) -> anyhow::Result<ProgramGuideResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_GETPROGRAMGUIDE, &encode_get_program_guide(start_time, end_time, channel_list, page_token, recording_flag, data)?).await?;
+    decode_program_guide_response(&tlv)
+}
+
+/// Invoke `RecordProgram` command on cluster `Channel`.
+pub async fn record_program(conn: &crate::controller::Connection, endpoint: u16, program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_RECORDPROGRAM, &encode_record_program(program_identifier, should_record_series, data)?).await?;
+    Ok(())
+}
+
+/// Invoke `CancelRecordProgram` command on cluster `Channel`.
+pub async fn cancel_record_program(conn: &crate::controller::Connection, endpoint: u16, program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_CANCELRECORDPROGRAM, &encode_cancel_record_program(program_identifier, should_record_series, data)?).await?;
+    Ok(())
+}
+
+/// Read `ChannelList` attribute from cluster `Channel`.
+pub async fn read_channel_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ChannelInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_ATTR_ID_CHANNELLIST).await?;
+    decode_channel_list(&tlv)
+}
+
+/// Read `Lineup` attribute from cluster `Channel`.
+pub async fn read_lineup(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<LineupInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_ATTR_ID_LINEUP).await?;
+    decode_lineup(&tlv)
+}
+
+/// Read `CurrentChannel` attribute from cluster `Channel`.
+pub async fn read_current_channel(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ChannelInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_ATTR_ID_CURRENTCHANNEL).await?;
+    decode_current_channel(&tlv)
+}
+

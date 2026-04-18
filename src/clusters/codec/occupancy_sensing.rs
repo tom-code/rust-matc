@@ -344,6 +344,92 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `Occupancy` attribute from cluster `Occupancy Sensing`.
+pub async fn read_occupancy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Occupancy> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_OCCUPANCY).await?;
+    decode_occupancy(&tlv)
+}
+
+/// Read `OccupancySensorType` attribute from cluster `Occupancy Sensing`.
+pub async fn read_occupancy_sensor_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OccupancySensorType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_OCCUPANCYSENSORTYPE).await?;
+    decode_occupancy_sensor_type(&tlv)
+}
+
+/// Read `OccupancySensorTypeBitmap` attribute from cluster `Occupancy Sensing`.
+pub async fn read_occupancy_sensor_type_bitmap(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OccupancySensorTypeBitmap> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_OCCUPANCYSENSORTYPEBITMAP).await?;
+    decode_occupancy_sensor_type_bitmap(&tlv)
+}
+
+/// Read `HoldTime` attribute from cluster `Occupancy Sensing`.
+pub async fn read_hold_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_HOLDTIME).await?;
+    decode_hold_time(&tlv)
+}
+
+/// Read `HoldTimeLimits` attribute from cluster `Occupancy Sensing`.
+pub async fn read_hold_time_limits(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<HoldTimeLimits> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_HOLDTIMELIMITS).await?;
+    decode_hold_time_limits(&tlv)
+}
+
+/// Read `PIROccupiedToUnoccupiedDelay` attribute from cluster `Occupancy Sensing`.
+pub async fn read_pir_occupied_to_unoccupied_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_PIROCCUPIEDTOUNOCCUPIEDDELAY).await?;
+    decode_pir_occupied_to_unoccupied_delay(&tlv)
+}
+
+/// Read `PIRUnoccupiedToOccupiedDelay` attribute from cluster `Occupancy Sensing`.
+pub async fn read_pir_unoccupied_to_occupied_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_PIRUNOCCUPIEDTOOCCUPIEDDELAY).await?;
+    decode_pir_unoccupied_to_occupied_delay(&tlv)
+}
+
+/// Read `PIRUnoccupiedToOccupiedThreshold` attribute from cluster `Occupancy Sensing`.
+pub async fn read_pir_unoccupied_to_occupied_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_PIRUNOCCUPIEDTOOCCUPIEDTHRESHOLD).await?;
+    decode_pir_unoccupied_to_occupied_threshold(&tlv)
+}
+
+/// Read `UltrasonicOccupiedToUnoccupiedDelay` attribute from cluster `Occupancy Sensing`.
+pub async fn read_ultrasonic_occupied_to_unoccupied_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_ULTRASONICOCCUPIEDTOUNOCCUPIEDDELAY).await?;
+    decode_ultrasonic_occupied_to_unoccupied_delay(&tlv)
+}
+
+/// Read `UltrasonicUnoccupiedToOccupiedDelay` attribute from cluster `Occupancy Sensing`.
+pub async fn read_ultrasonic_unoccupied_to_occupied_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_ULTRASONICUNOCCUPIEDTOOCCUPIEDDELAY).await?;
+    decode_ultrasonic_unoccupied_to_occupied_delay(&tlv)
+}
+
+/// Read `UltrasonicUnoccupiedToOccupiedThreshold` attribute from cluster `Occupancy Sensing`.
+pub async fn read_ultrasonic_unoccupied_to_occupied_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_ULTRASONICUNOCCUPIEDTOOCCUPIEDTHRESHOLD).await?;
+    decode_ultrasonic_unoccupied_to_occupied_threshold(&tlv)
+}
+
+/// Read `PhysicalContactOccupiedToUnoccupiedDelay` attribute from cluster `Occupancy Sensing`.
+pub async fn read_physical_contact_occupied_to_unoccupied_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_PHYSICALCONTACTOCCUPIEDTOUNOCCUPIEDDELAY).await?;
+    decode_physical_contact_occupied_to_unoccupied_delay(&tlv)
+}
+
+/// Read `PhysicalContactUnoccupiedToOccupiedDelay` attribute from cluster `Occupancy Sensing`.
+pub async fn read_physical_contact_unoccupied_to_occupied_delay(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_PHYSICALCONTACTUNOCCUPIEDTOOCCUPIEDDELAY).await?;
+    decode_physical_contact_unoccupied_to_occupied_delay(&tlv)
+}
+
+/// Read `PhysicalContactUnoccupiedToOccupiedThreshold` attribute from cluster `Occupancy Sensing`.
+pub async fn read_physical_contact_unoccupied_to_occupied_threshold(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OCCUPANCY_SENSING, crate::clusters::defs::CLUSTER_OCCUPANCY_SENSING_ATTR_ID_PHYSICALCONTACTUNOCCUPIEDTOOCCUPIEDTHRESHOLD).await?;
+    decode_physical_contact_unoccupied_to_occupied_threshold(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct OccupancyChangedEvent {
     pub occupancy: Option<Occupancy>,

@@ -351,6 +351,44 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `Accuracy` attribute from cluster `Electrical Energy Measurement`.
+pub async fn read_accuracy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<MeasurementAccuracy> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_ENERGY_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT_ATTR_ID_ACCURACY).await?;
+    decode_accuracy(&tlv)
+}
+
+/// Read `CumulativeEnergyImported` attribute from cluster `Electrical Energy Measurement`.
+pub async fn read_cumulative_energy_imported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<EnergyMeasurement>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_ENERGY_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT_ATTR_ID_CUMULATIVEENERGYIMPORTED).await?;
+    decode_cumulative_energy_imported(&tlv)
+}
+
+/// Read `CumulativeEnergyExported` attribute from cluster `Electrical Energy Measurement`.
+pub async fn read_cumulative_energy_exported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<EnergyMeasurement>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_ENERGY_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT_ATTR_ID_CUMULATIVEENERGYEXPORTED).await?;
+    decode_cumulative_energy_exported(&tlv)
+}
+
+/// Read `PeriodicEnergyImported` attribute from cluster `Electrical Energy Measurement`.
+pub async fn read_periodic_energy_imported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<EnergyMeasurement>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_ENERGY_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT_ATTR_ID_PERIODICENERGYIMPORTED).await?;
+    decode_periodic_energy_imported(&tlv)
+}
+
+/// Read `PeriodicEnergyExported` attribute from cluster `Electrical Energy Measurement`.
+pub async fn read_periodic_energy_exported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<EnergyMeasurement>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_ENERGY_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT_ATTR_ID_PERIODICENERGYEXPORTED).await?;
+    decode_periodic_energy_exported(&tlv)
+}
+
+/// Read `CumulativeEnergyReset` attribute from cluster `Electrical Energy Measurement`.
+pub async fn read_cumulative_energy_reset(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<CumulativeEnergyReset>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ELECTRICAL_ENERGY_MEASUREMENT, crate::clusters::defs::CLUSTER_ELECTRICAL_ENERGY_MEASUREMENT_ATTR_ID_CUMULATIVEENERGYRESET).await?;
+    decode_cumulative_energy_reset(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct CumulativeEnergyMeasuredEvent {
     pub energy_imported: Option<EnergyMeasurement>,

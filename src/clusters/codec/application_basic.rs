@@ -226,3 +226,53 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `VendorName` attribute from cluster `Application Basic`.
+pub async fn read_vendor_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_VENDORNAME).await?;
+    decode_vendor_name(&tlv)
+}
+
+/// Read `VendorID` attribute from cluster `Application Basic`.
+pub async fn read_vendor_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_VENDORID).await?;
+    decode_vendor_id(&tlv)
+}
+
+/// Read `ApplicationName` attribute from cluster `Application Basic`.
+pub async fn read_application_name(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_APPLICATIONNAME).await?;
+    decode_application_name(&tlv)
+}
+
+/// Read `ProductID` attribute from cluster `Application Basic`.
+pub async fn read_product_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_PRODUCTID).await?;
+    decode_product_id(&tlv)
+}
+
+/// Read `Application` attribute from cluster `Application Basic`.
+pub async fn read_application(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Application> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_APPLICATION).await?;
+    decode_application(&tlv)
+}
+
+/// Read `Status` attribute from cluster `Application Basic`.
+pub async fn read_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ApplicationStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_STATUS).await?;
+    decode_status(&tlv)
+}
+
+/// Read `ApplicationVersion` attribute from cluster `Application Basic`.
+pub async fn read_application_version(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_APPLICATIONVERSION).await?;
+    decode_application_version(&tlv)
+}
+
+/// Read `AllowedVendorList` attribute from cluster `Application Basic`.
+pub async fn read_allowed_vendor_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_BASIC, crate::clusters::defs::CLUSTER_APPLICATION_BASIC_ATTR_ID_ALLOWEDVENDORLIST).await?;
+    decode_allowed_vendor_list(&tlv)
+}
+

@@ -167,3 +167,41 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Read `DeviceTypeList` attribute from cluster `Descriptor`.
+pub async fn read_device_type_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DeviceType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DESCRIPTOR, crate::clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_DEVICETYPELIST).await?;
+    decode_device_type_list(&tlv)
+}
+
+/// Read `ServerList` attribute from cluster `Descriptor`.
+pub async fn read_server_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DESCRIPTOR, crate::clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST).await?;
+    decode_server_list(&tlv)
+}
+
+/// Read `ClientList` attribute from cluster `Descriptor`.
+pub async fn read_client_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DESCRIPTOR, crate::clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_CLIENTLIST).await?;
+    decode_client_list(&tlv)
+}
+
+/// Read `PartsList` attribute from cluster `Descriptor`.
+pub async fn read_parts_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DESCRIPTOR, crate::clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST).await?;
+    decode_parts_list(&tlv)
+}
+
+/// Read `TagList` attribute from cluster `Descriptor`.
+pub async fn read_tag_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DESCRIPTOR, crate::clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_TAGLIST).await?;
+    decode_tag_list(&tlv)
+}
+
+/// Read `EndpointUniqueID` attribute from cluster `Descriptor`.
+pub async fn read_endpoint_unique_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<String> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DESCRIPTOR, crate::clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_ENDPOINTUNIQUEID).await?;
+    decode_endpoint_unique_id(&tlv)
+}
+

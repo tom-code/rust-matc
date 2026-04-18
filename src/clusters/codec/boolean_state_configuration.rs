@@ -216,6 +216,68 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SuppressAlarm` command on cluster `Boolean State Configuration`.
+pub async fn suppress_alarm(conn: &crate::controller::Connection, endpoint: u16, alarms_to_suppress: AlarmMode) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_CMD_ID_SUPPRESSALARM, &encode_suppress_alarm(alarms_to_suppress)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnableDisableAlarm` command on cluster `Boolean State Configuration`.
+pub async fn enable_disable_alarm(conn: &crate::controller::Connection, endpoint: u16, alarms_to_enable_disable: AlarmMode) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_CMD_ID_ENABLEDISABLEALARM, &encode_enable_disable_alarm(alarms_to_enable_disable)?).await?;
+    Ok(())
+}
+
+/// Read `CurrentSensitivityLevel` attribute from cluster `Boolean State Configuration`.
+pub async fn read_current_sensitivity_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_CURRENTSENSITIVITYLEVEL).await?;
+    decode_current_sensitivity_level(&tlv)
+}
+
+/// Read `SupportedSensitivityLevels` attribute from cluster `Boolean State Configuration`.
+pub async fn read_supported_sensitivity_levels(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_SUPPORTEDSENSITIVITYLEVELS).await?;
+    decode_supported_sensitivity_levels(&tlv)
+}
+
+/// Read `DefaultSensitivityLevel` attribute from cluster `Boolean State Configuration`.
+pub async fn read_default_sensitivity_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_DEFAULTSENSITIVITYLEVEL).await?;
+    decode_default_sensitivity_level(&tlv)
+}
+
+/// Read `AlarmsActive` attribute from cluster `Boolean State Configuration`.
+pub async fn read_alarms_active(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_ALARMSACTIVE).await?;
+    decode_alarms_active(&tlv)
+}
+
+/// Read `AlarmsSuppressed` attribute from cluster `Boolean State Configuration`.
+pub async fn read_alarms_suppressed(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_ALARMSSUPPRESSED).await?;
+    decode_alarms_suppressed(&tlv)
+}
+
+/// Read `AlarmsEnabled` attribute from cluster `Boolean State Configuration`.
+pub async fn read_alarms_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_ALARMSENABLED).await?;
+    decode_alarms_enabled(&tlv)
+}
+
+/// Read `AlarmsSupported` attribute from cluster `Boolean State Configuration`.
+pub async fn read_alarms_supported(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmMode> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_ALARMSSUPPORTED).await?;
+    decode_alarms_supported(&tlv)
+}
+
+/// Read `SensorFault` attribute from cluster `Boolean State Configuration`.
+pub async fn read_sensor_fault(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SensorFault> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_BOOLEAN_STATE_CONFIGURATION, crate::clusters::defs::CLUSTER_BOOLEAN_STATE_CONFIGURATION_ATTR_ID_SENSORFAULT).await?;
+    decode_sensor_fault(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AlarmsStateChangedEvent {
     pub alarms_active: Option<AlarmMode>,

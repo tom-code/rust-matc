@@ -512,3 +512,101 @@ pub fn decode_sign_vid_verification_response(inp: &tlv::TlvItemValue) -> anyhow:
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `AttestationRequest` command on cluster `Operational Credentials`.
+pub async fn attestation_request(conn: &crate::controller::Connection, endpoint: u16, attestation_nonce: Vec<u8>) -> anyhow::Result<AttestationResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_ATTESTATIONREQUEST, &encode_attestation_request(attestation_nonce)?).await?;
+    decode_attestation_response(&tlv)
+}
+
+/// Invoke `CertificateChainRequest` command on cluster `Operational Credentials`.
+pub async fn certificate_chain_request(conn: &crate::controller::Connection, endpoint: u16, certificate_type: CertificateChainType) -> anyhow::Result<CertificateChainResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_CERTIFICATECHAINREQUEST, &encode_certificate_chain_request(certificate_type)?).await?;
+    decode_certificate_chain_response(&tlv)
+}
+
+/// Invoke `CSRRequest` command on cluster `Operational Credentials`.
+pub async fn csr_request(conn: &crate::controller::Connection, endpoint: u16, csr_nonce: Vec<u8>, is_for_update_noc: bool) -> anyhow::Result<CSRResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_CSRREQUEST, &encode_csr_request(csr_nonce, is_for_update_noc)?).await?;
+    decode_csr_response(&tlv)
+}
+
+/// Invoke `AddNOC` command on cluster `Operational Credentials`.
+pub async fn add_noc(conn: &crate::controller::Connection, endpoint: u16, noc_value: Vec<u8>, icac_value: Vec<u8>, ipk_value: Vec<u8>, case_admin_subject: u64, admin_vendor_id: u16) -> anyhow::Result<NOCResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_ADDNOC, &encode_add_noc(noc_value, icac_value, ipk_value, case_admin_subject, admin_vendor_id)?).await?;
+    decode_noc_response(&tlv)
+}
+
+/// Invoke `UpdateNOC` command on cluster `Operational Credentials`.
+pub async fn update_noc(conn: &crate::controller::Connection, endpoint: u16, noc_value: Vec<u8>, icac_value: Vec<u8>) -> anyhow::Result<NOCResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_UPDATENOC, &encode_update_noc(noc_value, icac_value)?).await?;
+    decode_noc_response(&tlv)
+}
+
+/// Invoke `UpdateFabricLabel` command on cluster `Operational Credentials`.
+pub async fn update_fabric_label(conn: &crate::controller::Connection, endpoint: u16, label: String) -> anyhow::Result<NOCResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_UPDATEFABRICLABEL, &encode_update_fabric_label(label)?).await?;
+    decode_noc_response(&tlv)
+}
+
+/// Invoke `RemoveFabric` command on cluster `Operational Credentials`.
+pub async fn remove_fabric(conn: &crate::controller::Connection, endpoint: u16, fabric_index: u8) -> anyhow::Result<NOCResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_REMOVEFABRIC, &encode_remove_fabric(fabric_index)?).await?;
+    decode_noc_response(&tlv)
+}
+
+/// Invoke `AddTrustedRootCertificate` command on cluster `Operational Credentials`.
+pub async fn add_trusted_root_certificate(conn: &crate::controller::Connection, endpoint: u16, root_ca_certificate: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_ADDTRUSTEDROOTCERTIFICATE, &encode_add_trusted_root_certificate(root_ca_certificate)?).await?;
+    Ok(())
+}
+
+/// Invoke `SetVIDVerificationStatement` command on cluster `Operational Credentials`.
+pub async fn set_vid_verification_statement(conn: &crate::controller::Connection, endpoint: u16, vendor_id: u16, vid_verification_statement: Vec<u8>, vvsc: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_SETVIDVERIFICATIONSTATEMENT, &encode_set_vid_verification_statement(vendor_id, vid_verification_statement, vvsc)?).await?;
+    Ok(())
+}
+
+/// Invoke `SignVIDVerificationRequest` command on cluster `Operational Credentials`.
+pub async fn sign_vid_verification_request(conn: &crate::controller::Connection, endpoint: u16, fabric_index: u8, client_challenge: Vec<u8>) -> anyhow::Result<SignVIDVerificationResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_SIGNVIDVERIFICATIONREQUEST, &encode_sign_vid_verification_request(fabric_index, client_challenge)?).await?;
+    decode_sign_vid_verification_response(&tlv)
+}
+
+/// Read `NOCs` attribute from cluster `Operational Credentials`.
+pub async fn read_no_cs(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<NOC>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_NOCS).await?;
+    decode_no_cs(&tlv)
+}
+
+/// Read `Fabrics` attribute from cluster `Operational Credentials`.
+pub async fn read_fabrics(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<FabricDescriptor>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_FABRICS).await?;
+    decode_fabrics(&tlv)
+}
+
+/// Read `SupportedFabrics` attribute from cluster `Operational Credentials`.
+pub async fn read_supported_fabrics(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_SUPPORTEDFABRICS).await?;
+    decode_supported_fabrics(&tlv)
+}
+
+/// Read `CommissionedFabrics` attribute from cluster `Operational Credentials`.
+pub async fn read_commissioned_fabrics(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_COMMISSIONEDFABRICS).await?;
+    decode_commissioned_fabrics(&tlv)
+}
+
+/// Read `TrustedRootCertificates` attribute from cluster `Operational Credentials`.
+pub async fn read_trusted_root_certificates(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_TRUSTEDROOTCERTIFICATES).await?;
+    decode_trusted_root_certificates(&tlv)
+}
+
+/// Read `CurrentFabricIndex` attribute from cluster `Operational Credentials`.
+pub async fn read_current_fabric_index(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_ATTR_ID_CURRENTFABRICINDEX).await?;
+    decode_current_fabric_index(&tlv)
+}
+

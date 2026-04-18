@@ -129,6 +129,26 @@ pub fn decode_reverse_open_commissioning_window(inp: &tlv::TlvItemValue) -> anyh
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `RequestCommissioningApproval` command on cluster `Commissioner Control`.
+pub async fn request_commissioning_approval(conn: &crate::controller::Connection, endpoint: u16, request_id: u64, vendor_id: u16, product_id: u16, label: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COMMISSIONER_CONTROL, crate::clusters::defs::CLUSTER_COMMISSIONER_CONTROL_CMD_ID_REQUESTCOMMISSIONINGAPPROVAL, &encode_request_commissioning_approval(request_id, vendor_id, product_id, label)?).await?;
+    Ok(())
+}
+
+/// Invoke `CommissionNode` command on cluster `Commissioner Control`.
+pub async fn commission_node(conn: &crate::controller::Connection, endpoint: u16, request_id: u64, response_timeout_seconds: u16) -> anyhow::Result<ReverseOpenCommissioningWindow> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMISSIONER_CONTROL, crate::clusters::defs::CLUSTER_COMMISSIONER_CONTROL_CMD_ID_COMMISSIONNODE, &encode_commission_node(request_id, response_timeout_seconds)?).await?;
+    decode_reverse_open_commissioning_window(&tlv)
+}
+
+/// Read `SupportedDeviceCategories` attribute from cluster `Commissioner Control`.
+pub async fn read_supported_device_categories(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SupportedDeviceCategory> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMISSIONER_CONTROL, crate::clusters::defs::CLUSTER_COMMISSIONER_CONTROL_ATTR_ID_SUPPORTEDDEVICECATEGORIES).await?;
+    decode_supported_device_categories(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct CommissioningRequestResultEvent {
     pub request_id: Option<u64>,

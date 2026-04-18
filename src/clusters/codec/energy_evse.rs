@@ -750,6 +750,188 @@ pub fn decode_get_targets_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Ge
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `Disable` command on cluster `Energy EVSE`.
+pub async fn disable(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_DISABLE, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `EnableCharging` command on cluster `Energy EVSE`.
+pub async fn enable_charging(conn: &crate::controller::Connection, endpoint: u16, charging_enabled_until: Option<u64>, minimum_charge_current: u8, maximum_charge_current: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_ENABLECHARGING, &encode_enable_charging(charging_enabled_until, minimum_charge_current, maximum_charge_current)?).await?;
+    Ok(())
+}
+
+/// Invoke `EnableDischarging` command on cluster `Energy EVSE`.
+pub async fn enable_discharging(conn: &crate::controller::Connection, endpoint: u16, discharging_enabled_until: Option<u64>, maximum_discharge_current: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_ENABLEDISCHARGING, &encode_enable_discharging(discharging_enabled_until, maximum_discharge_current)?).await?;
+    Ok(())
+}
+
+/// Invoke `StartDiagnostics` command on cluster `Energy EVSE`.
+pub async fn start_diagnostics(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_STARTDIAGNOSTICS, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `SetTargets` command on cluster `Energy EVSE`.
+pub async fn set_targets(conn: &crate::controller::Connection, endpoint: u16, charging_target_schedules: Vec<ChargingTargetSchedule>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_SETTARGETS, &encode_set_targets(charging_target_schedules)?).await?;
+    Ok(())
+}
+
+/// Invoke `GetTargets` command on cluster `Energy EVSE`.
+pub async fn get_targets(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<GetTargetsResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_GETTARGETS, &[]).await?;
+    decode_get_targets_response(&tlv)
+}
+
+/// Invoke `ClearTargets` command on cluster `Energy EVSE`.
+pub async fn clear_targets(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_CMD_ID_CLEARTARGETS, &[]).await?;
+    Ok(())
+}
+
+/// Read `State` attribute from cluster `Energy EVSE`.
+pub async fn read_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<State>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_STATE).await?;
+    decode_state(&tlv)
+}
+
+/// Read `SupplyState` attribute from cluster `Energy EVSE`.
+pub async fn read_supply_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SupplyState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_SUPPLYSTATE).await?;
+    decode_supply_state(&tlv)
+}
+
+/// Read `FaultState` attribute from cluster `Energy EVSE`.
+pub async fn read_fault_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<FaultState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_FAULTSTATE).await?;
+    decode_fault_state(&tlv)
+}
+
+/// Read `ChargingEnabledUntil` attribute from cluster `Energy EVSE`.
+pub async fn read_charging_enabled_until(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_CHARGINGENABLEDUNTIL).await?;
+    decode_charging_enabled_until(&tlv)
+}
+
+/// Read `DischargingEnabledUntil` attribute from cluster `Energy EVSE`.
+pub async fn read_discharging_enabled_until(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_DISCHARGINGENABLEDUNTIL).await?;
+    decode_discharging_enabled_until(&tlv)
+}
+
+/// Read `CircuitCapacity` attribute from cluster `Energy EVSE`.
+pub async fn read_circuit_capacity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_CIRCUITCAPACITY).await?;
+    decode_circuit_capacity(&tlv)
+}
+
+/// Read `MinimumChargeCurrent` attribute from cluster `Energy EVSE`.
+pub async fn read_minimum_charge_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_MINIMUMCHARGECURRENT).await?;
+    decode_minimum_charge_current(&tlv)
+}
+
+/// Read `MaximumChargeCurrent` attribute from cluster `Energy EVSE`.
+pub async fn read_maximum_charge_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_MAXIMUMCHARGECURRENT).await?;
+    decode_maximum_charge_current(&tlv)
+}
+
+/// Read `MaximumDischargeCurrent` attribute from cluster `Energy EVSE`.
+pub async fn read_maximum_discharge_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_MAXIMUMDISCHARGECURRENT).await?;
+    decode_maximum_discharge_current(&tlv)
+}
+
+/// Read `UserMaximumChargeCurrent` attribute from cluster `Energy EVSE`.
+pub async fn read_user_maximum_charge_current(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_USERMAXIMUMCHARGECURRENT).await?;
+    decode_user_maximum_charge_current(&tlv)
+}
+
+/// Read `RandomizationDelayWindow` attribute from cluster `Energy EVSE`.
+pub async fn read_randomization_delay_window(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_RANDOMIZATIONDELAYWINDOW).await?;
+    decode_randomization_delay_window(&tlv)
+}
+
+/// Read `NextChargeStartTime` attribute from cluster `Energy EVSE`.
+pub async fn read_next_charge_start_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_NEXTCHARGESTARTTIME).await?;
+    decode_next_charge_start_time(&tlv)
+}
+
+/// Read `NextChargeTargetTime` attribute from cluster `Energy EVSE`.
+pub async fn read_next_charge_target_time(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_NEXTCHARGETARGETTIME).await?;
+    decode_next_charge_target_time(&tlv)
+}
+
+/// Read `NextChargeRequiredEnergy` attribute from cluster `Energy EVSE`.
+pub async fn read_next_charge_required_energy(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_NEXTCHARGEREQUIREDENERGY).await?;
+    decode_next_charge_required_energy(&tlv)
+}
+
+/// Read `NextChargeTargetSoC` attribute from cluster `Energy EVSE`.
+pub async fn read_next_charge_target_so_c(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_NEXTCHARGETARGETSOC).await?;
+    decode_next_charge_target_so_c(&tlv)
+}
+
+/// Read `ApproximateEVEfficiency` attribute from cluster `Energy EVSE`.
+pub async fn read_approximate_ev_efficiency(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_APPROXIMATEEVEFFICIENCY).await?;
+    decode_approximate_ev_efficiency(&tlv)
+}
+
+/// Read `StateOfCharge` attribute from cluster `Energy EVSE`.
+pub async fn read_state_of_charge(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_STATEOFCHARGE).await?;
+    decode_state_of_charge(&tlv)
+}
+
+/// Read `BatteryCapacity` attribute from cluster `Energy EVSE`.
+pub async fn read_battery_capacity(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_BATTERYCAPACITY).await?;
+    decode_battery_capacity(&tlv)
+}
+
+/// Read `VehicleID` attribute from cluster `Energy EVSE`.
+pub async fn read_vehicle_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_VEHICLEID).await?;
+    decode_vehicle_id(&tlv)
+}
+
+/// Read `SessionID` attribute from cluster `Energy EVSE`.
+pub async fn read_session_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_SESSIONID).await?;
+    decode_session_id(&tlv)
+}
+
+/// Read `SessionDuration` attribute from cluster `Energy EVSE`.
+pub async fn read_session_duration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u32>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_SESSIONDURATION).await?;
+    decode_session_duration(&tlv)
+}
+
+/// Read `SessionEnergyCharged` attribute from cluster `Energy EVSE`.
+pub async fn read_session_energy_charged(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_SESSIONENERGYCHARGED).await?;
+    decode_session_energy_charged(&tlv)
+}
+
+/// Read `SessionEnergyDischarged` attribute from cluster `Energy EVSE`.
+pub async fn read_session_energy_discharged(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ENERGY_EVSE, crate::clusters::defs::CLUSTER_ENERGY_EVSE_ATTR_ID_SESSIONENERGYDISCHARGED).await?;
+    decode_session_energy_discharged(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct EVConnectedEvent {
     pub session_id: Option<u32>,

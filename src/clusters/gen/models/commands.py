@@ -25,10 +25,11 @@ if TYPE_CHECKING:
 class MatterCommand:
     """Represents a Matter command with its fields."""
 
-    def __init__(self, id: str, name: str, direction: str):
+    def __init__(self, id: str, name: str, direction: str, response_name: Optional[str] = None):
         self.id = id
         self.name = name
         self.direction = direction
+        self.response_name = response_name
         self.fields: List[MatterField] = []
 
     def add_field(self, field: MatterField):
@@ -44,13 +45,20 @@ class MatterCommand:
         # Convert command name to PascalCase and append Params
         return f"{convert_to_pascal_case(self.name)}Params"
 
-    def generate_rust_function(self, structs: Dict[str, 'MatterStruct'], enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None) -> str:
-        """Generate complete Rust function for encoding this command."""
-        func_name = self.get_rust_function_name()
+    def render_params(self, structs: Dict[str, 'MatterStruct'], enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None):
+        """Compute the parameter list for this command's encoder signature.
 
-        # Generate function parameters - store both for signature and struct generation
-        params = []  # List of "name: type" strings
-        param_fields = []  # List of (name, type) tuples
+        Shared by `generate_rust_function` (emits the encoder) and the typed
+        façade emitter (emits the wrapper that calls the encoder) so the two
+        signatures never drift.
+
+        Returns (param_fields, use_param_struct, param_struct_name):
+        - param_fields: ordered list of (rust_name, rust_type) tuples
+        - use_param_struct: True when >7 params and the encoder takes a single
+          `params: FooParams` struct instead of positional args
+        - param_struct_name: the struct name when use_param_struct, else None
+        """
+        param_fields = []
         for field in self.fields:
             param_name = field.get_rust_param_name()
             # If this is a list of a custom struct, expose Vec<StructName>
@@ -88,12 +96,18 @@ class MatterCommand:
             if field.nullable:
                 rust_type = f"Option<{rust_type}>"
 
-            params.append(f"{param_name}: {rust_type}")
             param_fields.append((param_name, rust_type))
 
-        # Determine if we need a parameter struct (more than 7 params)
-        use_param_struct = len(params) > 7
-        struct_name = self.get_rust_params_struct_name() if use_param_struct else None
+        use_param_struct = len(param_fields) > 7
+        param_struct_name = self.get_rust_params_struct_name() if use_param_struct else None
+        return param_fields, use_param_struct, param_struct_name
+
+    def generate_rust_function(self, structs: Dict[str, 'MatterStruct'], enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None) -> str:
+        """Generate complete Rust function for encoding this command."""
+        func_name = self.get_rust_function_name()
+
+        param_fields, use_param_struct, struct_name = self.render_params(structs, enums, bitmaps)
+        params = [f"{name}: {typ}" for name, typ in param_fields]
 
         # Generate function signature
         if use_param_struct:

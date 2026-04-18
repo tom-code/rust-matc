@@ -99,3 +99,23 @@ pub fn decode_network_passphrase_response(inp: &tlv::TlvItemValue) -> anyhow::Re
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `NetworkPassphraseRequest` command on cluster `Wi-Fi Network Management`.
+pub async fn network_passphrase_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<NetworkPassphraseResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_MANAGEMENT, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_MANAGEMENT_CMD_ID_NETWORKPASSPHRASEREQUEST, &[]).await?;
+    decode_network_passphrase_response(&tlv)
+}
+
+/// Read `SSID` attribute from cluster `Wi-Fi Network Management`.
+pub async fn read_ssid(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Vec<u8>>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_MANAGEMENT, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_MANAGEMENT_ATTR_ID_SSID).await?;
+    decode_ssid(&tlv)
+}
+
+/// Read `PassphraseSurrogate` attribute from cluster `Wi-Fi Network Management`.
+pub async fn read_passphrase_surrogate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WI_FI_NETWORK_MANAGEMENT, crate::clusters::defs::CLUSTER_WI_FI_NETWORK_MANAGEMENT_ATTR_ID_PASSPHRASESURROGATE).await?;
+    decode_passphrase_surrogate(&tlv)
+}
+

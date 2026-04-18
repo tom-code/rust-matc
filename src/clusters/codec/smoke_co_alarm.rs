@@ -473,6 +473,92 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SelfTestRequest` command on cluster `Smoke CO Alarm`.
+pub async fn self_test_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_CMD_ID_SELFTESTREQUEST, &[]).await?;
+    Ok(())
+}
+
+/// Read `ExpressedState` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_expressed_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ExpressedState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_EXPRESSEDSTATE).await?;
+    decode_expressed_state(&tlv)
+}
+
+/// Read `SmokeState` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_smoke_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_SMOKESTATE).await?;
+    decode_smoke_state(&tlv)
+}
+
+/// Read `COState` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_co_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_COSTATE).await?;
+    decode_co_state(&tlv)
+}
+
+/// Read `BatteryAlert` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_battery_alert(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_BATTERYALERT).await?;
+    decode_battery_alert(&tlv)
+}
+
+/// Read `DeviceMuted` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_device_muted(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<MuteState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_DEVICEMUTED).await?;
+    decode_device_muted(&tlv)
+}
+
+/// Read `TestInProgress` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_test_in_progress(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_TESTINPROGRESS).await?;
+    decode_test_in_progress(&tlv)
+}
+
+/// Read `HardwareFaultAlert` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_hardware_fault_alert(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_HARDWAREFAULTALERT).await?;
+    decode_hardware_fault_alert(&tlv)
+}
+
+/// Read `EndOfServiceAlert` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_end_of_service_alert(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<EndOfService> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_ENDOFSERVICEALERT).await?;
+    decode_end_of_service_alert(&tlv)
+}
+
+/// Read `InterconnectSmokeAlarm` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_interconnect_smoke_alarm(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_INTERCONNECTSMOKEALARM).await?;
+    decode_interconnect_smoke_alarm(&tlv)
+}
+
+/// Read `InterconnectCOAlarm` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_interconnect_co_alarm(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<AlarmState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_INTERCONNECTCOALARM).await?;
+    decode_interconnect_co_alarm(&tlv)
+}
+
+/// Read `ContaminationState` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_contamination_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ContaminationState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_CONTAMINATIONSTATE).await?;
+    decode_contamination_state(&tlv)
+}
+
+/// Read `SmokeSensitivityLevel` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_smoke_sensitivity_level(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Sensitivity> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_SMOKESENSITIVITYLEVEL).await?;
+    decode_smoke_sensitivity_level(&tlv)
+}
+
+/// Read `ExpiryDate` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_expiry_date(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_EXPIRYDATE).await?;
+    decode_expiry_date(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SmokeAlarmEvent {
     pub alarm_severity_level: Option<AlarmState>,

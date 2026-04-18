@@ -188,3 +188,41 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `OpenCommissioningWindow` command on cluster `Administrator Commissioning`.
+pub async fn open_commissioning_window(conn: &crate::controller::Connection, endpoint: u16, commissioning_timeout: u16, pake_passcode_verifier: Vec<u8>, discriminator: u16, iterations: u32, salt: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, crate::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_CMD_ID_OPENCOMMISSIONINGWINDOW, &encode_open_commissioning_window(commissioning_timeout, pake_passcode_verifier, discriminator, iterations, salt)?).await?;
+    Ok(())
+}
+
+/// Invoke `OpenBasicCommissioningWindow` command on cluster `Administrator Commissioning`.
+pub async fn open_basic_commissioning_window(conn: &crate::controller::Connection, endpoint: u16, commissioning_timeout: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, crate::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_CMD_ID_OPENBASICCOMMISSIONINGWINDOW, &encode_open_basic_commissioning_window(commissioning_timeout)?).await?;
+    Ok(())
+}
+
+/// Invoke `RevokeCommissioning` command on cluster `Administrator Commissioning`.
+pub async fn revoke_commissioning(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, crate::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_CMD_ID_REVOKECOMMISSIONING, &[]).await?;
+    Ok(())
+}
+
+/// Read `WindowStatus` attribute from cluster `Administrator Commissioning`.
+pub async fn read_window_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<CommissioningWindowStatus> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, crate::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_ATTR_ID_WINDOWSTATUS).await?;
+    decode_window_status(&tlv)
+}
+
+/// Read `AdminFabricIndex` attribute from cluster `Administrator Commissioning`.
+pub async fn read_admin_fabric_index(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, crate::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_ATTR_ID_ADMINFABRICINDEX).await?;
+    decode_admin_fabric_index(&tlv)
+}
+
+/// Read `AdminVendorId` attribute from cluster `Administrator Commissioning`.
+pub async fn read_admin_vendor_id(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, crate::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_ATTR_ID_ADMINVENDORID).await?;
+    decode_admin_vendor_id(&tlv)
+}
+

@@ -732,6 +732,104 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `PowerAdjustRequest` command on cluster `Device Energy Management`.
+pub async fn power_adjust_request(conn: &crate::controller::Connection, endpoint: u16, power: u32, duration: u32, cause: AdjustmentCause) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_POWERADJUSTREQUEST, &encode_power_adjust_request(power, duration, cause)?).await?;
+    Ok(())
+}
+
+/// Invoke `CancelPowerAdjustRequest` command on cluster `Device Energy Management`.
+pub async fn cancel_power_adjust_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_CANCELPOWERADJUSTREQUEST, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `StartTimeAdjustRequest` command on cluster `Device Energy Management`.
+pub async fn start_time_adjust_request(conn: &crate::controller::Connection, endpoint: u16, requested_start_time: u64, cause: AdjustmentCause) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_STARTTIMEADJUSTREQUEST, &encode_start_time_adjust_request(requested_start_time, cause)?).await?;
+    Ok(())
+}
+
+/// Invoke `PauseRequest` command on cluster `Device Energy Management`.
+pub async fn pause_request(conn: &crate::controller::Connection, endpoint: u16, duration: u32, cause: AdjustmentCause) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_PAUSEREQUEST, &encode_pause_request(duration, cause)?).await?;
+    Ok(())
+}
+
+/// Invoke `ResumeRequest` command on cluster `Device Energy Management`.
+pub async fn resume_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_RESUMEREQUEST, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `ModifyForecastRequest` command on cluster `Device Energy Management`.
+pub async fn modify_forecast_request(conn: &crate::controller::Connection, endpoint: u16, forecast_id: u32, slot_adjustments: Vec<SlotAdjustment>, cause: AdjustmentCause) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_MODIFYFORECASTREQUEST, &encode_modify_forecast_request(forecast_id, slot_adjustments, cause)?).await?;
+    Ok(())
+}
+
+/// Invoke `RequestConstraintBasedForecast` command on cluster `Device Energy Management`.
+pub async fn request_constraint_based_forecast(conn: &crate::controller::Connection, endpoint: u16, constraints: Vec<Constraints>, cause: AdjustmentCause) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_REQUESTCONSTRAINTBASEDFORECAST, &encode_request_constraint_based_forecast(constraints, cause)?).await?;
+    Ok(())
+}
+
+/// Invoke `CancelRequest` command on cluster `Device Energy Management`.
+pub async fn cancel_request(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_CMD_ID_CANCELREQUEST, &[]).await?;
+    Ok(())
+}
+
+/// Read `ESAType` attribute from cluster `Device Energy Management`.
+pub async fn read_esa_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ESAType> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_ESATYPE).await?;
+    decode_esa_type(&tlv)
+}
+
+/// Read `ESACanGenerate` attribute from cluster `Device Energy Management`.
+pub async fn read_esa_can_generate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_ESACANGENERATE).await?;
+    decode_esa_can_generate(&tlv)
+}
+
+/// Read `ESAState` attribute from cluster `Device Energy Management`.
+pub async fn read_esa_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ESAState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_ESASTATE).await?;
+    decode_esa_state(&tlv)
+}
+
+/// Read `AbsMinPower` attribute from cluster `Device Energy Management`.
+pub async fn read_abs_min_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_ABSMINPOWER).await?;
+    decode_abs_min_power(&tlv)
+}
+
+/// Read `AbsMaxPower` attribute from cluster `Device Energy Management`.
+pub async fn read_abs_max_power(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u32> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_ABSMAXPOWER).await?;
+    decode_abs_max_power(&tlv)
+}
+
+/// Read `PowerAdjustmentCapability` attribute from cluster `Device Energy Management`.
+pub async fn read_power_adjustment_capability(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<PowerAdjustCapability>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_POWERADJUSTMENTCAPABILITY).await?;
+    decode_power_adjustment_capability(&tlv)
+}
+
+/// Read `Forecast` attribute from cluster `Device Energy Management`.
+pub async fn read_forecast(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Forecast>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_FORECAST).await?;
+    decode_forecast(&tlv)
+}
+
+/// Read `OptOutState` attribute from cluster `Device Energy Management`.
+pub async fn read_opt_out_state(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<OptOutState> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DEVICE_ENERGY_MANAGEMENT, crate::clusters::defs::CLUSTER_DEVICE_ENERGY_MANAGEMENT_ATTR_ID_OPTOUTSTATE).await?;
+    decode_opt_out_state(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct PowerAdjustEndEvent {
     pub cause: Option<Cause>,

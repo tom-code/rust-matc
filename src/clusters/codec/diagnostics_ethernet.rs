@@ -245,3 +245,65 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `ResetCounts` command on cluster `Ethernet Network Diagnostics`.
+pub async fn reset_counts(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_CMD_ID_RESETCOUNTS, &[]).await?;
+    Ok(())
+}
+
+/// Read `PHYRate` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_phy_rate(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<PHYRate>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_PHYRATE).await?;
+    decode_phy_rate(&tlv)
+}
+
+/// Read `FullDuplex` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_full_duplex(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<bool>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_FULLDUPLEX).await?;
+    decode_full_duplex(&tlv)
+}
+
+/// Read `PacketRxCount` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_packet_rx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_PACKETRXCOUNT).await?;
+    decode_packet_rx_count(&tlv)
+}
+
+/// Read `PacketTxCount` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_packet_tx_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_PACKETTXCOUNT).await?;
+    decode_packet_tx_count(&tlv)
+}
+
+/// Read `TxErrCount` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_tx_err_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_TXERRCOUNT).await?;
+    decode_tx_err_count(&tlv)
+}
+
+/// Read `CollisionCount` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_collision_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_COLLISIONCOUNT).await?;
+    decode_collision_count(&tlv)
+}
+
+/// Read `OverrunCount` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_overrun_count(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_OVERRUNCOUNT).await?;
+    decode_overrun_count(&tlv)
+}
+
+/// Read `CarrierDetect` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_carrier_detect(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<bool>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_CARRIERDETECT).await?;
+    decode_carrier_detect(&tlv)
+}
+
+/// Read `TimeSinceReset` attribute from cluster `Ethernet Network Diagnostics`.
+pub async fn read_time_since_reset(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ETHERNET_NETWORK_DIAGNOSTICS, crate::clusters::defs::CLUSTER_ETHERNET_NETWORK_DIAGNOSTICS_ATTR_ID_TIMESINCERESET).await?;
+    decode_time_since_reset(&tlv)
+}
+

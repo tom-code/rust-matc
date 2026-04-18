@@ -478,3 +478,29 @@ pub fn decode_launcher_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Launc
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `LaunchContent` command on cluster `Content Launcher`.
+pub async fn launch_content(conn: &crate::controller::Connection, endpoint: u16, search: ContentSearch, auto_play: bool, data: String, playback_preferences: PlaybackPreferences, use_current_context: bool) -> anyhow::Result<LauncherResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_LAUNCHER, crate::clusters::defs::CLUSTER_CONTENT_LAUNCHER_CMD_ID_LAUNCHCONTENT, &encode_launch_content(search, auto_play, data, playback_preferences, use_current_context)?).await?;
+    decode_launcher_response(&tlv)
+}
+
+/// Invoke `LaunchURL` command on cluster `Content Launcher`.
+pub async fn launch_url(conn: &crate::controller::Connection, endpoint: u16, content_url: String, display_string: String, branding_information: BrandingInformation, playback_preferences: PlaybackPreferences) -> anyhow::Result<LauncherResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_LAUNCHER, crate::clusters::defs::CLUSTER_CONTENT_LAUNCHER_CMD_ID_LAUNCHURL, &encode_launch_url(content_url, display_string, branding_information, playback_preferences)?).await?;
+    decode_launcher_response(&tlv)
+}
+
+/// Read `AcceptHeader` attribute from cluster `Content Launcher`.
+pub async fn read_accept_header(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<String>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_LAUNCHER, crate::clusters::defs::CLUSTER_CONTENT_LAUNCHER_ATTR_ID_ACCEPTHEADER).await?;
+    decode_accept_header(&tlv)
+}
+
+/// Read `SupportedStreamingProtocols` attribute from cluster `Content Launcher`.
+pub async fn read_supported_streaming_protocols(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<SupportedProtocols> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_LAUNCHER, crate::clusters::defs::CLUSTER_CONTENT_LAUNCHER_ATTR_ID_SUPPORTEDSTREAMINGPROTOCOLS).await?;
+    decode_supported_streaming_protocols(&tlv)
+}
+

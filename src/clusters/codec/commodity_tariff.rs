@@ -1081,3 +1081,131 @@ pub fn decode_get_day_entry_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `GetTariffComponent` command on cluster `Commodity Tariff`.
+pub async fn get_tariff_component(conn: &crate::controller::Connection, endpoint: u16, tariff_component_id: u32) -> anyhow::Result<GetTariffComponentResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_CMD_ID_GETTARIFFCOMPONENT, &encode_get_tariff_component(tariff_component_id)?).await?;
+    decode_get_tariff_component_response(&tlv)
+}
+
+/// Invoke `GetDayEntry` command on cluster `Commodity Tariff`.
+pub async fn get_day_entry(conn: &crate::controller::Connection, endpoint: u16, day_entry_id: u32) -> anyhow::Result<GetDayEntryResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_CMD_ID_GETDAYENTRY, &encode_get_day_entry(day_entry_id)?).await?;
+    decode_get_day_entry_response(&tlv)
+}
+
+/// Read `TariffInfo` attribute from cluster `Commodity Tariff`.
+pub async fn read_tariff_info(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<TariffInformation>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_TARIFFINFO).await?;
+    decode_tariff_info(&tlv)
+}
+
+/// Read `TariffUnit` attribute from cluster `Commodity Tariff`.
+pub async fn read_tariff_unit(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_TARIFFUNIT).await?;
+    decode_tariff_unit(&tlv)
+}
+
+/// Read `StartDate` attribute from cluster `Commodity Tariff`.
+pub async fn read_start_date(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_STARTDATE).await?;
+    decode_start_date(&tlv)
+}
+
+/// Read `DayEntries` attribute from cluster `Commodity Tariff`.
+pub async fn read_day_entries(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DayEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_DAYENTRIES).await?;
+    decode_day_entries(&tlv)
+}
+
+/// Read `DayPatterns` attribute from cluster `Commodity Tariff`.
+pub async fn read_day_patterns(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<DayPattern>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_DAYPATTERNS).await?;
+    decode_day_patterns(&tlv)
+}
+
+/// Read `CalendarPeriods` attribute from cluster `Commodity Tariff`.
+pub async fn read_calendar_periods(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<CalendarPeriod>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_CALENDARPERIODS).await?;
+    decode_calendar_periods(&tlv)
+}
+
+/// Read `IndividualDays` attribute from cluster `Commodity Tariff`.
+pub async fn read_individual_days(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Day>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_INDIVIDUALDAYS).await?;
+    decode_individual_days(&tlv)
+}
+
+/// Read `CurrentDay` attribute from cluster `Commodity Tariff`.
+pub async fn read_current_day(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Day>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_CURRENTDAY).await?;
+    decode_current_day(&tlv)
+}
+
+/// Read `NextDay` attribute from cluster `Commodity Tariff`.
+pub async fn read_next_day(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<Day>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_NEXTDAY).await?;
+    decode_next_day(&tlv)
+}
+
+/// Read `CurrentDayEntry` attribute from cluster `Commodity Tariff`.
+pub async fn read_current_day_entry(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DayEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_CURRENTDAYENTRY).await?;
+    decode_current_day_entry(&tlv)
+}
+
+/// Read `CurrentDayEntryDate` attribute from cluster `Commodity Tariff`.
+pub async fn read_current_day_entry_date(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_CURRENTDAYENTRYDATE).await?;
+    decode_current_day_entry_date(&tlv)
+}
+
+/// Read `NextDayEntry` attribute from cluster `Commodity Tariff`.
+pub async fn read_next_day_entry(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DayEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_NEXTDAYENTRY).await?;
+    decode_next_day_entry(&tlv)
+}
+
+/// Read `NextDayEntryDate` attribute from cluster `Commodity Tariff`.
+pub async fn read_next_day_entry_date(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_NEXTDAYENTRYDATE).await?;
+    decode_next_day_entry_date(&tlv)
+}
+
+/// Read `TariffComponents` attribute from cluster `Commodity Tariff`.
+pub async fn read_tariff_components(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TariffComponent>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_TARIFFCOMPONENTS).await?;
+    decode_tariff_components(&tlv)
+}
+
+/// Read `TariffPeriods` attribute from cluster `Commodity Tariff`.
+pub async fn read_tariff_periods(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TariffPeriod>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_TARIFFPERIODS).await?;
+    decode_tariff_periods(&tlv)
+}
+
+/// Read `CurrentTariffComponents` attribute from cluster `Commodity Tariff`.
+pub async fn read_current_tariff_components(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TariffComponent>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_CURRENTTARIFFCOMPONENTS).await?;
+    decode_current_tariff_components(&tlv)
+}
+
+/// Read `NextTariffComponents` attribute from cluster `Commodity Tariff`.
+pub async fn read_next_tariff_components(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<TariffComponent>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_NEXTTARIFFCOMPONENTS).await?;
+    decode_next_tariff_components(&tlv)
+}
+
+/// Read `DefaultRandomizationOffset` attribute from cluster `Commodity Tariff`.
+pub async fn read_default_randomization_offset(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<i16>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_DEFAULTRANDOMIZATIONOFFSET).await?;
+    decode_default_randomization_offset(&tlv)
+}
+
+/// Read `DefaultRandomizationType` attribute from cluster `Commodity Tariff`.
+pub async fn read_default_randomization_type(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<DayEntryRandomizationType>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_COMMODITY_TARIFF, crate::clusters::defs::CLUSTER_COMMODITY_TARIFF_ATTR_ID_DEFAULTRANDOMIZATIONTYPE).await?;
+    decode_default_randomization_type(&tlv)
+}
+

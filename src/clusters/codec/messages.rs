@@ -253,6 +253,32 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `PresentMessagesRequest` command on cluster `Messages`.
+pub async fn present_messages_request(conn: &crate::controller::Connection, endpoint: u16, message_id: u8, priority: MessagePriority, message_control: MessageControl, start_time: Option<u64>, duration: Option<u64>, message_text: String, responses: Vec<MessageResponseOption>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MESSAGES, crate::clusters::defs::CLUSTER_MESSAGES_CMD_ID_PRESENTMESSAGESREQUEST, &encode_present_messages_request(message_id, priority, message_control, start_time, duration, message_text, responses)?).await?;
+    Ok(())
+}
+
+/// Invoke `CancelMessagesRequest` command on cluster `Messages`.
+pub async fn cancel_messages_request(conn: &crate::controller::Connection, endpoint: u16, message_i_ds: Vec<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MESSAGES, crate::clusters::defs::CLUSTER_MESSAGES_CMD_ID_CANCELMESSAGESREQUEST, &encode_cancel_messages_request(message_i_ds)?).await?;
+    Ok(())
+}
+
+/// Read `Messages` attribute from cluster `Messages`.
+pub async fn read_messages(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<Message>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MESSAGES, crate::clusters::defs::CLUSTER_MESSAGES_ATTR_ID_MESSAGES).await?;
+    decode_messages(&tlv)
+}
+
+/// Read `ActiveMessageIDs` attribute from cluster `Messages`.
+pub async fn read_active_message_i_ds(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MESSAGES, crate::clusters::defs::CLUSTER_MESSAGES_ATTR_ID_ACTIVEMESSAGEIDS).await?;
+    decode_active_message_i_ds(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct MessageQueuedEvent {
     pub message_id: Option<u8>,

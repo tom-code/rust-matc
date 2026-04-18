@@ -168,3 +168,41 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Typed facade (invokes + reads)
+
+/// Invoke `SelectInput` command on cluster `Media Input`.
+pub async fn select_input(conn: &crate::controller::Connection, endpoint: u16, index: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_INPUT, crate::clusters::defs::CLUSTER_MEDIA_INPUT_CMD_ID_SELECTINPUT, &encode_select_input(index)?).await?;
+    Ok(())
+}
+
+/// Invoke `ShowInputStatus` command on cluster `Media Input`.
+pub async fn show_input_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_INPUT, crate::clusters::defs::CLUSTER_MEDIA_INPUT_CMD_ID_SHOWINPUTSTATUS, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `HideInputStatus` command on cluster `Media Input`.
+pub async fn hide_input_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_INPUT, crate::clusters::defs::CLUSTER_MEDIA_INPUT_CMD_ID_HIDEINPUTSTATUS, &[]).await?;
+    Ok(())
+}
+
+/// Invoke `RenameInput` command on cluster `Media Input`.
+pub async fn rename_input(conn: &crate::controller::Connection, endpoint: u16, index: u8, name: String) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_INPUT, crate::clusters::defs::CLUSTER_MEDIA_INPUT_CMD_ID_RENAMEINPUT, &encode_rename_input(index, name)?).await?;
+    Ok(())
+}
+
+/// Read `InputList` attribute from cluster `Media Input`.
+pub async fn read_input_list(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<InputInfo>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_INPUT, crate::clusters::defs::CLUSTER_MEDIA_INPUT_ATTR_ID_INPUTLIST).await?;
+    decode_input_list(&tlv)
+}
+
+/// Read `CurrentInput` attribute from cluster `Media Input`.
+pub async fn read_current_input(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_MEDIA_INPUT, crate::clusters::defs::CLUSTER_MEDIA_INPUT_ATTR_ID_CURRENTINPUT).await?;
+    decode_current_input(&tlv)
+}
+
