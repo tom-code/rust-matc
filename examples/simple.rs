@@ -35,10 +35,10 @@ async fn main() -> Result<()> {
     // from the Matter XML spec. Compare with invoke_request / read_request2
     // calls against raw clusters::defs constants.
     on_off::on(&connection, 1).await?;
-    assert_eq!(on_off::read_on_off(&connection, 1).await?, true);
+    assert!(on_off::read_on_off(&connection, 1).await?);
 
     on_off::off(&connection, 1).await?;
-    assert_eq!(on_off::read_on_off(&connection, 1).await?, false);
+    assert!(!on_off::read_on_off(&connection, 1).await?);
 
     Ok(())
 }

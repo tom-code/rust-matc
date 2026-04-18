@@ -23,38 +23,6 @@
 //!                      address is stale (e.g. device changed IP).
 //! - [clusters](clusters) - matter cluster definitions and encoders/decoders for cluster attributes and commands.
 //!
-//! ## Cluster access: typed facade vs. raw API
-//!
-//! There are two ways to talk to a cluster on a connected device:
-//!
-//! 1. **Typed facade (recommended for known clusters)** — each generated cluster module in
-//!    [clusters::codec] exposes one `pub async fn` per command and one `read_<attr>` per
-//!    attribute. Calls take `&Connection, endpoint, ...args` and do encode+invoke+decode
-//!    (or read+decode) in a single step, with typed parameters and typed return values
-//!    (`Result<()>` for ACK-only commands, `Result<FooResponse>` for commands with a
-//!    response struct, the decoder's native Rust type for attributes). See
-//!    `examples/simple.rs` for a minimal end-to-end usage.
-//!
-//!    ```ignore
-//!    use matc::clusters::codec::on_off;
-//!    on_off::on(&conn, 1).await?;
-//!    let state: bool = on_off::read_on_off(&conn, 1).await?;
-//!    ```
-//!
-//! 2. **Raw API (for dynamic / untyped / debugging use)** — the facade is an *alternative*,
-//!    not a replacement. The lower-level
-//!    [Connection::invoke_request](controller::Connection::invoke_request) /
-//!    [Connection::read_request2](controller::Connection::read_request2) methods take
-//!    cluster/command/attribute IDs from [clusters::defs] and raw TLV byte payloads, and
-//!    return the raw response TLV. Use this when you need to:
-//!    - talk to a cluster or field not covered by the generated facade,
-//!    - build command payloads dynamically at runtime (e.g. a generic CLI or REPL — see
-//!      `examples/demo.rs` and `examples/shell.rs`),
-//!    - inspect the raw response TLV (e.g. `res.tlv.dump(1)` for protocol-level debugging),
-//!    - use `invoke_request_timed` and other specialized paths the facade does not wrap.
-//!
-//! Both APIs speak to the same `Connection` and can be mixed freely in one program.
-//!
 //!
 //! Examples directory contains simple demo application and simple standalone examples on how to use APIs.
 //!
@@ -83,12 +51,14 @@
 //! # }
 //! ```
 //!
-//! Example how to load existing device manager configuration and commission device using it:
+//! Example how to load existing device manager configuration and commission device using it.
+//! Shows both ways to talk to the device — typed facade (recommended) and raw API:
 //! ```no_run
 //! # use matc::devman::DeviceManager;
 //! # use anyhow::Result;
 //! # use matc::devman::ManagerConfig;
 //! # use matc::clusters;
+//! # use matc::clusters::codec::on_off;
 //! # #[tokio::main]
 //! # async fn main() -> Result<()> {
 //! const CONTROLLER_ID: u64 = 200;
@@ -98,8 +68,15 @@
 //! const PIN: u32 = 123456;
 //! let devman = DeviceManager::load(DATA_DIR).await?;
 //! let device = devman.commission("1.1.1.1:5540", PIN, NODE_ID, NAME).await?;
-//! // now we can use device connection to send commands and read attributes
+//!
+//! // Option A - typed facade: one call per command / attribute, typed args and return value.
+//! on_off::on(&device, 1).await?;
+//! let state: bool = on_off::read_on_off(&device, 1).await?;
+//!
+//! // Option B - raw API: cluster/command IDs + raw TLV payload. Useful when the cluster
+//! // is not covered by the facade or when the payload is built dynamically at runtime.
 //! device.invoke_request(1, clusters::defs::CLUSTER_ID_ON_OFF, clusters::defs::CLUSTER_ON_OFF_CMD_ID_ON, &[]).await?;
+//! # let _ = state;
 //! # Ok(())
 //! # }
 //! ```
@@ -229,6 +206,37 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ## Cluster access: typed facade vs. raw API
+//!
+//! The examples above use a mix of two styles for talking to a cluster on a connected
+//! device. Both are supported and can be mixed freely on the same `Connection`:
+//!
+//! 1. **Typed facade (recommended for known clusters)** — each generated cluster module in
+//!    [clusters::codec] exposes one `pub async fn` per command and one `read_<attr>` per
+//!    attribute. Calls take `&Connection, endpoint, ...args` and do encode+invoke+decode
+//!    (or read+decode) in a single step, with typed parameters and typed return values
+//!    (`Result<()>` for ACK-only commands, `Result<FooResponse>` for commands with a
+//!    response struct, the decoder's native Rust type for attributes). See
+//!    `examples/simple.rs` for a minimal end-to-end usage.
+//!
+//!    ```ignore
+//!    use matc::clusters::codec::on_off;
+//!    on_off::on(&conn, 1).await?;
+//!    let state: bool = on_off::read_on_off(&conn, 1).await?;
+//!    ```
+//!
+//! 2. **Raw API (for dynamic / untyped / debugging use)** — the facade is an *alternative*,
+//!    not a replacement. The lower-level
+//!    [Connection::invoke_request](controller::Connection::invoke_request) /
+//!    [Connection::read_request2](controller::Connection::read_request2) methods take
+//!    cluster/command/attribute IDs from [clusters::defs] and raw TLV byte payloads, and
+//!    return the raw response TLV. Use this when you need to:
+//!    - talk to a cluster or field not covered by the generated facade,
+//!    - build command payloads dynamically at runtime (e.g. a generic CLI or REPL — see
+//!      `examples/demo.rs` and `examples/shell.rs`),
+//!    - inspect the raw response TLV (e.g. `res.tlv.dump(1)` for protocol-level debugging),
+//!    - use `invoke_request_timed` and other specialized paths the facade does not wrap.
 //!
 //!
 #![doc = include_str!("../readme.md")]

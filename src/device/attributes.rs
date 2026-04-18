@@ -482,6 +482,7 @@ impl Device {
         self.set_attribute_raw(endpoint, cluster, attribute, &buf.data);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn set_cluster_globals(
         &mut self,
         endpoint: u16,
@@ -721,6 +722,7 @@ impl Device {
 
     /// Add a cluster to an existing endpoint: sets cluster globals and updates
     /// the endpoint's Descriptor ServerList.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_cluster(
         &mut self,
         endpoint: u16,

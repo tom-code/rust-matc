@@ -28,13 +28,13 @@ async fn main() -> Result<()> {
     on_off::on(&connection, 1).await?;
 
     // read ON/OFF state
-    assert_eq!(on_off::read_on_off(&connection, 1).await?, true);
+    assert!(on_off::read_on_off(&connection, 1).await?);
 
     // send OFF command to device
     on_off::off(&connection, 1).await?;
 
     // read ON/OFF state
-    assert_eq!(on_off::read_on_off(&connection, 1).await?, false);
+    assert!(!on_off::read_on_off(&connection, 1).await?);
 
     // send ON command to device
     on_off::on(&connection, 1).await?;

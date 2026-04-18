@@ -817,7 +817,7 @@ async fn list_devices(connection: &mut controller::Connection) {
     for (&ep, parents) in &all_parents {
         // Pick the deepest ancestor: the parent contained by the most other parents in the set
         let best = parents.iter().max_by_key(|&&p| {
-            parents.iter().filter(|&&q| q != p && infos.get(&q).map_or(false, |qi| qi.parts.contains(&p))).count()
+            parents.iter().filter(|&&q| q != p && infos.get(&q).is_some_and(|qi| qi.parts.contains(&p))).count()
         }).copied();
         if let Some(b) = best {
             direct_parent.insert(ep, b);

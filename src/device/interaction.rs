@@ -471,7 +471,7 @@ impl Device {
         // tag 2 = WriteRequests array; within each AttributeDataIB: tag 1 = AttributePathIB,
         // then tag 2 = Endpoint, tag 3 = Cluster, tag 4 = Attribute.
         let mut paths: Vec<(u16, u32, u32)> = Vec::new();
-        if let Some(write_tlv) = tlv::decode_tlv(proto_payload).ok() {
+        if let std::result::Result::Ok(write_tlv) = tlv::decode_tlv(proto_payload) {
             if let Some(writes_item) = write_tlv.get_item(&[2]) {
                 if let tlv::TlvItemValue::List(entries) = &writes_item.value {
                     for entry in entries {

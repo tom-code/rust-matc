@@ -25,6 +25,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::enum_variant_names)]
 enum Commands {
     /// Create a self-signed CA certificate (PAA-style)
     CreateCa {
@@ -163,6 +164,7 @@ fn add_ext(enc: &mut asn1::Encoder, oid: &str, critical: bool, value: &[u8]) -> 
 }
 
 /// Build a complete TBSCertificate DER SEQUENCE.
+#[allow(clippy::too_many_arguments)]
 fn encode_tbs(
     subject_pubkey: &[u8],
     subject_dn: &[u8],
@@ -345,6 +347,7 @@ fn create_pai(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_dac(
     cn: &str,
     vendor_id: u16,
