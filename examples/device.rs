@@ -144,6 +144,10 @@ async fn main() -> Result<()> {
                 matc::onboarding::encode_manual_pairing_code(&matc::onboarding::OnboardingInfo {
                     discriminator: config.discriminator,
                     passcode: config.pin,
+                    is_short_discriminator: false,
+                    vendor_id: None,
+                    product_id: None,
+                    discovery_capabilities: None,
                 })
             );
             println!("PIN: {}", config.pin);

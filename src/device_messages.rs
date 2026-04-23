@@ -182,7 +182,7 @@ pub fn im_invoke_response_data(
     Ok(tlv.data)
 }
 
-/// One entry in a ReportData response — either actual attribute data or a status code.
+/// One entry in a ReportData response - either actual attribute data or a status code.
 #[derive(Clone)]
 pub(crate) enum AttrReport {
     Data {

@@ -17,7 +17,8 @@
 //! - [discover](discover) - simple mdns based discovery of matter devices on local network
 //! - [devman](devman) - High level device manager which uses all above components to provide simpler api.
 //!                      It stores device information and certificates in specified directory and allows
-//!                      to commission new devices (by address or by manual pairing code with mDNS discovery)
+//!                      to commission new devices (by address, by manual pairing code with mDNS discovery,
+//!                      or over BLE with Wi-Fi/Thread credential provisioning - requires `ble` feature)
 //!                      and connect to already commissioned devices by name.
 //!                      Connections automatically re-discover devices via operational mDNS if the stored
 //!                      address is stale (e.g. device changed IP).
@@ -52,7 +53,7 @@
 //! ```
 //!
 //! Example how to load existing device manager configuration and commission device using it.
-//! Shows both ways to talk to the device — typed facade (recommended) and raw API:
+//! Shows both ways to talk to the device - typed facade (recommended) and raw API:
 //! ```no_run
 //! # use matc::devman::DeviceManager;
 //! # use anyhow::Result;
@@ -91,6 +92,31 @@
 //! let devman = DeviceManager::load(DATA_DIR).await?;
 //! let device = devman.commission_with_code("0251-520-0076", 300, "My Device").await?;
 //! # Ok(())
+//! # }
+//! ```
+//!
+//! Example how to commission a Wi-Fi device that advertises over BLE (requires `ble` feature):
+//! ```no_run
+//! # #[cfg(feature = "ble")]
+//! # {
+//! # use matc::devman::DeviceManager;
+//! # use anyhow::Result;
+//! # use matc::NetworkCreds;
+//! # #[tokio::main]
+//! # async fn main() -> Result<()> {
+//! const DATA_DIR: &str = "./matter-data";
+//! let devman = DeviceManager::load(DATA_DIR).await?;
+//! let device = devman.commission_ble_with_code(
+//!     "MT:Y.K908...",   // QR or manual pairing code
+//!     300,              // node ID to assign
+//!     "kitchen light",  // friendly name
+//!     NetworkCreds::WiFi {
+//!         ssid: b"HomeWifi".to_vec(),
+//!         creds: b"secret".to_vec(),
+//!     },
+//! ).await?;
+//! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
@@ -212,7 +238,7 @@
 //! The examples above use a mix of two styles for talking to a cluster on a connected
 //! device. Both are supported and can be mixed freely on the same `Connection`:
 //!
-//! 1. **Typed facade (recommended for known clusters)** — each generated cluster module in
+//! 1. **Typed facade (recommended for known clusters)** - each generated cluster module in
 //!    [clusters::codec] exposes one `pub async fn` per command and one `read_<attr>` per
 //!    attribute. Calls take `&Connection, endpoint, ...args` and do encode+invoke+decode
 //!    (or read+decode) in a single step, with typed parameters and typed return values
@@ -226,14 +252,14 @@
 //!    let state: bool = on_off::read_on_off(&conn, 1).await?;
 //!    ```
 //!
-//! 2. **Raw API (for dynamic / untyped / debugging use)** — the facade is an *alternative*,
+//! 2. **Raw API (for dynamic / untyped / debugging use)** - the facade is an *alternative*,
 //!    not a replacement. The lower-level
 //!    [Connection::invoke_request](controller::Connection::invoke_request) /
 //!    [Connection::read_request2](controller::Connection::read_request2) methods take
 //!    cluster/command/attribute IDs from [clusters::defs] and raw TLV byte payloads, and
 //!    return the raw response TLV. Use this when you need to:
 //!    - talk to a cluster or field not covered by the generated facade,
-//!    - build command payloads dynamically at runtime (e.g. a generic CLI or REPL — see
+//!    - build command payloads dynamically at runtime (e.g. a generic CLI or REPL - see
 //!      `examples/demo.rs` and `examples/shell.rs`),
 //!    - inspect the raw response TLV (e.g. `res.tlv.dump(1)` for protocol-level debugging),
 //!    - use `invoke_request_timed` and other specialized paths the facade does not wrap.
@@ -242,11 +268,16 @@
 #![doc = include_str!("../readme.md")]
 
 mod active_connection;
+#[cfg(feature = "ble")]
+pub mod ble;
+#[cfg(feature = "ble")]
+pub mod btp;
 pub mod cert_matter;
 pub mod cert_x509;
 pub mod certmanager;
 pub mod clusters;
 mod commission;
+pub use commission::NetworkCreds;
 pub mod controller;
 pub mod device;
 mod device_messages;

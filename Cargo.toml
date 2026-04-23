@@ -26,21 +26,29 @@ pem="3.0.*"
 
 rand = "0.8.*"
 const-oid = "0.9.*"
+async-trait = "0.1"
 anyhow = "1.0.*"
 hex = "0.4.*"
 byteorder = "1.5.0"
-tokio = {version="1.49.*", features=["sync", "net", "rt", "rt-multi-thread", "time", "macros"]}
+tokio = {version="1.49", features=["sync", "net", "rt", "rt-multi-thread", "time", "macros"]}
 tokio-util = {version="0.7.*"}
 log = "0.4"
 env_logger = "0.11"
 
 socket2 = { version="0.5.8", features = ["all"] }
+btleplug = { version="0.12", optional = true }
+#btleplug = { git = "https://github.com/purefunsolutions/btleplug", branch = "fix/macos-descriptor-discovery-hang", optional = true }
+uuid = { version = "1", optional = true }
+futures = { version = "0.3", optional = true }
 if-addrs = { version = "0.13", features = ["link-local"] }
 
 # used by generated code
 serde_json = "1.0.*"
 serde = {version="1.0.*", features = ["derive"] }
 
+
+[features]
+ble = ["dep:btleplug", "dep:uuid", "dep:futures"]
 
 [dev-dependencies]
 clap = {version="4.4.*", features=["derive"]}

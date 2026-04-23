@@ -177,9 +177,9 @@ pub(crate) struct FabricInfo {
     pub(crate) device_matter_cert: Vec<u8>,
     pub(crate) controller_id: u64,
     pub(crate) vendor_id: u16,
-    /// Root certificate (TLV-encoded Matter cert) — moved from Device.
+    /// Root certificate (TLV-encoded Matter cert)
     pub(crate) trusted_root_cert: Vec<u8>,
-    /// Node Operational Certificate (TLV-encoded) — moved from Device.
+    /// Node Operational Certificate (TLV-encoded)
     pub(crate) noc: Vec<u8>,
     /// Intermediate CA certificate, if provided.
     pub(crate) icac: Option<Vec<u8>>,

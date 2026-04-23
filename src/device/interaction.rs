@@ -146,7 +146,7 @@ impl Device {
                     }
                 }
             } else {
-                // Exact lookup — all three fields are present.
+                // Exact lookup - all three fields are present.
                 let (ep, cl, at) = (endpoint.unwrap(), cluster.unwrap(), attribute.unwrap());
                 // Try computed first, then fall back to HashMap.
                 if let Some(value_tlv) = self.compute_attribute(ep, cl, at, fabric_index) {
@@ -380,7 +380,7 @@ impl Device {
                 vec![]
             }
         } else {
-            log::debug!("Subscribe: no AttributeRequests — sending all attributes (wildcard)");
+            log::debug!("Subscribe: no AttributeRequests - sending all attributes (wildcard)");
             let fabric_index = self.session_fabric_index(msg_header.session_id);
             let mut all: Vec<AttrReport> = COMPUTED_ATTRS
                 .iter()
@@ -433,7 +433,7 @@ impl Device {
         let more = !remaining.is_empty();
         if more {
             log::info!(
-                "Subscribe: chunking response — {} reports remain after first chunk",
+                "Subscribe: chunking response - {} reports remain after first chunk",
                 remaining.len()
             );
             self.pending_chunks.push(PendingChunkState {
@@ -508,7 +508,7 @@ impl Device {
         proto_header: &messages::ProtocolMessageHeader,
     ) -> Result<()> {
         log::debug!("Received IM status response, sending ACK");
-        // If the sender has no FLAG_INITIATOR, they are the responder — meaning we are
+        // If the sender has no FLAG_INITIATOR, they are the responder - meaning we are
         // the initiator of this exchange (keepalive report). Our ACK must have FLAG_INITIATOR.
         let we_are_initiator =
             (proto_header.exchange_flags & messages::ProtocolMessageHeader::FLAG_INITIATOR) == 0;

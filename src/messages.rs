@@ -673,10 +673,10 @@ pub fn im_unsubscribe_all(exchange: u16) -> Result<Vec<u8>> {
 
     let mut tlv = tlv::TlvBuffer::from_vec(b);
     tlv.write_anon_struct()?;
-    tlv.write_bool(0, false)?;       // KeepSubscriptions = false → cancel all
+    tlv.write_bool(0, false)?;       // KeepSubscriptions = false - cancel all
     tlv.write_uint16(1, 0)?;         // MinIntervalFloor
     tlv.write_uint16(2, 0)?;         // MaxIntervalCeiling
-    tlv.write_array(3)?;             // AttributeRequests — empty
+    tlv.write_array(3)?;             // AttributeRequests - empty
     tlv.write_struct_end()?;
     tlv.write_bool(7, false)?;       // FabricFiltered
     tlv.write_uint8(0xff, 10)?;      // InteractionModelRevision

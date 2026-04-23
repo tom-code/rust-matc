@@ -109,7 +109,6 @@ async fn recv_loop(
                 });
             }
         } else {
-            // Incoming query — check if we have matching local services
             let state = inner.lock().await;
             if state.services.is_empty() {
                 continue;
@@ -221,7 +220,6 @@ impl MdnsService {
             Err(e) => log::warn!("mdns2: failed to create v4 socket: {}", e),
         }
 
-        // IPv6 — one per interface
         if let Ok(ifaces) = if_addrs::get_if_addrs() {
             let mut seen_indices = std::collections::HashSet::new();
             for iface in ifaces {

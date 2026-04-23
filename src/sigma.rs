@@ -145,7 +145,7 @@ pub(crate) fn verify_destination_id(
     let expected = cryptoutil::hmac_sha256(&data, &fabric.signed_ipk()?)?;
     log::info!("Sigma1: received destinationId={}, expected destinationId={}", hex::encode(received_destination_id), hex::encode(&expected));
     if expected != received_destination_id {
-        anyhow::bail!("CASE Sigma1: destinationId mismatch — wrong fabric or node");
+        anyhow::bail!("CASE Sigma1: destinationId mismatch - wrong fabric or node");
     }
     Ok(())
 }

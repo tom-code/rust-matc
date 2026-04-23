@@ -5,7 +5,7 @@ use crate::{fabric, sigma};
 use super::Device;
 
 /// Test Certification Declaration (CMS SignedData) from the Matter SDK.
-/// This is a minimal placeholder for development — real devices need a proper CD
+/// This is a minimal placeholder for development - real devices need a proper CD
 /// issued by the CSA.
 pub(crate) const TEST_CERTIFICATION_DECLARATION: &[u8] = &[
     0x30, 0x81, 0xE9, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02, 0xA0, 0x81,

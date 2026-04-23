@@ -7,7 +7,7 @@ use std::{
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::sync::CancellationToken;
 
-use crate::{messages::{self, Message, ProtocolMessageHeader}, session::Session, transport};
+use crate::{messages::{self, Message, ProtocolMessageHeader}, session::Session, transport::ConnectionTrait};
 
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(1);
 const RETRANSMIT_THRESHOLD: Duration = Duration::from_secs(3);
@@ -65,7 +65,7 @@ impl ReceivedCounters {
 
 /// Active connection with background read task for continuous message handling.
 pub struct ActiveConnection {
-    transport_conn: Arc<transport::Connection>,
+    transport_conn: Arc<dyn ConnectionTrait>,
     session: Arc<Session>,
 
     /// Routing responses to waiting callers by exchange ID
@@ -87,7 +87,7 @@ pub struct ActiveConnection {
 impl ActiveConnection {
     /// Create from transport connection and authenticated session.
     /// Spawns a background task that continuously reads from the connection.
-    pub fn new(conn: Arc<transport::Connection>, session: Session) -> Self {
+    pub fn new(conn: Arc<dyn ConnectionTrait>, session: Session) -> Self {
         let (event_tx, event_rx) = mpsc::channel(32);
         let cancel = CancellationToken::new();
 
@@ -193,6 +193,9 @@ impl ActiveConnection {
 
     /// Track sent message for retransmit with optional exchange_id for result signaling.
     async fn track_sent(&self, encoded: &[u8], exchange_id: Option<u16>) {
+        if self.transport_conn.is_reliable() {
+            return;
+        }
         if let Ok((header, _)) = messages::MessageHeader::decode(encoded) {
             let mut unacked = self.unacked.lock().await;
             let now = Instant::now();
@@ -214,7 +217,7 @@ impl Drop for ActiveConnection {
 }
 
 async fn connection_read_loop(
-    transport_conn: Arc<transport::Connection>,
+    transport_conn: Arc<dyn ConnectionTrait>,
     session: Arc<Session>,
     pending_exchanges: Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
     unacked: Arc<Mutex<HashMap<u32, UnackedMessage>>>,
@@ -244,7 +247,9 @@ async fn connection_read_loop(
                     }
                     Err(_) => {
                         // Timeout - check for retransmit
-                        check_retransmit(&transport_conn, &unacked, &pending_exchanges).await;
+                        if !transport_conn.is_reliable() {
+                            check_retransmit(&transport_conn, &unacked, &pending_exchanges).await;
+                        }
                     }
                 }
             }
@@ -255,7 +260,7 @@ async fn connection_read_loop(
 async fn process_incoming(
     data: &[u8],
     session: &Arc<Session>,
-    transport_conn: &Arc<transport::Connection>,
+    transport_conn: &Arc<dyn ConnectionTrait>,
     pending_exchanges: &Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
     unacked: &Arc<Mutex<HashMap<u32, UnackedMessage>>>,
     received_counters: &Arc<std::sync::Mutex<ReceivedCounters>>,
@@ -346,7 +351,7 @@ async fn process_incoming(
 
 async fn send_ack(
     session: &Arc<Session>,
-    transport_conn: &Arc<transport::Connection>,
+    transport_conn: &Arc<dyn ConnectionTrait>,
     message: &Message,
 ) -> Result<()> {
     let ack = messages::ack(
@@ -364,7 +369,7 @@ async fn send_ack(
 }
 
 async fn check_retransmit(
-    transport_conn: &Arc<transport::Connection>,
+    transport_conn: &Arc<dyn ConnectionTrait>,
     unacked: &Arc<Mutex<HashMap<u32, UnackedMessage>>>,
     pending_exchanges: &Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
 ) {

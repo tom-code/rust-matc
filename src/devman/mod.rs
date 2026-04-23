@@ -275,6 +275,56 @@ impl DeviceManager {
         Err(last_err).context(format!("commissioning failed on all IPs for discriminator {}", discriminator))
     }
 
+    /// Commission a device that is currently advertising over BLE.
+    ///
+    /// Accepts either a manual pairing code (`"0251-520-0076"`) or a QR payload
+    /// (`"MT:..."`). Scans for the matching BLE device, runs PASE + commissioning
+    /// over BTP, optionally provisions network credentials, then completes over
+    /// UDP+CASE once the device is reachable on the IP network.
+    ///
+    /// Requires the `ble` Cargo feature.
+    #[cfg(feature = "ble")]
+    pub async fn commission_ble_with_code(
+        &self,
+        pairing_code: &str,
+        node_id: u64,
+        name: &str,
+        network_creds: crate::commission::NetworkCreds,
+    ) -> Result<controller::Connection> {
+        let info = if pairing_code.starts_with("MT:") || pairing_code.starts_with("mt:") {
+            crate::onboarding::decode_qr_payload(pairing_code)
+        } else {
+            crate::onboarding::decode_manual_pairing_code(pairing_code)
+        }
+        .context("decoding pairing code")?;
+
+        let connection = self
+            .controller
+            .commission_ble(
+                info.discriminator,
+                info.is_short_discriminator,
+                info.passcode,
+                node_id,
+                self.config.controller_id,
+                network_creds,
+                &self.mdns,
+                &self.mdns_receiver,
+            )
+            .await?;
+
+        let device = crate::devman::Device {
+            node_id,
+            address: String::new(), // will be filled on first connect
+            name: name.to_owned(),
+        };
+        self.registry
+            .lock()
+            .map_err(|e| anyhow::anyhow!("registry lock: {}", e))?
+            .add(device)?;
+
+        Ok(connection)
+    }
+
     /// Discover the current address of a commissioned device via operational mDNS.
     /// Returns as soon as the device is found (no fixed timeout wait).
     /// Updates the stored address in the registry and returns the new address.

@@ -6,9 +6,13 @@
 ///
 ///   # Commission a device:
 ///   cargo run --example devman_demo -- -d ./matter-data commission 192.168.1.100:5540 300 123456 "kitchen light"
-/// 
+///
 ///   # Commission a device using manual pairing code and discovery:
 ///   cargo run --example devman_demo -- -d ./matter-data commission-with-discovery "0251-520-0076" 300 "kitchen light"
+///
+///   # Commission a Wi-Fi device over BLE (requires --features ble):
+///   cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble \
+///     "MT:Y.K908..." 300 "kitchen light" HomeWifi --password "secret"
 ///
 ///   # List registered devices:
 ///   cargo run --example devman_demo -- -d ./matter-data list
@@ -22,6 +26,8 @@ use matc::{
     clusters::{self, codec::{descriptor_cluster, on_off}},
     devman::{DeviceManager, ManagerConfig},
 };
+#[cfg(feature = "ble")]
+use matc::NetworkCreds;
 
 const DEFAULT_DATA_DIR: &str = "./matter-data";
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
@@ -73,6 +79,21 @@ enum Commands {
         node_id: u64,
         /// Friendly name
         name: String,
+    },
+    /// Commission a Wi-Fi device over BLE (requires --features ble)
+    #[cfg(feature = "ble")]
+    CommissionBle {
+        /// Manual or QR pairing code
+        pairing_code: String,
+        /// Node ID to assign
+        node_id: u64,
+        /// Friendly name
+        name: String,
+        /// Wi-Fi SSID to provision
+        ssid: String,
+        /// Wi-Fi password to provision
+        #[clap(long, default_value = "")]
+        password: String,
     },
     /// List registered devices
     List,
@@ -188,6 +209,31 @@ async fn main() -> Result<()> {
                     }
                 }).collect::<Vec<_>>();
                 println!("Supported clusters on endpoint {:?}: {:?}", ep, names);
+            }
+        }
+        #[cfg(feature = "ble")]
+        Commands::CommissionBle { pairing_code, node_id, name, ssid, password } => {
+            let dm = DeviceManager::load(data_dir).await?;
+            println!("Scanning for BLE commissionable device (pairing code: {})…", pairing_code);
+            let conn = dm.commission_ble_with_code(
+                &pairing_code,
+                node_id,
+                &name,
+                NetworkCreds::WiFi {
+                    ssid: ssid.into_bytes(),
+                    creds: password.into_bytes(),
+                },
+            ).await?;
+            println!("Commissioned '{}' (node {})", name, node_id);
+
+            if let Ok(server_list) = descriptor_cluster::read_server_list(&conn, 0).await {
+                println!("Supported clusters:");
+                for c in server_list {
+                    match clusters::names::get_cluster_name(c) {
+                        Some(name) => println!("  {}", name),
+                        None => println!("  unknown (0x{:x})", c),
+                    }
+                }
             }
         }
         Commands::List => {

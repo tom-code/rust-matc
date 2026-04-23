@@ -59,7 +59,7 @@ pub fn encode_label_compressed(
         out.write_all(bytes)?;
     }
 
-    // No suffix matched — terminate with null
+    // No suffix matched - terminate with null
     out.write_u8(0)?;
     Ok(())
 }

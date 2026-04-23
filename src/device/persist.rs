@@ -41,7 +41,7 @@ impl Device {
             let path = format!("{}/device_state.json", state_dir);
             if std::path::Path::new(&path).exists() {
                 std::fs::remove_file(&path)?;
-                log::info!("All fabrics removed — deleted {}", path);
+                log::info!("All fabrics removed - deleted {}", path);
             }
             return Ok(());
         }
@@ -117,7 +117,7 @@ impl Device {
 
     /// Restore a previously commissioned device from `{state_dir}/device_state.json`.
     ///
-    /// On success the device is ready to accept CASE sessions — it will NOT re-advertise
+    /// On success the device is ready to accept CASE sessions - it will NOT re-advertise
     /// the commissionable `_matterc._udp` service.
     pub async fn from_persisted_state(
         config: DeviceConfig,

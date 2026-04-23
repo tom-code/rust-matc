@@ -1,10 +1,10 @@
 # Device Certificate Chain (PKI)
 
-Matter requires a 3-level PKI chain: **PAA → PAI → DAC**.
+Matter requires a 3-level PKI chain: **PAA - PAI - DAC**.
 
-- **PAA** (Product Attestation Authority) — root CA, `pathlen:1`
-- **PAI** (Product Attestation Intermediate) — intermediate CA, `pathlen:0`
-- **DAC** (Device Attestation Certificate) — leaf cert, signed by PAI
+- **PAA** (Product Attestation Authority) - root CA, `pathlen:1`
+- **PAI** (Product Attestation Intermediate) - intermediate CA, `pathlen:0`
+- **DAC** (Device Attestation Certificate) - leaf cert, signed by PAI
 
 ## Generate Certificates
 

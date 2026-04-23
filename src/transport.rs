@@ -6,6 +6,18 @@ use anyhow::{Context, Result};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::Mutex};
 
+/// Transport-agnostic connection: send and receive raw Matter messages.
+///
+/// Implement this for UDP ([`Connection`]) and BTP ([`crate::btp::BtpConnection`]).
+#[async_trait::async_trait]
+pub trait ConnectionTrait: Send + Sync {
+    async fn send(&self, data: &[u8]) -> Result<()>;
+    async fn receive(&self, timeout: Duration) -> Result<Vec<u8>>;
+    /// True for transports (BTP) that guarantee delivery so Matter-layer MRP
+    /// retransmit should be suppressed.  Default: false (UDP).
+    fn is_reliable(&self) -> bool { false }
+}
+
 #[derive(Debug, Clone)]
 struct ConnectionInfo {
     sender: tokio::sync::mpsc::Sender<Vec<u8>>,
@@ -107,7 +119,7 @@ impl Transport {
     }
 
     /// Create (or replace) a logical connection entry for the given remote address.
-    pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<Connection> {
+    pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<dyn ConnectionTrait> {
         let mut clock = self.connections.lock().await;
         let (sender, receiver) = tokio::sync::mpsc::channel(32);
         clock.insert(remote.to_owned(), ConnectionInfo { sender });
@@ -141,6 +153,16 @@ impl Drop for Transport {
     fn drop(&mut self) {
         _ = self.remove_channel_sender.send("".to_owned());
         self.stop_receive_token.cancel();
+    }
+}
+
+#[async_trait::async_trait]
+impl ConnectionTrait for Connection {
+    async fn send(&self, data: &[u8]) -> Result<()> {
+        self.send(data).await
+    }
+    async fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
+        self.receive(timeout).await
     }
 }
 

@@ -15,21 +15,27 @@ It supports controller side of:
   * variant of [spake 2+](https://datatracker.ietf.org/doc/rfc9383/)
 * CASE - certificate authenticated session establishment
   * variant of [SIGMA](https://scispace.com/pdf/sigma-the-sign-and-mac-approach-to-authenticated-diffie-103fql3b25.pdf)
-* Commisioning procedure
+* Commissioning procedure
   * sign and push certificates to device
+  * BLE commissioning with Wi-Fi/Thread credential provisioning (opt-in, `--features ble`)
 * Basic interactions
   * Read attribute
   * Invoke command
 
-This library expects that device is already reachable using IPV4 or IPV6.
-Bluetooth/BLE related communication is not yet supported.
-To control device which first requires commissioning using BLE,
-you must first commission using different controller (such as phone),
-then using that controller enable commissioning.
-For example in iphone/ios this is available under "enable pairing mode"
-in device settings in Home app.
-It will show "manual pairing code" which can be decoded
-to obtain commissioning pass code (see decode-manual-pairing-code bellow).
+### BLE commissioning
+
+Enable with `--features ble` (requires `btleplug`). The full flow is:
+BLE scan → BTP PASE → AddNOC → NetworkCommissioning (Wi-Fi or Thread credentials) → drop BLE → operational mDNS → UDP CASE → CommissioningComplete.
+
+```bash
+# Commission a Wi-Fi device that is advertising over BLE:
+cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble \
+  "MT:Y.K908..." 300 "kitchen light" HomeWifi --password "secret"
+
+# Or use the standalone BLE example:
+cargo run --features ble --example simple-ble -- \
+  --pairing-code "MT:Y.K908..." --ssid HomeWifi --password secret --node-id 300 --name "kitchen light"
+```
 
 Use of demo application:
 * Compile demo application using cargo. Binary will be found usually in target/debug/examples/demo.\

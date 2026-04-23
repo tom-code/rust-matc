@@ -6,7 +6,7 @@ use crate::{
     messages::{self, Message},
     retransmit, session, sigma, spake2p,
     tlv::TlvItemValue,
-    transport,
+    transport::{self, ConnectionTrait},
     util::cryptoutil,
 };
 use anyhow::{Context, Result};
@@ -49,14 +49,14 @@ impl Controller {
     /// - return authenticated connection which can be used to send additional commands
     pub async fn commission(
         &self,
-        connection: &Arc<transport::Connection>,
+        connection: &Arc<dyn ConnectionTrait>,
         pin: u32,
         node_id: u64,
         controller_id: u64,
     ) -> Result<Connection> {
-        let mut session = auth_spake(connection, pin).await?;
+        let mut session = auth_spake(connection.as_ref(), pin).await?;
         let session = commission::commission(
-            connection,
+            connection.as_ref(),
             &mut session,
             &self.fabric,
             self.certmanager.as_ref(),
@@ -72,12 +72,12 @@ impl Controller {
     /// create authenticated connection to control device
     pub async fn auth_sigma(
         &self,
-        connection: &Arc<transport::Connection>,
+        connection: &Arc<dyn ConnectionTrait>,
         node_id: u64,
         controller_id: u64,
     ) -> Result<Connection> {
         let session = auth_sigma(
-            connection,
+            connection.as_ref(),
             &self.fabric,
             self.certmanager.as_ref(),
             node_id,
@@ -87,6 +87,121 @@ impl Controller {
         Ok(Connection {
             active: ActiveConnection::new(connection.clone(), session),
         })
+    }
+
+    /// Commission a device that is advertising over BLE.
+    ///
+    /// 1. Scans for a commissionable BLE device with the given `discriminator`.
+    /// 2. Runs PASE over BTP (BLE transport protocol).
+    /// 3. Pushes the CA cert, signs the device cert (AddNOC).
+    /// 4. Sends ArmFailSafe + SetRegulatoryConfig.
+    /// 5. Optionally provisions network credentials (Wi-Fi / Thread).
+    /// 6. Drops the BLE connection.
+    /// 7. Discovers the device on the IP network via mDNS.
+    /// 8. Establishes CASE + sends CommissioningComplete over UDP.
+    /// 9. Returns an authenticated [`Connection`] ready for commands.
+    ///
+    /// Requires the `ble` Cargo feature.
+    #[cfg(feature = "ble")]
+    pub async fn commission_ble(
+        &self,
+        discriminator: u16,
+        short_discriminator: bool,
+        pin: u32,
+        node_id: u64,
+        controller_id: u64,
+        network_creds: commission::NetworkCreds,
+        mdns: &std::sync::Arc<crate::mdns2::MdnsService>,
+        mdns_receiver: &tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<crate::mdns2::MdnsEvent>>,
+    ) -> Result<Connection> {
+        use crate::{btp::BtpConnection, discover};
+
+        // 1. BLE scan + GATT connect + BTP handshake
+        let peripheral = crate::ble::find_by_discriminator(discriminator, short_discriminator, std::time::Duration::from_secs(30))
+            .await
+            .context("BLE scan")?;
+        log::debug!("BLE device found: z2");
+        let btp_conn = BtpConnection::connect(peripheral).await.context("BTP connect")?;
+
+        // 2. PASE
+        let mut pase_session = auth_spake(btp_conn.as_ref(), pin).await.context("PASE over BLE")?;
+
+        // 3. BLE-side commissioning phase
+        commission::commission_ble_phase(
+            btp_conn.as_ref(),
+            &mut pase_session,
+            &self.fabric,
+            self.certmanager.as_ref(),
+            node_id,
+            controller_id,
+            &network_creds,
+        )
+        .await
+        .context("BLE commissioning phase")?;
+
+        // 4. Drop BTP (BLE connection closes when btp_conn is dropped)
+        drop(btp_conn);
+
+        // 5. Rediscover device via operational mDNS
+        let ca_pubkey = self.certmanager.get_ca_public_key()?;
+        let fabric_tmp = fabric::Fabric::new(self.fabric.id, 0, &ca_pubkey);
+        let compressed = fabric_tmp.compressed().context("compressed fabric ID")?;
+        let instance = format!("{}-{:016X}", hex::encode_upper(&compressed), node_id);
+        let expected_target = format!("{}._matter._tcp.local.", instance);
+        mdns.add_query("_matter._tcp.local", 0xff, std::time::Duration::from_secs(30)).await;
+
+        let mut addresses = Vec::new();
+        {
+            let mut rx = mdns_receiver.lock().await;
+            loop {
+                match tokio::time::timeout(std::time::Duration::from_secs(30), rx.recv()).await {
+                    Ok(Some(crate::mdns2::MdnsEvent::ServiceDiscovered { name, records: _, target })) => {
+                        if name != "_matter._tcp.local." || target != expected_target {
+                            continue;
+                        }
+                        let info = discover::extract_matter_info(&target, mdns).await?;
+                        log::debug!("Operational mDNS discovered device: {:?}", info);
+                        mdns.remove_query("_matter._tcp.local").await;
+
+                        let port = info.port.unwrap_or(5540);
+                        for ip in &info.ips {
+                            if ip.is_ipv6() {
+                                addresses.push(format!("[{}]:{}", ip, port));
+                            } else {
+                                addresses.push(format!("{}:{}", ip, port));
+                            }
+                        }
+                        break;
+                    }
+                    Ok(_) => continue,
+                    Err(_) => anyhow::bail!("operational mDNS timeout for {}", instance),
+                }
+            }
+        };
+
+        log::info!("Device discovered at {}", addresses.join(", "));
+
+        // 6. UDP connection + CASE + CommissioningComplete
+        for address in addresses {
+            log::debug!("Trying to commission over UDP at {}...", address);
+            let udp_conn = self.transport.create_connection(&address).await;
+            let ses = commission::commissioning_complete_udp(
+                udp_conn.as_ref(),
+                self.certmanager.as_ref(),
+                node_id,
+                controller_id,
+                &self.fabric,
+            )
+            .await;
+            if let Ok(ses) = ses {
+                return Ok(Connection {
+                    active: ActiveConnection::new(udp_conn, ses),
+                });
+            } else {
+                log::debug!("Failed to commission over UDP at {}: {:?}", address, ses.err());
+            }
+        }
+        Err(anyhow::anyhow!("failed to commission device over UDP at any discovered address"))
     }
 }
 
@@ -292,7 +407,7 @@ pub fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<session::Session> {
+pub(crate) async fn auth_spake(connection: &dyn ConnectionTrait, pin: u32) -> Result<session::Session> {
     let exchange = rand::random();
     log::debug!("start auth_spake");
     let mut session = session::Session::new();
@@ -388,7 +503,7 @@ async fn auth_spake(connection: &transport::Connection, pin: u32) -> Result<sess
 }
 
 pub(crate) async fn auth_sigma(
-    connection: &transport::Connection,
+    connection: &dyn ConnectionTrait,
     fabric: &fabric::Fabric,
     cm: &dyn certmanager::CertManager,
     node_id: u64,
