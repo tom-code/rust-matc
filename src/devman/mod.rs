@@ -195,7 +195,7 @@ impl DeviceManager {
             Ok(c) => Ok(c),
             Err(e) => {
                 log::info!("Connection to {} failed ({}), attempting operational rediscovery...", address, e);
-                let new_address = self.discover_device(node_id).await
+                let new_address = self.discover_device(node_id, Duration::from_secs(10)).await
                     .context(format!("rediscovery for node {} after connect failure", node_id))?;
                 let conn = self.transport.create_connection(&new_address).await;
                 self.controller
@@ -328,7 +328,7 @@ impl DeviceManager {
     /// Discover the current address of a commissioned device via operational mDNS.
     /// Returns as soon as the device is found (no fixed timeout wait).
     /// Updates the stored address in the registry and returns the new address.
-    pub async fn discover_device(&self, node_id: u64) -> Result<String> {
+    pub async fn discover_device(&self, node_id: u64, timeout: Duration) -> Result<String> {
         let ca_public_key = self.certmanager.get_ca_public_key()?;
         let fabric = Fabric::new(self.config.fabric_id, 0, &ca_public_key);
         let compressed = fabric.compressed().context("computing compressed fabric ID")?;
@@ -341,7 +341,10 @@ impl DeviceManager {
         let mut receiver = self.mdns_receiver.lock().await;
 
         let (ips, port) = loop {
-            match receiver.recv().await {
+            let event = tokio::time::timeout(timeout, receiver.recv())
+                .await
+                .map_err(|_| anyhow::anyhow!("operational discovery timeout for node {}", node_id))?;
+            match event {
                 Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
                     if svc_name != "_matter._tcp.local." {
                         continue;

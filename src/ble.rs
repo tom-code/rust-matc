@@ -32,6 +32,16 @@ pub struct CommissionableDevice {
     pub discriminator: u16,
     pub vendor_id: u16,
     pub product_id: u16,
+    /// Commissioning window is open (CM flag, bit 12 of service data).
+    pub cm_flag: bool,
+    /// Signal strength in dBm; closer to 0 is stronger.
+    pub rssi: Option<i16>,
+    /// BLE advertising name (often empty).
+    pub name: Option<String>,
+    /// TX power level in dBm; combine with `rssi` for path-loss estimation.
+    pub tx_power: Option<i16>,
+    /// Platform-specific peripheral identifier (UUID on macOS, MAC on Linux).
+    pub address: String,
     pub peripheral: Peripheral,
 }
 
@@ -75,8 +85,8 @@ pub async fn find_by_discriminator(discriminator: u16, short_match: bool, scan_t
                 if svc_data.len() < 8 {
                     continue;
                 }
-                let (disc, vid, pid) = parse_service_data(&svc_data);
-                log::debug!("BLE found device: disc={} vid={} pid={}", disc, vid, pid);
+                let (disc, vid, pid, cm_flag) = parse_service_data(&svc_data);
+                log::debug!("BLE found device: disc={} vid={} pid={} cm={}", disc, vid, pid, cm_flag);
                 let matches = if short_match {
                     disc >> 8 == discriminator >> 8
                 } else {
@@ -114,8 +124,18 @@ pub async fn scan_commissionable(scan_timeout: Duration) -> Result<Vec<Commissio
         };
         if let Some(svc_data) = props.service_data.get(&MATTER_SERVICE_UUID) {
             if svc_data.len() >= 8 {
-                let (disc, vid, pid) = parse_service_data(svc_data);
-                found.push(CommissionableDevice { discriminator: disc, vendor_id: vid, product_id: pid, peripheral });
+                let (disc, vid, pid, cm_flag) = parse_service_data(svc_data);
+                found.push(CommissionableDevice {
+                    discriminator: disc,
+                    vendor_id: vid,
+                    product_id: pid,
+                    cm_flag,
+                    rssi: props.rssi,
+                    name: props.local_name.clone(),
+                    tx_power: props.tx_power_level,
+                    address: peripheral.id().to_string(),
+                    peripheral,
+                });
             }
         }
     }
@@ -124,9 +144,11 @@ pub async fn scan_commissionable(scan_timeout: Duration) -> Result<Vec<Commissio
 
 
 /// Parse a Matter BLE advertisement service-data payload.
-fn parse_service_data(data: &[u8]) -> (u16, u16, u16) {
+/// Returns `(discriminator, vendor_id, product_id, cm_flag)`.
+fn parse_service_data(data: &[u8]) -> (u16, u16, u16, bool) {
     let disc_raw = (data[1] as u16) | ((data[2] as u16) << 8);
     let discriminator = disc_raw & 0x0fff;
+    let cm_flag = (disc_raw >> 12) & 0x1 != 0;
     let vid = if data.len() >= 5 {
         (data[3] as u16) | ((data[4] as u16) << 8)
     } else {
@@ -137,7 +159,7 @@ fn parse_service_data(data: &[u8]) -> (u16, u16, u16) {
     } else {
         0
     };
-    (discriminator, vid, pid)
+    (discriminator, vid, pid, cm_flag)
 }
 
 /// Connect to a peripheral, discover BTP characteristics, and return a
