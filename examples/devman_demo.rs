@@ -20,11 +20,16 @@
 ///   # Send ON/OFF commands:
 ///   cargo run --example devman_demo -- -d ./matter-data on "kitchen light"
 ///   cargo run --example devman_demo -- -d ./matter-data off "kitchen light"
+///
+///   # List all attributes on all endpoints:
+///   cargo run --example devman_demo -- -d ./matter-data list-attributes "kitchen light"
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use matc::{
     clusters::{self, codec::{descriptor_cluster, on_off}},
+    controller,
     devman::{DeviceManager, ManagerConfig},
+    tlv,
 };
 #[cfg(feature = "ble")]
 use matc::NetworkCreds;
@@ -112,6 +117,11 @@ enum Commands {
         /// Device name or node ID
         device: String,
     },
+    /// List all attributes on all clusters on all endpoints
+    ListAttributes {
+        /// Device name or node ID
+        device: String,
+    },
     /// Remove device from registry
     Remove {
         /// Device name or node ID
@@ -147,6 +157,68 @@ fn resolve_node_id(dm: &DeviceManager, device: &str) -> Result<u64> {
     Ok(dev.node_id)
 }
 
+async fn print_cluster_attributes(
+    connection: &mut controller::Connection,
+    endpoint: u16,
+    cluster: u32,
+) {
+    match clusters::names::get_cluster_name(cluster) {
+        Some(v) => println!("    {}", v),
+        None => println!("    unknown cluster - id 0x{:x}", cluster),
+    }
+    let attrlist = clusters::codec::get_attribute_list(cluster);
+    for attr in attrlist {
+        let out = connection.read_request2(endpoint, cluster, attr.0).await;
+        if let Ok(out) = out {
+            println!(
+                "      attr 0x{:x} {}: {}",
+                attr.0,
+                attr.1,
+                clusters::codec::decode_attribute_json(cluster, attr.0, &out)
+            );
+        }
+    }
+}
+
+async fn print_endpoint_attributes(connection: &mut controller::Connection, endpoint: u16) {
+    let resptlv = connection
+        .read_request2(
+            endpoint,
+            clusters::defs::CLUSTER_ID_DESCRIPTOR,
+            clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_SERVERLIST,
+        )
+        .await
+        .unwrap();
+    println!("  clusters:");
+    if let tlv::TlvItemValue::List(l) = resptlv {
+        for c in l {
+            if let tlv::TlvItemValue::Int(cluster) = c.value {
+                print_cluster_attributes(connection, endpoint, cluster as u32).await;
+            }
+        }
+    }
+}
+
+async fn all_attributes(connection: &mut controller::Connection) {
+    let resptlv = connection
+        .read_request2(
+            0,
+            clusters::defs::CLUSTER_ID_DESCRIPTOR,
+            clusters::defs::CLUSTER_DESCRIPTOR_ATTR_ID_PARTSLIST,
+        )
+        .await
+        .unwrap();
+    if let tlv::TlvItemValue::List(l) = resptlv {
+        for part in l {
+            if let tlv::TlvItemValue::Int(v) = part.value {
+                println!("endpoint {}", v);
+                print_endpoint_attributes(connection, v as u16).await;
+            }
+        }
+    }
+    println!("endpoint 0");
+    print_endpoint_attributes(connection, 0).await;
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -266,6 +338,11 @@ async fn main() -> Result<()> {
             let conn = connect_by_name_or_id(&dm, &device).await?;
             on_off::toggle(&conn, 1).await?;
             println!("TOGGLE sent to '{}'", device);
+        }
+        Commands::ListAttributes { device } => {
+            let dm = DeviceManager::load(data_dir).await?;
+            let mut conn = connect_by_name_or_id(&dm, &device).await?;
+            all_attributes(&mut conn).await;
         }
         Commands::Remove { device } => {
             let dm = DeviceManager::load(data_dir).await?;
