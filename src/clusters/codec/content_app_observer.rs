@@ -7,6 +7,7 @@
 
 use crate::tlv;
 use anyhow;
+use serde_json;
 
 
 // Enum definitions
@@ -54,6 +55,42 @@ pub fn encode_content_app_message(data: String, encoding_hint: String) -> anyhow
         ]),
     };
     Ok(tlv.encode()?)
+}
+
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ContentAppMessage"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ContentAppMessage"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "data", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "encoding_hint", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let data = crate::clusters::codec::json_util::get_string(args, "data")?;
+        let encoding_hint = crate::clusters::codec::json_util::get_string(args, "encoding_hint")?;
+        encode_content_app_message(data, encoding_hint)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
 }
 
 #[derive(Debug, serde::Serialize)]

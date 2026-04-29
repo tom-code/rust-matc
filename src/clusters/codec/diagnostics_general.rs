@@ -520,6 +520,59 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "TestEventTrigger"),
+        (0x01, "TimeSnapshot"),
+        (0x03, "PayloadTestRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("TestEventTrigger"),
+        0x01 => Some("TimeSnapshot"),
+        0x03 => Some("PayloadTestRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "enable_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "event_trigger", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "enable_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "value", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "count", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let enable_key = crate::clusters::codec::json_util::get_octstr(args, "enable_key")?;
+        let event_trigger = crate::clusters::codec::json_util::get_u64(args, "event_trigger")?;
+        encode_test_event_trigger(enable_key, event_trigger)
+        }
+        0x01 => Ok(vec![]),
+        0x03 => {
+        let enable_key = crate::clusters::codec::json_util::get_octstr(args, "enable_key")?;
+        let value = crate::clusters::codec::json_util::get_u8(args, "value")?;
+        let count = crate::clusters::codec::json_util::get_u16(args, "count")?;
+        encode_payload_test_request(enable_key, value, count)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct TimeSnapshotResponse {
     pub system_time_ms: Option<u8>,

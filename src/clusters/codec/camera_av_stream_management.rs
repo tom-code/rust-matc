@@ -1353,6 +1353,147 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AudioStreamAllocate"),
+        (0x02, "AudioStreamDeallocate"),
+        (0x03, "VideoStreamAllocate"),
+        (0x05, "VideoStreamModify"),
+        (0x06, "VideoStreamDeallocate"),
+        (0x07, "SnapshotStreamAllocate"),
+        (0x09, "SnapshotStreamModify"),
+        (0x0A, "SnapshotStreamDeallocate"),
+        (0x0B, "SetStreamPriorities"),
+        (0x0C, "CaptureSnapshot"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AudioStreamAllocate"),
+        0x02 => Some("AudioStreamDeallocate"),
+        0x03 => Some("VideoStreamAllocate"),
+        0x05 => Some("VideoStreamModify"),
+        0x06 => Some("VideoStreamDeallocate"),
+        0x07 => Some("SnapshotStreamAllocate"),
+        0x09 => Some("SnapshotStreamModify"),
+        0x0A => Some("SnapshotStreamDeallocate"),
+        0x0B => Some("SetStreamPriorities"),
+        0x0C => Some("CaptureSnapshot"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "audio_codec", kind: crate::clusters::codec::FieldKind::Enum { name: "AudioCodec", variants: &[(0, "Opus"), (1, "AacLc")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "channel_count", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "sample_rate", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "bit_rate", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "bit_depth", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "video_codec", kind: crate::clusters::codec::FieldKind::Enum { name: "VideoCodec", variants: &[(0, "H264"), (1, "Hevc"), (2, "Vvc"), (3, "Av1")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "min_frame_rate", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "max_frame_rate", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "min_resolution", kind: crate::clusters::codec::FieldKind::Struct { name: "VideoResolutionStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "max_resolution", kind: crate::clusters::codec::FieldKind::Struct { name: "VideoResolutionStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "min_bit_rate", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 7, name: "max_bit_rate", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 8, name: "key_frame_interval", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 9, name: "watermark_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 10, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "watermark_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "image_codec", kind: crate::clusters::codec::FieldKind::Enum { name: "ImageCodec", variants: &[(0, "Jpeg"), (1, "Heic")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "max_frame_rate", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "min_resolution", kind: crate::clusters::codec::FieldKind::Struct { name: "VideoResolutionStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "max_resolution", kind: crate::clusters::codec::FieldKind::Struct { name: "VideoResolutionStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "quality", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "watermark_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "watermark_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "stream_priorities", kind: crate::clusters::codec::FieldKind::List { entry_type: "StreamUsageEnum" }, optional: false, nullable: false },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "requested_resolution", kind: crate::clusters::codec::FieldKind::Struct { name: "VideoResolutionStruct" }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let stream_usage = crate::clusters::codec::json_util::get_u8(args, "stream_usage")?;
+        let audio_codec = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "audio_codec")?;
+            AudioCodec::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid AudioCodec: {}", n))?
+        };
+        let channel_count = crate::clusters::codec::json_util::get_u8(args, "channel_count")?;
+        let sample_rate = crate::clusters::codec::json_util::get_u32(args, "sample_rate")?;
+        let bit_rate = crate::clusters::codec::json_util::get_u32(args, "bit_rate")?;
+        let bit_depth = crate::clusters::codec::json_util::get_u8(args, "bit_depth")?;
+        encode_audio_stream_allocate(stream_usage, audio_codec, channel_count, sample_rate, bit_rate, bit_depth)
+        }
+        0x02 => {
+        let audio_stream_id = crate::clusters::codec::json_util::get_u8(args, "audio_stream_id")?;
+        encode_audio_stream_deallocate(audio_stream_id)
+        }
+        0x03 => Err(anyhow::anyhow!("command \"VideoStreamAllocate\" has complex args: use raw mode")),
+        0x05 => {
+        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        let watermark_enabled = crate::clusters::codec::json_util::get_bool(args, "watermark_enabled")?;
+        let osd_enabled = crate::clusters::codec::json_util::get_bool(args, "osd_enabled")?;
+        encode_video_stream_modify(video_stream_id, watermark_enabled, osd_enabled)
+        }
+        0x06 => {
+        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        encode_video_stream_deallocate(video_stream_id)
+        }
+        0x07 => Err(anyhow::anyhow!("command \"SnapshotStreamAllocate\" has complex args: use raw mode")),
+        0x09 => {
+        let snapshot_stream_id = crate::clusters::codec::json_util::get_u8(args, "snapshot_stream_id")?;
+        let watermark_enabled = crate::clusters::codec::json_util::get_bool(args, "watermark_enabled")?;
+        let osd_enabled = crate::clusters::codec::json_util::get_bool(args, "osd_enabled")?;
+        encode_snapshot_stream_modify(snapshot_stream_id, watermark_enabled, osd_enabled)
+        }
+        0x0A => {
+        let snapshot_stream_id = crate::clusters::codec::json_util::get_u8(args, "snapshot_stream_id")?;
+        encode_snapshot_stream_deallocate(snapshot_stream_id)
+        }
+        0x0B => Err(anyhow::anyhow!("command \"SetStreamPriorities\" has complex args: use raw mode")),
+        0x0C => Err(anyhow::anyhow!("command \"CaptureSnapshot\" has complex args: use raw mode")),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AudioStreamAllocateResponse {
     pub audio_stream_id: Option<u8>,

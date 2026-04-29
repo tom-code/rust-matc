@@ -706,6 +706,77 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x01, "Disable"),
+        (0x02, "EnableCharging"),
+        (0x03, "EnableDischarging"),
+        (0x04, "StartDiagnostics"),
+        (0x05, "SetTargets"),
+        (0x06, "GetTargets"),
+        (0x07, "ClearTargets"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x01 => Some("Disable"),
+        0x02 => Some("EnableCharging"),
+        0x03 => Some("EnableDischarging"),
+        0x04 => Some("StartDiagnostics"),
+        0x05 => Some("SetTargets"),
+        0x06 => Some("GetTargets"),
+        0x07 => Some("ClearTargets"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "charging_enabled_until", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "minimum_charge_current", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "maximum_charge_current", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "discharging_enabled_until", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "maximum_discharge_current", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "charging_target_schedules", kind: crate::clusters::codec::FieldKind::List { entry_type: "ChargingTargetScheduleStruct" }, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![]),
+        0x07 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x01 => Ok(vec![]),
+        0x02 => {
+        let charging_enabled_until = crate::clusters::codec::json_util::get_opt_u64(args, "charging_enabled_until")?;
+        let minimum_charge_current = crate::clusters::codec::json_util::get_u8(args, "minimum_charge_current")?;
+        let maximum_charge_current = crate::clusters::codec::json_util::get_u8(args, "maximum_charge_current")?;
+        encode_enable_charging(charging_enabled_until, minimum_charge_current, maximum_charge_current)
+        }
+        0x03 => {
+        let discharging_enabled_until = crate::clusters::codec::json_util::get_opt_u64(args, "discharging_enabled_until")?;
+        let maximum_discharge_current = crate::clusters::codec::json_util::get_u8(args, "maximum_discharge_current")?;
+        encode_enable_discharging(discharging_enabled_until, maximum_discharge_current)
+        }
+        0x04 => Ok(vec![]),
+        0x05 => Err(anyhow::anyhow!("command \"SetTargets\" has complex args: use raw mode")),
+        0x06 => Ok(vec![]),
+        0x07 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct GetTargetsResponse {
     pub charging_target_schedules: Option<Vec<ChargingTargetSchedule>>,

@@ -170,6 +170,59 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SelectInput"),
+        (0x01, "ShowInputStatus"),
+        (0x02, "HideInputStatus"),
+        (0x03, "RenameInput"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SelectInput"),
+        0x01 => Some("ShowInputStatus"),
+        0x02 => Some("HideInputStatus"),
+        0x03 => Some("RenameInput"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let index = crate::clusters::codec::json_util::get_u8(args, "index")?;
+        encode_select_input(index)
+        }
+        0x01 => Ok(vec![]),
+        0x02 => Ok(vec![]),
+        0x03 => {
+        let index = crate::clusters::codec::json_util::get_u8(args, "index")?;
+        let name = crate::clusters::codec::json_util::get_string(args, "name")?;
+        encode_rename_input(index, name)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `SelectInput` command on cluster `Media Input`.

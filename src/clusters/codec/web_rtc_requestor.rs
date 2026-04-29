@@ -114,6 +114,75 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Offer"),
+        (0x01, "Answer"),
+        (0x02, "ICECandidates"),
+        (0x03, "End"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Offer"),
+        0x01 => Some("Answer"),
+        0x02 => Some("ICECandidates"),
+        0x03 => Some("End"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "sdp", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "sdp", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "reason", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        let sdp = crate::clusters::codec::json_util::get_string(args, "sdp")?;
+        let ice_transport_policy = crate::clusters::codec::json_util::get_string(args, "ice_transport_policy")?;
+        encode_offer(web_rtc_session_id, sdp, ice_transport_policy)
+        }
+        0x01 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        let sdp = crate::clusters::codec::json_util::get_string(args, "sdp")?;
+        encode_answer(web_rtc_session_id, sdp)
+        }
+        0x02 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        encode_ice_candidates(web_rtc_session_id)
+        }
+        0x03 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        let reason = crate::clusters::codec::json_util::get_u8(args, "reason")?;
+        encode_end(web_rtc_session_id, reason)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `Offer` command on cluster `WebRTC Transport Requestor`.

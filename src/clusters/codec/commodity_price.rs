@@ -217,6 +217,49 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "GetDetailedPriceRequest"),
+        (0x02, "GetDetailedForecastRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("GetDetailedPriceRequest"),
+        0x02 => Some("GetDetailedForecastRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "details", kind: crate::clusters::codec::FieldKind::Bitmap { name: "CommodityPriceDetail", bits: &[(1, "DESCRIPTION"), (2, "COMPONENTS")] }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "details", kind: crate::clusters::codec::FieldKind::Bitmap { name: "CommodityPriceDetail", bits: &[(1, "DESCRIPTION"), (2, "COMPONENTS")] }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let details = crate::clusters::codec::json_util::get_u8(args, "details")?;
+        encode_get_detailed_price_request(details)
+        }
+        0x02 => {
+        let details = crate::clusters::codec::json_util::get_u8(args, "details")?;
+        encode_get_detailed_forecast_request(details)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct GetDetailedPriceResponse {
     pub current_price: Option<CommodityPrice>,

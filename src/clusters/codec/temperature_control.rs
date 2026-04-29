@@ -158,6 +158,42 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SetTemperature"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SetTemperature"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "target_temperature", kind: crate::clusters::codec::FieldKind::I16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "target_temperature_level", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let target_temperature = crate::clusters::codec::json_util::get_i16(args, "target_temperature")?;
+        let target_temperature_level = crate::clusters::codec::json_util::get_u8(args, "target_temperature_level")?;
+        encode_set_temperature(target_temperature, target_temperature_level)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `SetTemperature` command on cluster `Temperature Control`.

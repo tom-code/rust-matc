@@ -386,6 +386,55 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Stop"),
+        (0x01, "MoveTo"),
+        (0x02, "Calibrate"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Stop"),
+        0x01 => Some("MoveTo"),
+        0x02 => Some("Calibrate"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "position", kind: crate::clusters::codec::FieldKind::Enum { name: "TargetPosition", variants: &[(0, "Movetofullyclosed"), (1, "Movetofullyopen"), (2, "Movetopedestrianposition"), (3, "Movetoventilationposition"), (4, "Movetosignatureposition")] }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "latch", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "speed", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+        ]),
+        0x02 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Ok(vec![]),
+        0x01 => {
+        let position = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "position")?;
+            TargetPosition::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TargetPosition: {}", n))?
+        };
+        let latch = crate::clusters::codec::json_util::get_bool(args, "latch")?;
+        let speed = crate::clusters::codec::json_util::get_u8(args, "speed")?;
+        encode_move_to(position, latch, speed)
+        }
+        0x02 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `Stop` command on cluster `Closure Control`.

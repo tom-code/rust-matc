@@ -281,6 +281,64 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "KeySetWrite"),
+        (0x01, "KeySetRead"),
+        (0x03, "KeySetRemove"),
+        (0x04, "KeySetReadAllIndices"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("KeySetWrite"),
+        0x01 => Some("KeySetRead"),
+        0x03 => Some("KeySetRemove"),
+        0x04 => Some("KeySetReadAllIndices"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_key_set", kind: crate::clusters::codec::FieldKind::Struct { name: "GroupKeySetStruct" }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "do_not_use", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"KeySetWrite\" has complex args: use raw mode")),
+        0x01 => {
+        let group_key_set_id = crate::clusters::codec::json_util::get_u16(args, "group_key_set_id")?;
+        encode_key_set_read(group_key_set_id)
+        }
+        0x03 => {
+        let group_key_set_id = crate::clusters::codec::json_util::get_u16(args, "group_key_set_id")?;
+        encode_key_set_remove(group_key_set_id)
+        }
+        0x04 => {
+        let do_not_use = crate::clusters::codec::json_util::get_u8(args, "do_not_use")?;
+        encode_key_set_read_all_indices(do_not_use)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct KeySetReadResponse {
     pub group_key_set: Option<GroupKeySet>,

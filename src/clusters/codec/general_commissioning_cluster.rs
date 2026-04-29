@@ -423,6 +423,73 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ArmFailSafe"),
+        (0x02, "SetRegulatoryConfig"),
+        (0x04, "CommissioningComplete"),
+        (0x06, "SetTCAcknowledgements"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ArmFailSafe"),
+        0x02 => Some("SetRegulatoryConfig"),
+        0x04 => Some("CommissioningComplete"),
+        0x06 => Some("SetTCAcknowledgements"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "expiry_length_seconds", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "new_regulatory_config", kind: crate::clusters::codec::FieldKind::Enum { name: "RegulatoryLocationType", variants: &[(0, "Indoor"), (1, "Outdoor"), (2, "Indooroutdoor")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "country_code", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "tc_version", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "tc_user_response", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let expiry_length_seconds = crate::clusters::codec::json_util::get_u16(args, "expiry_length_seconds")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_arm_fail_safe(expiry_length_seconds, breadcrumb)
+        }
+        0x02 => {
+        let new_regulatory_config = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "new_regulatory_config")?;
+            RegulatoryLocationType::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid RegulatoryLocationType: {}", n))?
+        };
+        let country_code = crate::clusters::codec::json_util::get_string(args, "country_code")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_set_regulatory_config(new_regulatory_config, country_code, breadcrumb)
+        }
+        0x04 => Ok(vec![]),
+        0x06 => {
+        let tc_version = crate::clusters::codec::json_util::get_u16(args, "tc_version")?;
+        let tc_user_response = crate::clusters::codec::json_util::get_u8(args, "tc_user_response")?;
+        encode_set_tc_acknowledgements(tc_version, tc_user_response)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ArmFailSafeResponse {
     pub error_code: Option<CommissioningError>,

@@ -429,6 +429,47 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Step"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Step"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "direction", kind: crate::clusters::codec::FieldKind::Enum { name: "StepDirection", variants: &[(0, "Increase"), (1, "Decrease")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "wrap", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "lowest_off", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let direction = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "direction")?;
+            StepDirection::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepDirection: {}", n))?
+        };
+        let wrap = crate::clusters::codec::json_util::get_bool(args, "wrap")?;
+        let lowest_off = crate::clusters::codec::json_util::get_bool(args, "lowest_off")?;
+        encode_step(direction, wrap, lowest_off)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `Step` command on cluster `Fan Control`.

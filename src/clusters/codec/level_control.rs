@@ -468,6 +468,168 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "MoveToLevel"),
+        (0x01, "Move"),
+        (0x02, "Step"),
+        (0x03, "Stop"),
+        (0x04, "MoveToLevelWithOnOff"),
+        (0x05, "MoveWithOnOff"),
+        (0x06, "StepWithOnOff"),
+        (0x07, "StopWithOnOff"),
+        (0x08, "MoveToClosestFrequency"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("MoveToLevel"),
+        0x01 => Some("Move"),
+        0x02 => Some("Step"),
+        0x03 => Some("Stop"),
+        0x04 => Some("MoveToLevelWithOnOff"),
+        0x05 => Some("MoveWithOnOff"),
+        0x06 => Some("StepWithOnOff"),
+        0x07 => Some("StopWithOnOff"),
+        0x08 => Some("MoveToClosestFrequency"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "level", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "move_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "MoveMode", variants: &[(0, "Up"), (1, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "StepMode", variants: &[(0, "Up"), (1, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_size", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "level", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "move_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "MoveMode", variants: &[(0, "Up"), (1, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "StepMode", variants: &[(0, "Up"), (1, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_size", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF"), (2, "COUPLE_COLOR_TEMP_TO_LEVEL")] }, optional: false, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "frequency", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let level = crate::clusters::codec::json_util::get_u8(args, "level")?;
+        let transition_time = crate::clusters::codec::json_util::get_opt_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_level(level, transition_time, options_mask, options_override)
+        }
+        0x01 => {
+        let move_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "move_mode")?;
+            MoveMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid MoveMode: {}", n))?
+        };
+        let rate = crate::clusters::codec::json_util::get_opt_u8(args, "rate")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_(move_mode, rate, options_mask, options_override)
+        }
+        0x02 => {
+        let step_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "step_mode")?;
+            StepMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepMode: {}", n))?
+        };
+        let step_size = crate::clusters::codec::json_util::get_u8(args, "step_size")?;
+        let transition_time = crate::clusters::codec::json_util::get_opt_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_step(step_mode, step_size, transition_time, options_mask, options_override)
+        }
+        0x03 => {
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_stop(options_mask, options_override)
+        }
+        0x04 => {
+        let level = crate::clusters::codec::json_util::get_u8(args, "level")?;
+        let transition_time = crate::clusters::codec::json_util::get_opt_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_level_with_on_off(level, transition_time, options_mask, options_override)
+        }
+        0x05 => {
+        let move_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "move_mode")?;
+            MoveMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid MoveMode: {}", n))?
+        };
+        let rate = crate::clusters::codec::json_util::get_opt_u8(args, "rate")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_with_on_off(move_mode, rate, options_mask, options_override)
+        }
+        0x06 => {
+        let step_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "step_mode")?;
+            StepMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepMode: {}", n))?
+        };
+        let step_size = crate::clusters::codec::json_util::get_u8(args, "step_size")?;
+        let transition_time = crate::clusters::codec::json_util::get_opt_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_step_with_on_off(step_mode, step_size, transition_time, options_mask, options_override)
+        }
+        0x07 => {
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_stop_with_on_off(options_mask, options_override)
+        }
+        0x08 => {
+        let frequency = crate::clusters::codec::json_util::get_u16(args, "frequency")?;
+        encode_move_to_closest_frequency(frequency)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `MoveToLevel` command on cluster `Level Control`.

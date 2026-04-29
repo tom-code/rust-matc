@@ -291,6 +291,74 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Off"),
+        (0x01, "On"),
+        (0x02, "Toggle"),
+        (0x40, "OffWithEffect"),
+        (0x41, "OnWithRecallGlobalScene"),
+        (0x42, "OnWithTimedOff"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Off"),
+        0x01 => Some("On"),
+        0x02 => Some("Toggle"),
+        0x40 => Some("OffWithEffect"),
+        0x41 => Some("OnWithRecallGlobalScene"),
+        0x42 => Some("OnWithTimedOff"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![]),
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![]),
+        0x40 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "effect_identifier", kind: crate::clusters::codec::FieldKind::Enum { name: "EffectIdentifier", variants: &[(0, "Delayedalloff"), (1, "Dyinglight")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "effect_variant", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x41 => Some(vec![]),
+        0x42 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "on_off_control", kind: crate::clusters::codec::FieldKind::Bitmap { name: "OnOffControl", bits: &[(1, "ACCEPT_ONLY_WHEN_ON")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "on_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "off_wait_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Ok(vec![]),
+        0x01 => Ok(vec![]),
+        0x02 => Ok(vec![]),
+        0x40 => {
+        let effect_identifier = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "effect_identifier")?;
+            EffectIdentifier::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid EffectIdentifier: {}", n))?
+        };
+        let effect_variant = crate::clusters::codec::json_util::get_u8(args, "effect_variant")?;
+        encode_off_with_effect(effect_identifier, effect_variant)
+        }
+        0x41 => Ok(vec![]),
+        0x42 => {
+        let on_off_control = crate::clusters::codec::json_util::get_u8(args, "on_off_control")?;
+        let on_time = crate::clusters::codec::json_util::get_u16(args, "on_time")?;
+        let off_wait_time = crate::clusters::codec::json_util::get_u16(args, "off_wait_time")?;
+        encode_on_with_timed_off(on_off_control, on_time, off_wait_time)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `Off` command on cluster `On/Off`.

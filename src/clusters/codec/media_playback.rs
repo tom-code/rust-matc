@@ -610,6 +610,124 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Play"),
+        (0x01, "Pause"),
+        (0x02, "Stop"),
+        (0x03, "StartOver"),
+        (0x04, "Previous"),
+        (0x05, "Next"),
+        (0x06, "Rewind"),
+        (0x07, "FastForward"),
+        (0x08, "SkipForward"),
+        (0x09, "SkipBackward"),
+        (0x0B, "Seek"),
+        (0x0C, "ActivateAudioTrack"),
+        (0x0D, "ActivateTextTrack"),
+        (0x0E, "DeactivateTextTrack"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Play"),
+        0x01 => Some("Pause"),
+        0x02 => Some("Stop"),
+        0x03 => Some("StartOver"),
+        0x04 => Some("Previous"),
+        0x05 => Some("Next"),
+        0x06 => Some("Rewind"),
+        0x07 => Some("FastForward"),
+        0x08 => Some("SkipForward"),
+        0x09 => Some("SkipBackward"),
+        0x0B => Some("Seek"),
+        0x0C => Some("ActivateAudioTrack"),
+        0x0D => Some("ActivateTextTrack"),
+        0x0E => Some("DeactivateTextTrack"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![]),
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![]),
+        0x03 => Some(vec![]),
+        0x04 => Some(vec![]),
+        0x05 => Some(vec![]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "audio_advance_unmuted", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "audio_advance_unmuted", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "delta_position_milliseconds", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "delta_position_milliseconds", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "position", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "track_id", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "audio_output_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: true },
+        ]),
+        0x0D => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "track_id", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0E => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Ok(vec![]),
+        0x01 => Ok(vec![]),
+        0x02 => Ok(vec![]),
+        0x03 => Ok(vec![]),
+        0x04 => Ok(vec![]),
+        0x05 => Ok(vec![]),
+        0x06 => {
+        let audio_advance_unmuted = crate::clusters::codec::json_util::get_bool(args, "audio_advance_unmuted")?;
+        encode_rewind(audio_advance_unmuted)
+        }
+        0x07 => {
+        let audio_advance_unmuted = crate::clusters::codec::json_util::get_bool(args, "audio_advance_unmuted")?;
+        encode_fast_forward(audio_advance_unmuted)
+        }
+        0x08 => {
+        let delta_position_milliseconds = crate::clusters::codec::json_util::get_u64(args, "delta_position_milliseconds")?;
+        encode_skip_forward(delta_position_milliseconds)
+        }
+        0x09 => {
+        let delta_position_milliseconds = crate::clusters::codec::json_util::get_u64(args, "delta_position_milliseconds")?;
+        encode_skip_backward(delta_position_milliseconds)
+        }
+        0x0B => {
+        let position = crate::clusters::codec::json_util::get_u64(args, "position")?;
+        encode_seek(position)
+        }
+        0x0C => {
+        let track_id = crate::clusters::codec::json_util::get_string(args, "track_id")?;
+        let audio_output_index = crate::clusters::codec::json_util::get_opt_u8(args, "audio_output_index")?;
+        encode_activate_audio_track(track_id, audio_output_index)
+        }
+        0x0D => {
+        let track_id = crate::clusters::codec::json_util::get_string(args, "track_id")?;
+        encode_activate_text_track(track_id)
+        }
+        0x0E => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct PlaybackResponse {
     pub status: Option<Status>,

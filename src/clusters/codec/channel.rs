@@ -415,6 +415,97 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ChangeChannel"),
+        (0x02, "ChangeChannelByNumber"),
+        (0x03, "SkipChannel"),
+        (0x04, "GetProgramGuide"),
+        (0x06, "RecordProgram"),
+        (0x07, "CancelRecordProgram"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ChangeChannel"),
+        0x02 => Some("ChangeChannelByNumber"),
+        0x03 => Some("SkipChannel"),
+        0x04 => Some("GetProgramGuide"),
+        0x06 => Some("RecordProgram"),
+        0x07 => Some("CancelRecordProgram"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "match_", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "major_number", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "minor_number", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "count", kind: crate::clusters::codec::FieldKind::I16, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "start_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "end_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "channel_list", kind: crate::clusters::codec::FieldKind::List { entry_type: "ChannelInfoStruct" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "page_token", kind: crate::clusters::codec::FieldKind::Struct { name: "PageTokenStruct" }, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "recording_flag", kind: crate::clusters::codec::FieldKind::Bitmap { name: "RecordingFlag", bits: &[(1, "SCHEDULED"), (2, "RECORD_SERIES"), (4, "RECORDED")] }, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 7, name: "data", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "program_identifier", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "should_record_series", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "data", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "program_identifier", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "should_record_series", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "data", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let match_ = crate::clusters::codec::json_util::get_string(args, "match_")?;
+        encode_change_channel(match_)
+        }
+        0x02 => {
+        let major_number = crate::clusters::codec::json_util::get_u16(args, "major_number")?;
+        let minor_number = crate::clusters::codec::json_util::get_u16(args, "minor_number")?;
+        encode_change_channel_by_number(major_number, minor_number)
+        }
+        0x03 => {
+        let count = crate::clusters::codec::json_util::get_i16(args, "count")?;
+        encode_skip_channel(count)
+        }
+        0x04 => Err(anyhow::anyhow!("command \"GetProgramGuide\" has complex args: use raw mode")),
+        0x06 => {
+        let program_identifier = crate::clusters::codec::json_util::get_string(args, "program_identifier")?;
+        let should_record_series = crate::clusters::codec::json_util::get_bool(args, "should_record_series")?;
+        let data = crate::clusters::codec::json_util::get_octstr(args, "data")?;
+        encode_record_program(program_identifier, should_record_series, data)
+        }
+        0x07 => {
+        let program_identifier = crate::clusters::codec::json_util::get_string(args, "program_identifier")?;
+        let should_record_series = crate::clusters::codec::json_util::get_bool(args, "should_record_series")?;
+        let data = crate::clusters::codec::json_util::get_octstr(args, "data")?;
+        encode_cancel_record_program(program_identifier, should_record_series, data)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ChangeChannelResponse {
     pub status: Option<Status>,

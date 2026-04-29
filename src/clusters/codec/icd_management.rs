@@ -368,6 +368,71 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "RegisterClient"),
+        (0x02, "UnregisterClient"),
+        (0x03, "StayActiveRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("RegisterClient"),
+        0x02 => Some("UnregisterClient"),
+        0x03 => Some("StayActiveRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "check_in_node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "monitored_subject", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "key", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "verification_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "client_type", kind: crate::clusters::codec::FieldKind::Enum { name: "ClientType", variants: &[(0, "Permanent"), (1, "Ephemeral")] }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "check_in_node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "verification_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "stay_active_duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let check_in_node_id = crate::clusters::codec::json_util::get_u64(args, "check_in_node_id")?;
+        let monitored_subject = crate::clusters::codec::json_util::get_u64(args, "monitored_subject")?;
+        let key = crate::clusters::codec::json_util::get_octstr(args, "key")?;
+        let verification_key = crate::clusters::codec::json_util::get_octstr(args, "verification_key")?;
+        let client_type = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "client_type")?;
+            ClientType::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid ClientType: {}", n))?
+        };
+        encode_register_client(check_in_node_id, monitored_subject, key, verification_key, client_type)
+        }
+        0x02 => {
+        let check_in_node_id = crate::clusters::codec::json_util::get_u64(args, "check_in_node_id")?;
+        let verification_key = crate::clusters::codec::json_util::get_octstr(args, "verification_key")?;
+        encode_unregister_client(check_in_node_id, verification_key)
+        }
+        0x03 => {
+        let stay_active_duration = crate::clusters::codec::json_util::get_u32(args, "stay_active_duration")?;
+        encode_stay_active_request(stay_active_duration)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct RegisterClientResponse {
     pub icd_counter: Option<u32>,

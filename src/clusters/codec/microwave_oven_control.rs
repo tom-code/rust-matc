@@ -220,6 +220,57 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SetCookingParameters"),
+        (0x01, "AddMoreTime"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SetCookingParameters"),
+        0x01 => Some("AddMoreTime"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "cook_mode", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "cook_time", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "power_setting", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "watt_setting_index", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "start_after_setting", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "time_to_add", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let cook_mode = crate::clusters::codec::json_util::get_u8(args, "cook_mode")?;
+        let cook_time = crate::clusters::codec::json_util::get_u32(args, "cook_time")?;
+        let power_setting = crate::clusters::codec::json_util::get_u8(args, "power_setting")?;
+        let watt_setting_index = crate::clusters::codec::json_util::get_u8(args, "watt_setting_index")?;
+        let start_after_setting = crate::clusters::codec::json_util::get_bool(args, "start_after_setting")?;
+        encode_set_cooking_parameters(cook_mode, cook_time, power_setting, watt_setting_index, start_after_setting)
+        }
+        0x01 => {
+        let time_to_add = crate::clusters::codec::json_util::get_u32(args, "time_to_add")?;
+        encode_add_more_time(time_to_add)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `SetCookingParameters` command on cluster `Microwave Oven Control`.

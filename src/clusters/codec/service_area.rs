@@ -384,6 +384,46 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SelectAreas"),
+        (0x02, "SkipArea"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SelectAreas"),
+        0x02 => Some("SkipArea"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "new_areas", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint32" }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "skipped_area", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"SelectAreas\" has complex args: use raw mode")),
+        0x02 => {
+        let skipped_area = crate::clusters::codec::json_util::get_u32(args, "skipped_area")?;
+        encode_skip_area(skipped_area)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SelectAreasResponse {
     pub status: Option<u8>,

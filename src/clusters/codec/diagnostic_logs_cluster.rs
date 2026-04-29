@@ -7,6 +7,7 @@
 
 use crate::tlv;
 use anyhow;
+use serde_json;
 
 
 // Import serialization helpers for octet strings
@@ -132,6 +133,50 @@ pub fn encode_retrieve_logs_request(intent: Intent, requested_protocol: Transfer
         ]),
     };
     Ok(tlv.encode()?)
+}
+
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "RetrieveLogsRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("RetrieveLogsRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "intent", kind: crate::clusters::codec::FieldKind::Enum { name: "Intent", variants: &[(0, "Endusersupport"), (1, "Networkdiag"), (2, "Crashlogs")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "requested_protocol", kind: crate::clusters::codec::FieldKind::Enum { name: "TransferProtocol", variants: &[(0, "Responsepayload"), (1, "Bdx")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transfer_file_designator", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let intent = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "intent")?;
+            Intent::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid Intent: {}", n))?
+        };
+        let requested_protocol = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "requested_protocol")?;
+            TransferProtocol::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TransferProtocol: {}", n))?
+        };
+        let transfer_file_designator = crate::clusters::codec::json_util::get_string(args, "transfer_file_designator")?;
+        encode_retrieve_logs_request(intent, requested_protocol, transfer_file_designator)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
 }
 
 #[derive(Debug, serde::Serialize)]

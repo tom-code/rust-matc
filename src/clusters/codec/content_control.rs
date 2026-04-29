@@ -537,6 +537,136 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "UpdatePIN"),
+        (0x01, "ResetPIN"),
+        (0x03, "Enable"),
+        (0x04, "Disable"),
+        (0x05, "AddBonusTime"),
+        (0x06, "SetScreenDailyTime"),
+        (0x07, "BlockUnratedContent"),
+        (0x08, "UnblockUnratedContent"),
+        (0x09, "SetOnDemandRatingThreshold"),
+        (0x0A, "SetScheduledContentRatingThreshold"),
+        (0x0B, "AddBlockChannels"),
+        (0x0C, "RemoveBlockChannels"),
+        (0x0D, "AddBlockApplications"),
+        (0x0E, "RemoveBlockApplications"),
+        (0x0F, "SetBlockContentTimeWindow"),
+        (0x10, "RemoveBlockContentTimeWindow"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("UpdatePIN"),
+        0x01 => Some("ResetPIN"),
+        0x03 => Some("Enable"),
+        0x04 => Some("Disable"),
+        0x05 => Some("AddBonusTime"),
+        0x06 => Some("SetScreenDailyTime"),
+        0x07 => Some("BlockUnratedContent"),
+        0x08 => Some("UnblockUnratedContent"),
+        0x09 => Some("SetOnDemandRatingThreshold"),
+        0x0A => Some("SetScheduledContentRatingThreshold"),
+        0x0B => Some("AddBlockChannels"),
+        0x0C => Some("RemoveBlockChannels"),
+        0x0D => Some("AddBlockApplications"),
+        0x0E => Some("RemoveBlockApplications"),
+        0x0F => Some("SetBlockContentTimeWindow"),
+        0x10 => Some("RemoveBlockContentTimeWindow"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "old_pin", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "new_pin", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![]),
+        0x03 => Some(vec![]),
+        0x04 => Some(vec![]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "pin_code", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "bonus_time", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "screen_time", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![]),
+        0x08 => Some(vec![]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "rating", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "rating", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "channels", kind: crate::clusters::codec::FieldKind::List { entry_type: "BlockChannelStruct" }, optional: false, nullable: false },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "channel_indexes", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: false, nullable: false },
+        ]),
+        0x0D => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "applications", kind: crate::clusters::codec::FieldKind::List { entry_type: "AppInfoStruct" }, optional: false, nullable: false },
+        ]),
+        0x0E => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "applications", kind: crate::clusters::codec::FieldKind::List { entry_type: "AppInfoStruct" }, optional: false, nullable: false },
+        ]),
+        0x0F => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "time_window", kind: crate::clusters::codec::FieldKind::Struct { name: "TimeWindowStruct" }, optional: false, nullable: false },
+        ]),
+        0x10 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "time_window_indexes", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let old_pin = crate::clusters::codec::json_util::get_string(args, "old_pin")?;
+        let new_pin = crate::clusters::codec::json_util::get_string(args, "new_pin")?;
+        encode_update_pin(old_pin, new_pin)
+        }
+        0x01 => Ok(vec![]),
+        0x03 => Ok(vec![]),
+        0x04 => Ok(vec![]),
+        0x05 => {
+        let pin_code = crate::clusters::codec::json_util::get_string(args, "pin_code")?;
+        let bonus_time = crate::clusters::codec::json_util::get_u32(args, "bonus_time")?;
+        encode_add_bonus_time(pin_code, bonus_time)
+        }
+        0x06 => {
+        let screen_time = crate::clusters::codec::json_util::get_u32(args, "screen_time")?;
+        encode_set_screen_daily_time(screen_time)
+        }
+        0x07 => Ok(vec![]),
+        0x08 => Ok(vec![]),
+        0x09 => {
+        let rating = crate::clusters::codec::json_util::get_string(args, "rating")?;
+        encode_set_on_demand_rating_threshold(rating)
+        }
+        0x0A => {
+        let rating = crate::clusters::codec::json_util::get_string(args, "rating")?;
+        encode_set_scheduled_content_rating_threshold(rating)
+        }
+        0x0B => Err(anyhow::anyhow!("command \"AddBlockChannels\" has complex args: use raw mode")),
+        0x0C => Err(anyhow::anyhow!("command \"RemoveBlockChannels\" has complex args: use raw mode")),
+        0x0D => Err(anyhow::anyhow!("command \"AddBlockApplications\" has complex args: use raw mode")),
+        0x0E => Err(anyhow::anyhow!("command \"RemoveBlockApplications\" has complex args: use raw mode")),
+        0x0F => Err(anyhow::anyhow!("command \"SetBlockContentTimeWindow\" has complex args: use raw mode")),
+        0x10 => Err(anyhow::anyhow!("command \"RemoveBlockContentTimeWindow\" has complex args: use raw mode")),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ResetPINResponse {
     pub pin_code: Option<String>,

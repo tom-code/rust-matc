@@ -193,6 +193,92 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SolicitOffer"),
+        (0x02, "ProvideOffer"),
+        (0x04, "ProvideAnswer"),
+        (0x05, "ProvideICECandidates"),
+        (0x06, "EndSession"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SolicitOffer"),
+        0x02 => Some("ProvideOffer"),
+        0x04 => Some("ProvideAnswer"),
+        0x05 => Some("ProvideICECandidates"),
+        0x06 => Some("EndSession"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "originating_endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "metadata_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 7, name: "s_frame_config", kind: crate::clusters::codec::FieldKind::Struct { name: "SFrameStruct" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 8, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "VideoStreamID" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 9, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "AudioStreamID" }, optional: true, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "sdp", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "originating_endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 7, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 8, name: "metadata_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 9, name: "s_frame_config", kind: crate::clusters::codec::FieldKind::Struct { name: "SFrameStruct" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 10, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "VideoStreamID" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 11, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "AudioStreamID" }, optional: true, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "sdp", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "reason", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"SolicitOffer\" has complex args: use raw mode")),
+        0x02 => Err(anyhow::anyhow!("command \"ProvideOffer\" has complex args: use raw mode")),
+        0x04 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        let sdp = crate::clusters::codec::json_util::get_string(args, "sdp")?;
+        encode_provide_answer(web_rtc_session_id, sdp)
+        }
+        0x05 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        encode_provide_ice_candidates(web_rtc_session_id)
+        }
+        0x06 => {
+        let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
+        let reason = crate::clusters::codec::json_util::get_u8(args, "reason")?;
+        encode_end_session(web_rtc_session_id, reason)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SolicitOfferResponse {
     pub web_rtc_session_id: Option<u8>,

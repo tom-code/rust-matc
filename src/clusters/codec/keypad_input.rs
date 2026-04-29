@@ -7,6 +7,7 @@
 
 use crate::tlv;
 use anyhow;
+use serde_json;
 
 
 // Enum definitions
@@ -253,6 +254,43 @@ pub fn encode_send_key(key_code: CecKeyCode) -> anyhow::Result<Vec<u8>> {
         ]),
     };
     Ok(tlv.encode()?)
+}
+
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SendKey"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SendKey"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "key_code", kind: crate::clusters::codec::FieldKind::Enum { name: "CecKeyCode", variants: &[(0, "Select"), (1, "Up"), (2, "Down"), (3, "Left"), (4, "Right"), (5, "Rightup"), (6, "Rightdown"), (7, "Leftup"), (8, "Leftdown"), (9, "Rootmenu"), (10, "Setupmenu"), (11, "Contentsmenu"), (12, "Favoritemenu"), (13, "Exit"), (16, "Mediatopmenu"), (17, "Mediacontextsensitivemenu"), (29, "Numberentrymode"), (30, "Number11"), (31, "Number12"), (32, "Number0ornumber10"), (33, "Numbers1"), (34, "Numbers2"), (35, "Numbers3"), (36, "Numbers4"), (37, "Numbers5"), (38, "Numbers6"), (39, "Numbers7"), (40, "Numbers8"), (41, "Numbers9"), (42, "Dot"), (43, "Enter"), (44, "Clear"), (47, "Nextfavorite"), (48, "Channelup"), (49, "Channeldown"), (50, "Previouschannel"), (51, "Soundselect"), (52, "Inputselect"), (53, "Displayinformation"), (54, "Help"), (55, "Pageup"), (56, "Pagedown"), (64, "Power"), (65, "Volumeup"), (66, "Volumedown"), (67, "Mute"), (68, "Play"), (69, "Stop"), (70, "Pause"), (71, "Record"), (72, "Rewind"), (73, "Fastforward"), (74, "Eject"), (75, "Forward"), (76, "Backward"), (77, "Stoprecord"), (78, "Pauserecord"), (79, "Reserved"), (80, "Angle"), (81, "Subpicture"), (82, "Videoondemand"), (83, "Electronicprogramguide"), (84, "Timerprogramming"), (85, "Initialconfiguration"), (86, "Selectbroadcasttype"), (87, "Selectsoundpresentation"), (96, "Playfunction"), (97, "Pauseplayfunction"), (98, "Recordfunction"), (99, "Pauserecordfunction"), (100, "Stopfunction"), (101, "Mutefunction"), (102, "Restorevolumefunction"), (103, "Tunefunction"), (104, "Selectmediafunction"), (105, "Selectavinputfunction"), (106, "Selectaudioinputfunction"), (107, "Powertogglefunction"), (108, "Powerofffunction"), (109, "Poweronfunction"), (113, "F1blue"), (114, "F2red"), (115, "F3green"), (116, "F4yellow"), (117, "F5"), (118, "Data")] }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let key_code = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "key_code")?;
+            CecKeyCode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid CecKeyCode: {}", n))?
+        };
+        encode_send_key(key_code)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
 }
 
 #[derive(Debug, serde::Serialize)]

@@ -488,6 +488,101 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ScanNetworks"),
+        (0x02, "AddOrUpdateWiFiNetwork"),
+        (0x03, "AddOrUpdateThreadNetwork"),
+        (0x04, "RemoveNetwork"),
+        (0x06, "ConnectNetwork"),
+        (0x08, "ReorderNetwork"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ScanNetworks"),
+        0x02 => Some("AddOrUpdateWiFiNetwork"),
+        0x03 => Some("AddOrUpdateThreadNetwork"),
+        0x04 => Some("RemoveNetwork"),
+        0x06 => Some("ConnectNetwork"),
+        0x08 => Some("ReorderNetwork"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "ssid", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "ssid", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "credentials", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "operational_dataset", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "network_id", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "network_id", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "network_id", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "network_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "breadcrumb", kind: crate::clusters::codec::FieldKind::U64, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let ssid = crate::clusters::codec::json_util::get_opt_octstr(args, "ssid")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_scan_networks(ssid, breadcrumb)
+        }
+        0x02 => {
+        let ssid = crate::clusters::codec::json_util::get_octstr(args, "ssid")?;
+        let credentials = crate::clusters::codec::json_util::get_octstr(args, "credentials")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_add_or_update_wifi_network(ssid, credentials, breadcrumb)
+        }
+        0x03 => {
+        let operational_dataset = crate::clusters::codec::json_util::get_octstr(args, "operational_dataset")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_add_or_update_thread_network(operational_dataset, breadcrumb)
+        }
+        0x04 => {
+        let network_id = crate::clusters::codec::json_util::get_octstr(args, "network_id")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_remove_network(network_id, breadcrumb)
+        }
+        0x06 => {
+        let network_id = crate::clusters::codec::json_util::get_octstr(args, "network_id")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_connect_network(network_id, breadcrumb)
+        }
+        0x08 => {
+        let network_id = crate::clusters::codec::json_util::get_octstr(args, "network_id")?;
+        let network_index = crate::clusters::codec::json_util::get_u8(args, "network_index")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        encode_reorder_network(network_id, network_index, breadcrumb)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ScanNetworksResponse {
     pub networking_status: Option<NetworkCommissioningStatus>,

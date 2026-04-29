@@ -613,6 +613,60 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SetTarget"),
+        (0x01, "Step"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SetTarget"),
+        0x01 => Some("Step"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "position", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "latch", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "speed", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "direction", kind: crate::clusters::codec::FieldKind::Enum { name: "StepDirection", variants: &[(0, "Decrease"), (1, "Increase")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "number_of_steps", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "speed", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let position = crate::clusters::codec::json_util::get_u8(args, "position")?;
+        let latch = crate::clusters::codec::json_util::get_bool(args, "latch")?;
+        let speed = crate::clusters::codec::json_util::get_u8(args, "speed")?;
+        encode_set_target(position, latch, speed)
+        }
+        0x01 => {
+        let direction = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "direction")?;
+            StepDirection::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepDirection: {}", n))?
+        };
+        let number_of_steps = crate::clusters::codec::json_util::get_u16(args, "number_of_steps")?;
+        let speed = crate::clusters::codec::json_util::get_u8(args, "speed")?;
+        encode_step(direction, number_of_steps, speed)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `SetTarget` command on cluster `Closure Dimension`.

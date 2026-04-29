@@ -1968,6 +1968,276 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "LockDoor"),
+        (0x01, "UnlockDoor"),
+        (0x02, "Toggle"),
+        (0x03, "UnlockWithTimeout"),
+        (0x0B, "SetWeekDaySchedule"),
+        (0x0C, "GetWeekDaySchedule"),
+        (0x0D, "ClearWeekDaySchedule"),
+        (0x0E, "SetYearDaySchedule"),
+        (0x0F, "GetYearDaySchedule"),
+        (0x10, "ClearYearDaySchedule"),
+        (0x11, "SetHolidaySchedule"),
+        (0x12, "GetHolidaySchedule"),
+        (0x13, "ClearHolidaySchedule"),
+        (0x1A, "SetUser"),
+        (0x1B, "GetUser"),
+        (0x1D, "ClearUser"),
+        (0x22, "SetCredential"),
+        (0x24, "GetCredentialStatus"),
+        (0x26, "ClearCredential"),
+        (0x27, "UnboltDoor"),
+        (0x28, "SetAliroReaderConfig"),
+        (0x29, "ClearAliroReaderConfig"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("LockDoor"),
+        0x01 => Some("UnlockDoor"),
+        0x02 => Some("Toggle"),
+        0x03 => Some("UnlockWithTimeout"),
+        0x0B => Some("SetWeekDaySchedule"),
+        0x0C => Some("GetWeekDaySchedule"),
+        0x0D => Some("ClearWeekDaySchedule"),
+        0x0E => Some("SetYearDaySchedule"),
+        0x0F => Some("GetYearDaySchedule"),
+        0x10 => Some("ClearYearDaySchedule"),
+        0x11 => Some("SetHolidaySchedule"),
+        0x12 => Some("GetHolidaySchedule"),
+        0x13 => Some("ClearHolidaySchedule"),
+        0x1A => Some("SetUser"),
+        0x1B => Some("GetUser"),
+        0x1D => Some("ClearUser"),
+        0x22 => Some("SetCredential"),
+        0x24 => Some("GetCredentialStatus"),
+        0x26 => Some("ClearCredential"),
+        0x27 => Some("UnboltDoor"),
+        0x28 => Some("SetAliroReaderConfig"),
+        0x29 => Some("ClearAliroReaderConfig"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "pin_code", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "pin_code", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x02 => Some(vec![]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "timeout", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "pin_code", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "week_day_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "days_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "DaysMask", bits: &[(1, "SUNDAY"), (2, "MONDAY"), (4, "TUESDAY"), (8, "WEDNESDAY"), (16, "THURSDAY"), (32, "FRIDAY"), (64, "SATURDAY")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "start_hour", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "start_minute", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "end_hour", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "end_minute", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "week_day_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x0D => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "week_day_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x0E => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "year_day_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "local_start_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "local_end_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x0F => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "year_day_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x10 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "year_day_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x11 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "holiday_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "local_start_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "local_end_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "operating_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "OperatingMode", variants: &[(0, "Normal"), (1, "Vacation"), (2, "Privacy"), (3, "Noremotelockunlock"), (4, "Passage")] }, optional: false, nullable: false },
+        ]),
+        0x12 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "holiday_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x13 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "holiday_index", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x1A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "operation_type", kind: crate::clusters::codec::FieldKind::Enum { name: "DataOperationType", variants: &[(0, "Add"), (1, "Clear"), (2, "Modify")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "user_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "user_unique_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "user_status", kind: crate::clusters::codec::FieldKind::Enum { name: "UserStatus", variants: &[(0, "Available"), (1, "Occupiedenabled"), (3, "Occupieddisabled")] }, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "user_type", kind: crate::clusters::codec::FieldKind::Enum { name: "UserType", variants: &[(0, "Unrestricteduser"), (1, "Yeardayscheduleuser"), (2, "Weekdayscheduleuser"), (3, "Programminguser"), (4, "Nonaccessuser"), (5, "Forceduser"), (6, "Disposableuser"), (7, "Expiringuser"), (8, "Schedulerestricteduser"), (9, "Remoteonlyuser")] }, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 6, name: "credential_rule", kind: crate::clusters::codec::FieldKind::Enum { name: "CredentialRule", variants: &[(0, "Single"), (1, "Dual"), (2, "Tri")] }, optional: false, nullable: true },
+        ]),
+        0x1B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x1D => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x22 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "operation_type", kind: crate::clusters::codec::FieldKind::Enum { name: "DataOperationType", variants: &[(0, "Add"), (1, "Clear"), (2, "Modify")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "credential", kind: crate::clusters::codec::FieldKind::Struct { name: "CredentialStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "credential_data", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "user_index", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "user_status", kind: crate::clusters::codec::FieldKind::Enum { name: "UserStatus", variants: &[(0, "Available"), (1, "Occupiedenabled"), (3, "Occupieddisabled")] }, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "user_type", kind: crate::clusters::codec::FieldKind::Enum { name: "UserType", variants: &[(0, "Unrestricteduser"), (1, "Yeardayscheduleuser"), (2, "Weekdayscheduleuser"), (3, "Programminguser"), (4, "Nonaccessuser"), (5, "Forceduser"), (6, "Disposableuser"), (7, "Expiringuser"), (8, "Schedulerestricteduser"), (9, "Remoteonlyuser")] }, optional: false, nullable: true },
+        ]),
+        0x24 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "credential", kind: crate::clusters::codec::FieldKind::Struct { name: "CredentialStruct" }, optional: false, nullable: false },
+        ]),
+        0x26 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "credential", kind: crate::clusters::codec::FieldKind::Struct { name: "CredentialStruct" }, optional: false, nullable: true },
+        ]),
+        0x27 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "pin_code", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x28 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "signing_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "verification_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_identifier", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "group_resolving_key", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x29 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        encode_lock_door(pin_code)
+        }
+        0x01 => {
+        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        encode_unlock_door(pin_code)
+        }
+        0x02 => Ok(vec![]),
+        0x03 => {
+        let timeout = crate::clusters::codec::json_util::get_u16(args, "timeout")?;
+        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        encode_unlock_with_timeout(timeout, pin_code)
+        }
+        0x0B => {
+        let week_day_index = crate::clusters::codec::json_util::get_u8(args, "week_day_index")?;
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        let days_mask = crate::clusters::codec::json_util::get_u8(args, "days_mask")?;
+        let start_hour = crate::clusters::codec::json_util::get_u8(args, "start_hour")?;
+        let start_minute = crate::clusters::codec::json_util::get_u8(args, "start_minute")?;
+        let end_hour = crate::clusters::codec::json_util::get_u8(args, "end_hour")?;
+        let end_minute = crate::clusters::codec::json_util::get_u8(args, "end_minute")?;
+        encode_set_week_day_schedule(week_day_index, user_index, days_mask, start_hour, start_minute, end_hour, end_minute)
+        }
+        0x0C => {
+        let week_day_index = crate::clusters::codec::json_util::get_u8(args, "week_day_index")?;
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        encode_get_week_day_schedule(week_day_index, user_index)
+        }
+        0x0D => {
+        let week_day_index = crate::clusters::codec::json_util::get_u8(args, "week_day_index")?;
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        encode_clear_week_day_schedule(week_day_index, user_index)
+        }
+        0x0E => {
+        let year_day_index = crate::clusters::codec::json_util::get_u8(args, "year_day_index")?;
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        let local_start_time = crate::clusters::codec::json_util::get_u64(args, "local_start_time")?;
+        let local_end_time = crate::clusters::codec::json_util::get_u64(args, "local_end_time")?;
+        encode_set_year_day_schedule(year_day_index, user_index, local_start_time, local_end_time)
+        }
+        0x0F => {
+        let year_day_index = crate::clusters::codec::json_util::get_u8(args, "year_day_index")?;
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        encode_get_year_day_schedule(year_day_index, user_index)
+        }
+        0x10 => {
+        let year_day_index = crate::clusters::codec::json_util::get_u8(args, "year_day_index")?;
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        encode_clear_year_day_schedule(year_day_index, user_index)
+        }
+        0x11 => {
+        let holiday_index = crate::clusters::codec::json_util::get_u8(args, "holiday_index")?;
+        let local_start_time = crate::clusters::codec::json_util::get_u64(args, "local_start_time")?;
+        let local_end_time = crate::clusters::codec::json_util::get_u64(args, "local_end_time")?;
+        let operating_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "operating_mode")?;
+            OperatingMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid OperatingMode: {}", n))?
+        };
+        encode_set_holiday_schedule(holiday_index, local_start_time, local_end_time, operating_mode)
+        }
+        0x12 => {
+        let holiday_index = crate::clusters::codec::json_util::get_u8(args, "holiday_index")?;
+        encode_get_holiday_schedule(holiday_index)
+        }
+        0x13 => {
+        let holiday_index = crate::clusters::codec::json_util::get_u8(args, "holiday_index")?;
+        encode_clear_holiday_schedule(holiday_index)
+        }
+        0x1A => {
+        let operation_type = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "operation_type")?;
+            DataOperationType::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid DataOperationType: {}", n))?
+        };
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        let user_name = crate::clusters::codec::json_util::get_opt_string(args, "user_name")?;
+        let user_unique_id = crate::clusters::codec::json_util::get_opt_u32(args, "user_unique_id")?;
+        let user_status = crate::clusters::codec::json_util::get_opt_u64(args, "user_status")?
+            .and_then(|n| UserStatus::from_u8(n as u8));
+        let user_type = crate::clusters::codec::json_util::get_opt_u64(args, "user_type")?
+            .and_then(|n| UserType::from_u8(n as u8));
+        let credential_rule = crate::clusters::codec::json_util::get_opt_u64(args, "credential_rule")?
+            .and_then(|n| CredentialRule::from_u8(n as u8));
+        encode_set_user(operation_type, user_index, user_name, user_unique_id, user_status, user_type, credential_rule)
+        }
+        0x1B => {
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        encode_get_user(user_index)
+        }
+        0x1D => {
+        let user_index = crate::clusters::codec::json_util::get_u16(args, "user_index")?;
+        encode_clear_user(user_index)
+        }
+        0x22 => Err(anyhow::anyhow!("command \"SetCredential\" has complex args: use raw mode")),
+        0x24 => Err(anyhow::anyhow!("command \"GetCredentialStatus\" has complex args: use raw mode")),
+        0x26 => Err(anyhow::anyhow!("command \"ClearCredential\" has complex args: use raw mode")),
+        0x27 => {
+        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        encode_unbolt_door(pin_code)
+        }
+        0x28 => {
+        let signing_key = crate::clusters::codec::json_util::get_octstr(args, "signing_key")?;
+        let verification_key = crate::clusters::codec::json_util::get_octstr(args, "verification_key")?;
+        let group_identifier = crate::clusters::codec::json_util::get_octstr(args, "group_identifier")?;
+        let group_resolving_key = crate::clusters::codec::json_util::get_octstr(args, "group_resolving_key")?;
+        encode_set_aliro_reader_config(signing_key, verification_key, group_identifier, group_resolving_key)
+        }
+        0x29 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct GetWeekDayScheduleResponse {
     pub week_day_index: Option<u8>,

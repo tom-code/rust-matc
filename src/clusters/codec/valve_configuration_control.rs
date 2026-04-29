@@ -319,6 +319,46 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Open"),
+        (0x01, "Close"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Open"),
+        0x01 => Some("Close"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "open_duration", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "target_level", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let open_duration = crate::clusters::codec::json_util::get_opt_u32(args, "open_duration")?;
+        let target_level = crate::clusters::codec::json_util::get_u8(args, "target_level")?;
+        encode_open(open_duration, target_level)
+        }
+        0x01 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `Open` command on cluster `Valve Configuration and Control`.

@@ -488,6 +488,68 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "CreateTwoDCartesianZone"),
+        (0x02, "UpdateTwoDCartesianZone"),
+        (0x03, "RemoveZone"),
+        (0x04, "CreateOrUpdateTrigger"),
+        (0x05, "RemoveTrigger"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("CreateTwoDCartesianZone"),
+        0x02 => Some("UpdateTwoDCartesianZone"),
+        0x03 => Some("RemoveZone"),
+        0x04 => Some("CreateOrUpdateTrigger"),
+        0x05 => Some("RemoveTrigger"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "zone", kind: crate::clusters::codec::FieldKind::Struct { name: "TwoDCartesianZoneStruct" }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "zone", kind: crate::clusters::codec::FieldKind::Struct { name: "TwoDCartesianZoneStruct" }, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "trigger", kind: crate::clusters::codec::FieldKind::Struct { name: "ZoneTriggerControlStruct" }, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"CreateTwoDCartesianZone\" has complex args: use raw mode")),
+        0x02 => Err(anyhow::anyhow!("command \"UpdateTwoDCartesianZone\" has complex args: use raw mode")),
+        0x03 => {
+        let zone_id = crate::clusters::codec::json_util::get_u8(args, "zone_id")?;
+        encode_remove_zone(zone_id)
+        }
+        0x04 => Err(anyhow::anyhow!("command \"CreateOrUpdateTrigger\" has complex args: use raw mode")),
+        0x05 => {
+        let zone_id = crate::clusters::codec::json_util::get_u8(args, "zone_id")?;
+        encode_remove_trigger(zone_id)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct CreateTwoDCartesianZoneResponse {
     pub zone_id: Option<u8>,

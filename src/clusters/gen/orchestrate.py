@@ -226,9 +226,9 @@ def generate_rust_code(xml_file: str) -> str:
     # tlv is only needed for commands, attributes, response commands, events, and structs (not enums)
     if commands_with_fields or attributes or response_commands_with_fields or events_with_fields or structs:
         imports += "use crate::tlv;\n"
-    if commands_with_fields or attributes or response_commands_with_fields or events_with_fields:
+    if commands_with_fields or commands or attributes or response_commands_with_fields or events_with_fields:
         imports += "use anyhow;\n"
-    if attributes:
+    if attributes or commands:
         imports += "use serde_json;\n"
 
     # Check which specific serialization helpers are needed
@@ -336,6 +336,12 @@ use crate::clusters::helpers::{{{helpers_import}}};
 
         # Generate attribute list function
         code += generate_attribute_list_function(parser.cluster_id, attributes)
+
+    # Generate command schema and JSON encoder
+    if commands:
+        code += generate_command_list_function(commands)
+        code += generate_command_schema_function(commands, enums, bitmaps, structs)
+        code += generate_command_json_encoder_function(commands, structs, enums, bitmaps)
 
     # Generate command response decoders
     if response_commands:
@@ -541,6 +547,679 @@ def generate_main_attribute_list_dispatcher(cluster_info: List[Dict[str, str]]) 
     return _generate_cluster_dispatcher(cluster_info, "attribute")
 
 
+# ---------------------------------------------------------------------------
+# Command schema / JSON encoder generation helpers
+# ---------------------------------------------------------------------------
+
+# Map from Matter type to FieldKind variant name (unit variants).
+_SCALAR_FIELD_KIND = {
+    'uint8':        'U8',
+    'uint16':       'U16',
+    'uint32':       'U32',
+    'uint64':       'U64',
+    'int8':         'I8',
+    'int16':        'I16',
+    'int32':        'I32',
+    'int64':        'I64',
+    'bool':         'Bool',
+    'string':       'String',
+    'octstr':       'OctetString',
+    # Specialised Matter numeric aliases -> closest scalar
+    'epoch-s':      'U64',
+    'epoch-us':     'U64',
+    'elapsed-s':    'U32',
+    'power-mW':     'U32',
+    'energy-mWh':   'U64',
+    'temperature':  'I16',
+    'devtype-id':   'U32',
+    'cluster-id':   'U32',
+    'endpoint-no':  'U16',
+    'node-id':      'U64',
+    'vendor-id':    'U16',
+    'subject-id':   'U64',
+    'SubjectID':    'U64',
+    'attribute-id': 'U32',
+    'enum8':        'U8',
+    'enum16':       'U16',
+    'bitmap8':      'U8',
+    'bitmap16':     'U16',
+    'bitmap32':     'U32',
+}
+
+
+def _matter_type_to_field_kind_expr(field, enums, bitmaps) -> str:
+    """Return a Rust FieldKind expression string for the given MatterField."""
+    from .models.enums import MatterEnum, MatterBitmap
+    from .naming import convert_to_snake_case, escape_rust_keyword
+
+    ft = field.field_type
+    if ft == 'list':
+        et = field.entry_type or 'uint8'
+        return f'crate::clusters::codec::FieldKind::List {{ entry_type: "{et}" }}'
+
+    if ft.endswith('Enum') and enums and ft in enums:
+        enum_obj = enums[ft]
+        rust_name = enum_obj.get_rust_enum_name()
+        # Emit variants inline as static slice (const-promotable literals).
+        variants = ", ".join(
+            f'({v}, "{n}")' for v, n, _ in enum_obj.items
+        )
+        return (
+            f'crate::clusters::codec::FieldKind::Enum {{ '
+            f'name: "{rust_name}", '
+            f'variants: &[{variants}] }}'
+        )
+
+    if ft.endswith('Bitmap') and bitmaps and ft in bitmaps:
+        bmp = bitmaps[ft]
+        rust_name = bmp.get_rust_bitmap_name()
+        bits = ", ".join(
+            f'({1 << bp}, "{n}")' for bp, n, _ in bmp.bitfields
+        )
+        return (
+            f'crate::clusters::codec::FieldKind::Bitmap {{ '
+            f'name: "{rust_name}", '
+            f'bits: &[{bits}] }}'
+        )
+
+    if ft.endswith('Struct'):
+        return f'crate::clusters::codec::FieldKind::Struct {{ name: "{ft}" }}'
+
+    # Generic enum/bitmap without local definition -> scalar fallback
+    if ft.endswith('Enum'):
+        return 'crate::clusters::codec::FieldKind::U8'
+    if ft.endswith('Bitmap'):
+        return 'crate::clusters::codec::FieldKind::U8'
+
+    kind = _SCALAR_FIELD_KIND.get(ft, 'U32')
+    return f'crate::clusters::codec::FieldKind::{kind}'
+
+
+def _field_has_complex_type(field, structs) -> bool:
+    """True if the field can't be encoded by the simple JSON encoder (v1)."""
+    # Any list field is complex for v1 (even list of primitives).
+    if field.field_type == 'list':
+        return True
+    if field.field_type.endswith('Struct') and structs and field.field_type in structs:
+        return True
+    return False
+
+
+def _command_has_complex_fields(command, structs) -> bool:
+    """True if any visible (non-cross-cluster-skipped) field is complex."""
+    for f in command.fields:
+        # Skip cross-cluster struct refs the same way render_params does.
+        if f.field_type == 'list' and f.entry_type and f.entry_type.endswith('Struct') and (not structs or f.entry_type not in structs):
+            continue
+        if not f.field_type == 'list' and f.field_type.endswith('Struct') and (not structs or f.field_type not in structs):
+            continue
+        if _field_has_complex_type(f, structs):
+            return True
+    return False
+
+
+# Map Matter type -> (get_fn, cast_suffix) for optional and mandatory extraction.
+# cast_suffix is what to append after the extracted u64/i64 value.
+_JSON_EXTRACT = {
+    'uint8':        ('get_u8',   ''),
+    'uint16':       ('get_u16',  ''),
+    'uint32':       ('get_u32',  ''),
+    'uint64':       ('get_u64',  ''),
+    'int8':         ('get_i8',   ''),
+    'int16':        ('get_i16',  ''),
+    'int32':        ('get_i32',  ''),
+    'int64':        ('get_i64',  ''),
+    'bool':         ('get_bool', ''),
+    'string':       ('get_string', ''),
+    'octstr':       ('get_octstr', ''),
+    'epoch-s':      ('get_u64',  ''),
+    'epoch-us':     ('get_u64',  ''),
+    'elapsed-s':    ('get_u32',  ''),
+    'power-mW':     ('get_u32',  ''),
+    'energy-mWh':   ('get_u64',  ''),
+    'temperature':  ('get_i16',  ''),
+    'devtype-id':   ('get_u32',  ''),
+    'cluster-id':   ('get_u32',  ''),
+    'endpoint-no':  ('get_u16',  ''),
+    'node-id':      ('get_u64',  ''),
+    'vendor-id':    ('get_u16',  ''),
+    'subject-id':   ('get_u64',  ''),
+    'SubjectID':    ('get_u64',  ''),
+    'attribute-id': ('get_u32',  ''),
+    'enum8':        ('get_u8',   ''),
+    'enum16':       ('get_u16',  ''),
+    'bitmap8':      ('get_u8',   ''),
+    'bitmap16':     ('get_u16',  ''),
+    'bitmap32':     ('get_u32',  ''),
+}
+
+
+_RUST_SCALAR_TO_EXTRACT = {
+    'u8':      'get_u8',
+    'u16':     'get_u16',
+    'u32':     'get_u32',
+    'u64':     'get_u64',
+    'i8':      'get_i8',
+    'i16':     'get_i16',
+    'i32':     'get_i32',
+    'i64':     'get_i64',
+    'bool':    'get_bool',
+    'String':  'get_string',
+    'Vec<u8>': 'get_octstr',
+}
+
+
+def _generate_field_json_extraction(param_name: str, rust_type: str, field, enums, bitmaps) -> str:
+    """
+    Return a Rust let-binding that extracts one field from the JSON `args`.
+    Dispatches on `rust_type` (the Rust type from render_params) so the
+    extracted value always matches what the encode_* function expects.
+    """
+    json_key = field.get_rust_param_name()
+
+    # Unwrap Option<T>
+    is_opt = rust_type.startswith('Option<')
+    inner_type = rust_type[7:-1] if is_opt else rust_type
+    opt_prefix = 'opt_' if is_opt else ''
+
+    # --- simple scalar types ---
+    if inner_type in _RUST_SCALAR_TO_EXTRACT:
+        base_fn = _RUST_SCALAR_TO_EXTRACT[inner_type]
+        get_fn = base_fn.replace('get_', f'get_{opt_prefix}')
+        return f'let {param_name} = crate::clusters::codec::json_util::{get_fn}(args, "{json_key}")?;'
+
+    # --- enum types (named Rust enum, not a primitive) ---
+    if enums:
+        for eobj in enums.values():
+            if eobj.get_rust_enum_name() == inner_type:
+                if is_opt:
+                    return (
+                        f'let {param_name} = crate::clusters::codec::json_util::get_opt_u64(args, "{json_key}")?\n'
+                        f'            .and_then(|n| {inner_type}::from_u8(n as u8));'
+                    )
+                else:
+                    return (
+                        f'let {param_name} = {{\n'
+                        f'            let n = crate::clusters::codec::json_util::get_u64(args, "{json_key}")?;\n'
+                        f'            {inner_type}::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid {inner_type}: {{}}", n))?\n'
+                        f'        }};'
+                    )
+
+    # --- bitmap types (type aliases to numeric) ---
+    if bitmaps:
+        for bobj in bitmaps.values():
+            if bobj.get_rust_bitmap_name() == inner_type:
+                base_type = bobj.get_base_type()
+                get_fn = f'get_{opt_prefix}{base_type}'
+                return f'let {param_name} = crate::clusters::codec::json_util::{get_fn}(args, "{json_key}")?;'
+
+    # --- fallback: treat as u32 (handles unknown bitmap aliases, etc.) ---
+    get_fn = f'get_{opt_prefix}u32'
+    return f'let {param_name} = crate::clusters::codec::json_util::{get_fn}(args, "{json_key}")?;'
+
+
+def generate_command_list_function(commands) -> str:
+    """Generate get_command_list() and get_command_name() for one cluster."""
+    if not commands:
+        return ''
+
+    seen: set = set()
+    entries = []
+    for cmd in commands:
+        if cmd.id not in seen:
+            seen.add(cmd.id)
+            entries.append((cmd.id, cmd.name))
+
+    if not entries:
+        return ''
+
+    list_lines = '\n'.join(f'        ({cid}, "{cname}"),' for cid, cname in entries)
+    name_arms = '\n'.join(f'        {cid} => Some("{cname}"),' for cid, cname in entries)
+
+    return f'''// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {{
+    vec![
+{list_lines}
+    ]
+}}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {{
+    match cmd_id {{
+{name_arms}
+        _ => None,
+    }}
+}}
+
+'''
+
+
+def generate_command_schema_function(commands, enums, bitmaps, structs) -> str:
+    """Generate get_command_schema() for one cluster."""
+    if not commands:
+        return ''
+
+    seen: set = set()
+    arms = []
+    for cmd in commands:
+        if cmd.id in seen:
+            continue
+        seen.add(cmd.id)
+
+        # Filter fields the same way render_params does (skip cross-cluster struct refs).
+        visible_fields = []
+        for f in cmd.fields:
+            if f.is_list and f.entry_type and f.entry_type.endswith('Struct') and (not structs or f.entry_type not in structs):
+                continue
+            if not f.is_list and f.field_type.endswith('Struct') and (not structs or f.field_type not in structs):
+                continue
+            visible_fields.append(f)
+
+        if not visible_fields:
+            arms.append(f'        {cmd.id} => Some(vec![]),')
+            continue
+
+        field_constructors = []
+        for f in visible_fields:
+            kind_expr = _matter_type_to_field_kind_expr(f, enums, bitmaps)
+            opt_str = 'true' if not f.mandatory else 'false'
+            null_str = 'true' if f.nullable else 'false'
+            field_constructors.append(
+                f'            crate::clusters::codec::CommandField {{ '
+                f'tag: {f.id}, '
+                f'name: "{f.get_rust_param_name()}", '
+                f'kind: {kind_expr}, '
+                f'optional: {opt_str}, '
+                f'nullable: {null_str} }},'
+            )
+        fields_str = '\n'.join(field_constructors)
+        arms.append(f'        {cmd.id} => Some(vec![\n{fields_str}\n        ]),')
+
+    arms_str = '\n'.join(arms)
+
+    return f'''pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {{
+    match cmd_id {{
+{arms_str}
+        _ => None,
+    }}
+}}
+
+'''
+
+
+def generate_command_json_encoder_function(commands, structs, enums, bitmaps) -> str:
+    """Generate encode_command_json() for one cluster."""
+    if not commands:
+        return ''
+
+    seen: set = set()
+    arms = []
+    for cmd in commands:
+        if cmd.id in seen:
+            continue
+        seen.add(cmd.id)
+
+        if not cmd.fields:
+            # No fields -> empty payload
+            arms.append(f'        {cmd.id} => Ok(vec![]),')
+            continue
+
+        if _command_has_complex_fields(cmd, structs):
+            arms.append(
+                f'        {cmd.id} => Err(anyhow::anyhow!('
+                f'"command \\\"{cmd.name}\\\" has complex args: use raw mode")),'
+            )
+            continue
+
+        # Build extraction lines + call to encode_*
+        from .models.commands import MatterCommand
+        param_fields, use_param_struct, struct_name = cmd.render_params(structs, enums, bitmaps)
+
+        extract_lines = []
+        for (pname, ptype), field in zip(param_fields, [
+            f for f in cmd.fields
+            if not (f.is_list and f.entry_type and f.entry_type.endswith('Struct') and (not structs or f.entry_type not in structs))
+            and not (not f.is_list and f.field_type.endswith('Struct') and (not structs or f.field_type not in structs))
+        ]):
+            extract_lines.append(
+                '        ' + _generate_field_json_extraction(pname, ptype, field, enums, bitmaps)
+            )
+
+        extract_str = '\n'.join(extract_lines)
+        func_name = cmd.get_rust_function_name()
+
+        if use_param_struct:
+            struct_fields = '\n'.join(f'                {n}: {n},' for n, _ in param_fields)
+            call = (
+                f'        let params = {struct_name} {{\n'
+                f'{struct_fields}\n'
+                f'        }};\n'
+                f'        {func_name}(params)'
+            )
+        else:
+            call_args = ', '.join(n for n, _ in param_fields)
+            call = f'        {func_name}({call_args})'
+
+        arms.append(
+            f'        {cmd.id} => {{\n'
+            f'{extract_str}\n'
+            f'{call}\n'
+            f'        }}'
+        )
+
+    arms_str = '\n'.join(arms)
+
+    # Use _args when no arm reads from args (avoids unused variable warning).
+    # Check for the actual call pattern, not just the string "args".
+    uses_args = any('json_util::get' in arm for arm in arms)
+    args_param = 'args' if uses_args else '_args'
+
+    return f'''pub fn encode_command_json(cmd_id: u32, {args_param}: &serde_json::Value) -> anyhow::Result<Vec<u8>> {{
+    match cmd_id {{
+{arms_str}
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{{:02X}}", cmd_id)),
+    }}
+}}
+
+'''
+
+
+def _generate_command_dispatchers(cluster_info: List[Dict]) -> str:
+    """Generate cross-cluster command dispatchers for mod.rs."""
+    seen: set = set()
+    list_arms = []
+    name_arms = []
+    schema_arms = []
+    encoder_arms = []
+
+    for info in sorted(cluster_info, key=lambda x: x['cluster_id']):
+        cid = info['cluster_id']
+        mod = info['module_name']
+        if not info.get('has_commands', False) or cid in seen:
+            continue
+        seen.add(cid)
+        list_arms.append(f'        {cid} => {mod}::get_command_list(),')
+        name_arms.append(f'        {cid} => {mod}::get_command_name(cmd_id),')
+        schema_arms.append(f'        {cid} => {mod}::get_command_schema(cmd_id),')
+        encoder_arms.append(f'        {cid} => {mod}::encode_command_json(cmd_id, args),')
+
+    list_arms_str = '\n'.join(list_arms)
+    name_arms_str = '\n'.join(name_arms)
+    schema_arms_str = '\n'.join(schema_arms)
+    encoder_arms_str = '\n'.join(encoder_arms)
+
+    return f'''
+pub fn get_command_list(cluster_id: u32) -> Vec<(u32, &'static str)> {{
+    match cluster_id {{
+{list_arms_str}
+        _ => vec![],
+    }}
+}}
+
+pub fn get_command_name(cluster_id: u32, cmd_id: u32) -> Option<&'static str> {{
+    match cluster_id {{
+{name_arms_str}
+        _ => None,
+    }}
+}}
+
+pub fn get_command_schema(cluster_id: u32, cmd_id: u32) -> Option<Vec<CommandField>> {{
+    match cluster_id {{
+{schema_arms_str}
+        _ => None,
+    }}
+}}
+
+pub fn encode_command_json(cluster_id: u32, cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {{
+    match cluster_id {{
+{encoder_arms_str}
+        _ => Err(anyhow::anyhow!("unsupported cluster: 0x{{:04X}}", cluster_id)),
+    }}
+}}
+'''
+
+
+_SCHEMA_RS = '''\
+// Shared types for runtime-introspectable command schemas.
+// Referenced by generated per-cluster codec files and by matc consumers.
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct CommandField {
+    pub tag: u32,
+    pub name: &\'static str,
+    pub kind: FieldKind,
+    pub optional: bool,
+    pub nullable: bool,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum FieldKind {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    Bool,
+    String,
+    OctetString,
+    Enum {
+        name: &\'static str,
+        variants: &\'static [(u32, &\'static str)],
+    },
+    Bitmap {
+        name: &\'static str,
+        bits: &\'static [(u32, &\'static str)],
+    },
+    Struct {
+        name: &\'static str,
+    },
+    List {
+        entry_type: &\'static str,
+    },
+}
+'''
+
+_JSON_UTIL_RS = '''\
+// Helper functions for extracting typed values from serde_json::Value objects
+// used by the generated encode_command_json functions.
+
+use anyhow;
+
+pub fn get_u8(args: &serde_json::Value, name: &str) -> anyhow::Result<u8> {
+    args.get(name)
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u8)
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_u16(args: &serde_json::Value, name: &str) -> anyhow::Result<u16> {
+    args.get(name)
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u16)
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_u32(args: &serde_json::Value, name: &str) -> anyhow::Result<u32> {
+    args.get(name)
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32)
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_u64(args: &serde_json::Value, name: &str) -> anyhow::Result<u64> {
+    args.get(name)
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_i8(args: &serde_json::Value, name: &str) -> anyhow::Result<i8> {
+    args.get(name)
+        .and_then(|v| v.as_i64())
+        .map(|n| n as i8)
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_i16(args: &serde_json::Value, name: &str) -> anyhow::Result<i16> {
+    args.get(name)
+        .and_then(|v| v.as_i64())
+        .map(|n| n as i16)
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_i32(args: &serde_json::Value, name: &str) -> anyhow::Result<i32> {
+    args.get(name)
+        .and_then(|v| v.as_i64())
+        .map(|n| n as i32)
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_i64(args: &serde_json::Value, name: &str) -> anyhow::Result<i64> {
+    args.get(name)
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_bool(args: &serde_json::Value, name: &str) -> anyhow::Result<bool> {
+    args.get(name)
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+pub fn get_string(args: &serde_json::Value, name: &str) -> anyhow::Result<String> {
+    args.get(name)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))
+}
+
+// Accepts a hex string and decodes it to bytes.
+pub fn get_octstr(args: &serde_json::Value, name: &str) -> anyhow::Result<Vec<u8>> {
+    let s = args.get(name)
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("missing or invalid field: {}", name))?;
+    let s = s.replace(\' \', "");
+    hex::decode(&s).map_err(|e| anyhow::anyhow!("field {}: invalid hex: {}", name, e))
+}
+
+// Optional variants - return None when the field is absent or null.
+pub fn get_opt_u8(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<u8>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_u64()
+            .map(|n| Some(n as u8))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_u16(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<u16>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_u64()
+            .map(|n| Some(n as u16))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_u32(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<u32>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_u64()
+            .map(|n| Some(n as u32))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_u64(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<u64>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_u64()
+            .map(Some)
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_i8(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<i8>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_i64()
+            .map(|n| Some(n as i8))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_i16(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<i16>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_i64()
+            .map(|n| Some(n as i16))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_i32(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<i32>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_i64()
+            .map(|n| Some(n as i32))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_i64(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<i64>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_i64()
+            .map(Some)
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_bool(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<bool>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_bool()
+            .map(Some)
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_string(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<String>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v.as_str()
+            .map(|s| Some(s.to_string()))
+            .ok_or_else(|| anyhow::anyhow!("invalid field: {}", name)),
+    }
+}
+
+pub fn get_opt_octstr(args: &serde_json::Value, name: &str) -> anyhow::Result<Option<Vec<u8>>> {
+    match args.get(name) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => {
+            let s = v.as_str().ok_or_else(|| anyhow::anyhow!("invalid field: {}", name))?;
+            let s = s.replace(\' \', "");
+            hex::decode(&s)
+                .map(Some)
+                .map_err(|e| anyhow::anyhow!("field {}: invalid hex: {}", name, e))
+        }
+    }
+}
+'''
+
+
+def generate_support_files(output_dir: str) -> None:
+    """Write schema.rs and json_util.rs into output_dir."""
+    for filename, content in (('schema.rs', _SCHEMA_RS), ('json_util.rs', _JSON_UTIL_RS)):
+        path = os.path.join(output_dir, filename)
+        with open(path, 'w') as f:
+            f.write(content)
+        print(f"  + Wrote {filename}")
+
+
 def generate_mod_file(output_dir: str, rust_files: List[str], cluster_info: List[Dict[str, str]]) -> None:
     """Generate a mod.rs file that includes all generated modules."""
     mod_file_path = os.path.join(output_dir, "mod.rs")
@@ -550,20 +1229,27 @@ def generate_mod_file(output_dir: str, rust_files: List[str], cluster_info: List
         f.write("//! \n")
         f.write("//! This file is automatically generated.\n\n")
 
-        # Generate module declarations
+        f.write("pub mod schema;\n")
+        f.write("pub mod json_util;\n")
+        f.write("pub use schema::{CommandField, FieldKind};\n\n")
+
+        # Generated module declarations
         for rust_file in sorted(rust_files):
             module_name = generate_module_name(rust_file)
             f.write(f"pub mod {module_name};\n")
 
-        # Add main dispatcher function
+        # Attribute dispatchers (existing)
         f.write("\n")
         f.write(generate_main_dispatcher(cluster_info))
 
-        # Add main attribute list dispatcher function
         f.write("\n")
         f.write(generate_main_attribute_list_dispatcher(cluster_info))
 
-    print(f"  ✓ Generated mod.rs with {len(rust_files)} modules and main dispatchers")
+        # Command dispatchers (new)
+        f.write("\n")
+        f.write(_generate_command_dispatchers(cluster_info))
+
+    print(f"  ✓ Generated mod.rs with {len(rust_files)} modules and dispatchers")
 
 
 def process_xml_files(xml_dir: str, output_dir: str) -> None:
@@ -606,10 +1292,20 @@ def process_xml_files(xml_dir: str, output_dir: str) -> None:
             attributes = root.findall(".//attribute")
             has_attributes = len(attributes) > 0
 
+            # Check if cluster has commandToServer commands
+            commands_elem = root.find('commands')
+            has_commands = False
+            if commands_elem is not None:
+                has_commands = any(
+                    cmd.get('direction', 'commandToServer') == 'commandToServer'
+                    for cmd in commands_elem.findall('command')
+                )
+
             cluster_info.append({
                 'cluster_id': cluster_id,
                 'module_name': module_name,
                 'has_attributes': has_attributes,
+                'has_commands': has_commands,
                 'xml_filename': xml_filename
             })
 
@@ -626,8 +1322,9 @@ def process_xml_files(xml_dir: str, output_dir: str) -> None:
             print(f"  ✗ Error processing {xml_filename}: {e}")
             failed_count += 1
 
-    # Generate mod.rs file with main dispatcher
+    # Write support files and mod.rs
     if generated_rust_files:
+        generate_support_files(output_dir)
         generate_mod_file(output_dir, generated_rust_files, cluster_info)
 
     print(f"\nProcessing complete:")

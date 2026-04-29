@@ -264,6 +264,122 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AddScene"),
+        (0x01, "ViewScene"),
+        (0x02, "RemoveScene"),
+        (0x03, "RemoveAllScenes"),
+        (0x04, "StoreScene"),
+        (0x05, "RecallScene"),
+        (0x06, "GetSceneMembership"),
+        (0x40, "CopyScene"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AddScene"),
+        0x01 => Some("ViewScene"),
+        0x02 => Some("RemoveScene"),
+        0x03 => Some("RemoveAllScenes"),
+        0x04 => Some("StoreScene"),
+        0x05 => Some("RecallScene"),
+        0x06 => Some("GetSceneMembership"),
+        0x40 => Some("CopyScene"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "scene_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "extension_field_set_structs", kind: crate::clusters::codec::FieldKind::List { entry_type: "ExtensionFieldSetStruct" }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x40 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "mode", kind: crate::clusters::codec::FieldKind::Bitmap { name: "CopyMode", bits: &[(1, "COPY_ALL_SCENES")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "group_identifier_from", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "scene_identifier_from", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "group_identifier_to", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "scene_identifier_to", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"AddScene\" has complex args: use raw mode")),
+        0x01 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
+        encode_view_scene(group_id, scene_id)
+        }
+        0x02 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
+        encode_remove_scene(group_id, scene_id)
+        }
+        0x03 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_remove_all_scenes(group_id)
+        }
+        0x04 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
+        encode_store_scene(group_id, scene_id)
+        }
+        0x05 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
+        let transition_time = crate::clusters::codec::json_util::get_opt_u32(args, "transition_time")?;
+        encode_recall_scene(group_id, scene_id, transition_time)
+        }
+        0x06 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_get_scene_membership(group_id)
+        }
+        0x40 => {
+        let mode = crate::clusters::codec::json_util::get_u8(args, "mode")?;
+        let group_identifier_from = crate::clusters::codec::json_util::get_u8(args, "group_identifier_from")?;
+        let scene_identifier_from = crate::clusters::codec::json_util::get_u8(args, "scene_identifier_from")?;
+        let group_identifier_to = crate::clusters::codec::json_util::get_u8(args, "group_identifier_to")?;
+        let scene_identifier_to = crate::clusters::codec::json_util::get_u8(args, "scene_identifier_to")?;
+        encode_copy_scene(mode, group_identifier_from, scene_identifier_from, group_identifier_to, scene_identifier_to)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AddSceneResponse {
     pub status: Option<u8>,

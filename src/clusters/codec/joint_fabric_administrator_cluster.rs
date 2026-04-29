@@ -212,6 +212,78 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ICACCSRRequest"),
+        (0x02, "AddICAC"),
+        (0x04, "OpenJointCommissioningWindow"),
+        (0x05, "TransferAnchorRequest"),
+        (0x07, "TransferAnchorComplete"),
+        (0x08, "AnnounceJointFabricAdministrator"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ICACCSRRequest"),
+        0x02 => Some("AddICAC"),
+        0x04 => Some("OpenJointCommissioningWindow"),
+        0x05 => Some("TransferAnchorRequest"),
+        0x07 => Some("TransferAnchorComplete"),
+        0x08 => Some("AnnounceJointFabricAdministrator"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 1, name: "icac_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "commissioning_timeout", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "pake_passcode_verifier", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "discriminator", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "iterations", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "salt", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![]),
+        0x07 => Some(vec![]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Ok(vec![]),
+        0x02 => {
+        let icac_value = crate::clusters::codec::json_util::get_octstr(args, "icac_value")?;
+        encode_add_icac(icac_value)
+        }
+        0x04 => {
+        let commissioning_timeout = crate::clusters::codec::json_util::get_u16(args, "commissioning_timeout")?;
+        let pake_passcode_verifier = crate::clusters::codec::json_util::get_octstr(args, "pake_passcode_verifier")?;
+        let discriminator = crate::clusters::codec::json_util::get_u16(args, "discriminator")?;
+        let iterations = crate::clusters::codec::json_util::get_u32(args, "iterations")?;
+        let salt = crate::clusters::codec::json_util::get_octstr(args, "salt")?;
+        encode_open_joint_commissioning_window(commissioning_timeout, pake_passcode_verifier, discriminator, iterations, salt)
+        }
+        0x05 => Ok(vec![]),
+        0x07 => Ok(vec![]),
+        0x08 => {
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
+        encode_announce_joint_fabric_administrator(endpoint_id)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ICACCSRResponse {
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]

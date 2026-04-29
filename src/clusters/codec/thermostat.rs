@@ -1728,6 +1728,63 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SetpointRaiseLower"),
+        (0x05, "SetActiveScheduleRequest"),
+        (0x06, "SetActivePresetRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SetpointRaiseLower"),
+        0x05 => Some("SetActiveScheduleRequest"),
+        0x06 => Some("SetActivePresetRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "mode", kind: crate::clusters::codec::FieldKind::Enum { name: "SetpointRaiseLowerMode", variants: &[(0, "Heat"), (1, "Cool"), (2, "Both")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "amount", kind: crate::clusters::codec::FieldKind::I8, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "schedule_handle", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "preset_handle", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: true },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "mode")?;
+            SetpointRaiseLowerMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid SetpointRaiseLowerMode: {}", n))?
+        };
+        let amount = crate::clusters::codec::json_util::get_i8(args, "amount")?;
+        encode_setpoint_raise_lower(mode, amount)
+        }
+        0x05 => {
+        let schedule_handle = crate::clusters::codec::json_util::get_octstr(args, "schedule_handle")?;
+        encode_set_active_schedule_request(schedule_handle)
+        }
+        0x06 => {
+        let preset_handle = crate::clusters::codec::json_util::get_opt_octstr(args, "preset_handle")?;
+        encode_set_active_preset_request(preset_handle)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `SetpointRaiseLower` command on cluster `Thermostat`.

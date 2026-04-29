@@ -469,6 +469,173 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "InstantAction"),
+        (0x01, "InstantActionWithTransition"),
+        (0x02, "StartAction"),
+        (0x03, "StartActionWithDuration"),
+        (0x04, "StopAction"),
+        (0x05, "PauseAction"),
+        (0x06, "PauseActionWithDuration"),
+        (0x07, "ResumeAction"),
+        (0x08, "EnableAction"),
+        (0x09, "EnableActionWithDuration"),
+        (0x0A, "DisableAction"),
+        (0x0B, "DisableActionWithDuration"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("InstantAction"),
+        0x01 => Some("InstantActionWithTransition"),
+        0x02 => Some("StartAction"),
+        0x03 => Some("StartActionWithDuration"),
+        0x04 => Some("StopAction"),
+        0x05 => Some("PauseAction"),
+        0x06 => Some("PauseActionWithDuration"),
+        0x07 => Some("ResumeAction"),
+        0x08 => Some("EnableAction"),
+        0x09 => Some("EnableActionWithDuration"),
+        0x0A => Some("DisableAction"),
+        0x0B => Some("DisableActionWithDuration"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "action_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "invoke_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_instant_action(action_id, invoke_id)
+        }
+        0x01 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        encode_instant_action_with_transition(action_id, invoke_id, transition_time)
+        }
+        0x02 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_start_action(action_id, invoke_id)
+        }
+        0x03 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
+        encode_start_action_with_duration(action_id, invoke_id, duration)
+        }
+        0x04 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_stop_action(action_id, invoke_id)
+        }
+        0x05 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_pause_action(action_id, invoke_id)
+        }
+        0x06 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
+        encode_pause_action_with_duration(action_id, invoke_id, duration)
+        }
+        0x07 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_resume_action(action_id, invoke_id)
+        }
+        0x08 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_enable_action(action_id, invoke_id)
+        }
+        0x09 => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
+        encode_enable_action_with_duration(action_id, invoke_id, duration)
+        }
+        0x0A => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        encode_disable_action(action_id, invoke_id)
+        }
+        0x0B => {
+        let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
+        encode_disable_action_with_duration(action_id, invoke_id, duration)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `InstantAction` command on cluster `Actions`.

@@ -266,6 +266,51 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AnnounceOTAProvider"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AnnounceOTAProvider"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "provider_node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "announcement_reason", kind: crate::clusters::codec::FieldKind::Enum { name: "AnnouncementReason", variants: &[(0, "Simpleannouncement"), (1, "Updateavailable"), (2, "Urgentupdateavailable")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "metadata_for_node", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "endpoint", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let provider_node_id = crate::clusters::codec::json_util::get_u64(args, "provider_node_id")?;
+        let vendor_id = crate::clusters::codec::json_util::get_u16(args, "vendor_id")?;
+        let announcement_reason = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "announcement_reason")?;
+            AnnouncementReason::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid AnnouncementReason: {}", n))?
+        };
+        let metadata_for_node = crate::clusters::codec::json_util::get_octstr(args, "metadata_for_node")?;
+        let endpoint = crate::clusters::codec::json_util::get_u16(args, "endpoint")?;
+        encode_announce_ota_provider(provider_node_id, vendor_id, announcement_reason, metadata_for_node, endpoint)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `AnnounceOTAProvider` command on cluster `OTA Software Update Requestor`.

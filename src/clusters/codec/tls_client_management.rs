@@ -182,6 +182,66 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ProvisionEndpoint"),
+        (0x02, "FindEndpoint"),
+        (0x04, "RemoveEndpoint"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ProvisionEndpoint"),
+        0x02 => Some("FindEndpoint"),
+        0x04 => Some("RemoveEndpoint"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "hostname", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "port", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let hostname = crate::clusters::codec::json_util::get_octstr(args, "hostname")?;
+        let port = crate::clusters::codec::json_util::get_u16(args, "port")?;
+        let caid = crate::clusters::codec::json_util::get_u8(args, "caid")?;
+        let ccdid = crate::clusters::codec::json_util::get_opt_u8(args, "ccdid")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_opt_u8(args, "endpoint_id")?;
+        encode_provision_endpoint(hostname, port, caid, ccdid, endpoint_id)
+        }
+        0x02 => {
+        let endpoint_id = crate::clusters::codec::json_util::get_u8(args, "endpoint_id")?;
+        encode_find_endpoint(endpoint_id)
+        }
+        0x04 => {
+        let endpoint_id = crate::clusters::codec::json_util::get_u8(args, "endpoint_id")?;
+        encode_remove_endpoint(endpoint_id)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ProvisionEndpointResponse {
     pub endpoint_id: Option<u8>,

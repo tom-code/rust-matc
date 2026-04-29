@@ -734,6 +734,102 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "PowerAdjustRequest"),
+        (0x01, "CancelPowerAdjustRequest"),
+        (0x02, "StartTimeAdjustRequest"),
+        (0x03, "PauseRequest"),
+        (0x04, "ResumeRequest"),
+        (0x05, "ModifyForecastRequest"),
+        (0x06, "RequestConstraintBasedForecast"),
+        (0x07, "CancelRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("PowerAdjustRequest"),
+        0x01 => Some("CancelPowerAdjustRequest"),
+        0x02 => Some("StartTimeAdjustRequest"),
+        0x03 => Some("PauseRequest"),
+        0x04 => Some("ResumeRequest"),
+        0x05 => Some("ModifyForecastRequest"),
+        0x06 => Some("RequestConstraintBasedForecast"),
+        0x07 => Some("CancelRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "power", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "cause", kind: crate::clusters::codec::FieldKind::Enum { name: "AdjustmentCause", variants: &[(0, "Localoptimization"), (1, "Gridoptimization")] }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "requested_start_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "cause", kind: crate::clusters::codec::FieldKind::Enum { name: "AdjustmentCause", variants: &[(0, "Localoptimization"), (1, "Gridoptimization")] }, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "cause", kind: crate::clusters::codec::FieldKind::Enum { name: "AdjustmentCause", variants: &[(0, "Localoptimization"), (1, "Gridoptimization")] }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "forecast_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "slot_adjustments", kind: crate::clusters::codec::FieldKind::List { entry_type: "SlotAdjustmentStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "cause", kind: crate::clusters::codec::FieldKind::Enum { name: "AdjustmentCause", variants: &[(0, "Localoptimization"), (1, "Gridoptimization")] }, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "constraints", kind: crate::clusters::codec::FieldKind::List { entry_type: "ConstraintsStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "cause", kind: crate::clusters::codec::FieldKind::Enum { name: "AdjustmentCause", variants: &[(0, "Localoptimization"), (1, "Gridoptimization")] }, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let power = crate::clusters::codec::json_util::get_u32(args, "power")?;
+        let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
+        let cause = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "cause")?;
+            AdjustmentCause::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid AdjustmentCause: {}", n))?
+        };
+        encode_power_adjust_request(power, duration, cause)
+        }
+        0x01 => Ok(vec![]),
+        0x02 => {
+        let requested_start_time = crate::clusters::codec::json_util::get_u64(args, "requested_start_time")?;
+        let cause = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "cause")?;
+            AdjustmentCause::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid AdjustmentCause: {}", n))?
+        };
+        encode_start_time_adjust_request(requested_start_time, cause)
+        }
+        0x03 => {
+        let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
+        let cause = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "cause")?;
+            AdjustmentCause::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid AdjustmentCause: {}", n))?
+        };
+        encode_pause_request(duration, cause)
+        }
+        0x04 => Ok(vec![]),
+        0x05 => Err(anyhow::anyhow!("command \"ModifyForecastRequest\" has complex args: use raw mode")),
+        0x06 => Err(anyhow::anyhow!("command \"RequestConstraintBasedForecast\" has complex args: use raw mode")),
+        0x07 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `PowerAdjustRequest` command on cluster `Device Energy Management`.

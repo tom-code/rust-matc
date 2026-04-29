@@ -137,6 +137,49 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Reset"),
+        (0x01, "ModifyEnabledAlarms"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Reset"),
+        0x01 => Some("ModifyEnabledAlarms"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "alarms", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Alarm", bits: &[] }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Alarm", bits: &[] }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let alarms = crate::clusters::codec::json_util::get_u8(args, "alarms")?;
+        encode_reset(alarms)
+        }
+        0x01 => {
+        let mask = crate::clusters::codec::json_util::get_u8(args, "mask")?;
+        encode_modify_enabled_alarms(mask)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct NotifyEvent {
     pub active: Option<Alarm>,

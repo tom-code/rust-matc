@@ -7,6 +7,7 @@
 
 use crate::tlv;
 use anyhow;
+use serde_json;
 
 
 // Import serialization helpers for octet strings
@@ -176,6 +177,66 @@ pub fn encode_notify_update_applied(update_token: Vec<u8>, software_version: u32
         ]),
     };
     Ok(tlv.encode()?)
+}
+
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "QueryImage"),
+        (0x02, "ApplyUpdateRequest"),
+        (0x04, "NotifyUpdateApplied"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("QueryImage"),
+        0x02 => Some("ApplyUpdateRequest"),
+        0x04 => Some("NotifyUpdateApplied"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "product_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "software_version", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "protocols_supported", kind: crate::clusters::codec::FieldKind::List { entry_type: "DownloadProtocolEnum" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "hardware_version", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "location", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "requestor_can_consent", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 7, name: "metadata_for_provider", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "update_token", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "new_version", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "update_token", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "software_version", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"QueryImage\" has complex args: use raw mode")),
+        0x02 => {
+        let update_token = crate::clusters::codec::json_util::get_octstr(args, "update_token")?;
+        let new_version = crate::clusters::codec::json_util::get_u32(args, "new_version")?;
+        encode_apply_update_request(update_token, new_version)
+        }
+        0x04 => {
+        let update_token = crate::clusters::codec::json_util::get_octstr(args, "update_token")?;
+        let software_version = crate::clusters::codec::json_util::get_u32(args, "software_version")?;
+        encode_notify_update_applied(update_token, software_version)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
 }
 
 #[derive(Debug, serde::Serialize)]

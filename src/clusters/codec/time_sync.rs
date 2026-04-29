@@ -563,6 +563,77 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SetUTCTime"),
+        (0x01, "SetTrustedTimeSource"),
+        (0x02, "SetTimeZone"),
+        (0x04, "SetDSTOffset"),
+        (0x05, "SetDefaultNTP"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SetUTCTime"),
+        0x01 => Some("SetTrustedTimeSource"),
+        0x02 => Some("SetTimeZone"),
+        0x04 => Some("SetDSTOffset"),
+        0x05 => Some("SetDefaultNTP"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "utc_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "granularity", kind: crate::clusters::codec::FieldKind::Enum { name: "Granularity", variants: &[(0, "Notimegranularity"), (1, "Minutesgranularity"), (2, "Secondsgranularity"), (3, "Millisecondsgranularity"), (4, "Microsecondsgranularity")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "time_source", kind: crate::clusters::codec::FieldKind::Enum { name: "TimeSource", variants: &[(0, "None"), (1, "Unknown"), (2, "Admin"), (3, "Nodetimecluster"), (4, "Nonmattersntp"), (5, "Nonmatterntp"), (6, "Mattersntp"), (7, "Matterntp"), (8, "Mixedntp"), (9, "Nonmattersntpnts"), (10, "Nonmatterntpnts"), (11, "Mattersntpnts"), (12, "Matterntpnts"), (13, "Mixedntpnts"), (14, "Cloudsource"), (15, "Ptp"), (16, "Gnss")] }, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "trusted_time_source", kind: crate::clusters::codec::FieldKind::Struct { name: "FabricScopedTrustedTimeSourceStruct" }, optional: false, nullable: true },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "time_zone", kind: crate::clusters::codec::FieldKind::List { entry_type: "TimeZoneStruct" }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "dst_offset", kind: crate::clusters::codec::FieldKind::List { entry_type: "DSTOffsetStruct" }, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "default_ntp", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: true },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let utc_time = crate::clusters::codec::json_util::get_u64(args, "utc_time")?;
+        let granularity = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "granularity")?;
+            Granularity::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid Granularity: {}", n))?
+        };
+        let time_source = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "time_source")?;
+            TimeSource::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TimeSource: {}", n))?
+        };
+        encode_set_utc_time(utc_time, granularity, time_source)
+        }
+        0x01 => Err(anyhow::anyhow!("command \"SetTrustedTimeSource\" has complex args: use raw mode")),
+        0x02 => Err(anyhow::anyhow!("command \"SetTimeZone\" has complex args: use raw mode")),
+        0x04 => Err(anyhow::anyhow!("command \"SetDSTOffset\" has complex args: use raw mode")),
+        0x05 => {
+        let default_ntp = crate::clusters::codec::json_util::get_opt_string(args, "default_ntp")?;
+        encode_set_default_ntp(default_ntp)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SetTimeZoneResponse {
     pub dst_offset_required: Option<bool>,

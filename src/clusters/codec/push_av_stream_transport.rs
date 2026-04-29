@@ -774,6 +774,85 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AllocatePushTransport"),
+        (0x02, "DeallocatePushTransport"),
+        (0x03, "ModifyPushTransport"),
+        (0x04, "SetTransportStatus"),
+        (0x05, "ManuallyTriggerTransport"),
+        (0x06, "FindTransport"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AllocatePushTransport"),
+        0x02 => Some("DeallocatePushTransport"),
+        0x03 => Some("ModifyPushTransport"),
+        0x04 => Some("SetTransportStatus"),
+        0x05 => Some("ManuallyTriggerTransport"),
+        0x06 => Some("FindTransport"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "transport_options", kind: crate::clusters::codec::FieldKind::Struct { name: "TransportOptionsStruct" }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "transport_options", kind: crate::clusters::codec::FieldKind::Struct { name: "TransportOptionsStruct" }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "transport_status", kind: crate::clusters::codec::FieldKind::Enum { name: "TransportStatus", variants: &[(0, "Active"), (1, "Inactive")] }, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "activation_reason", kind: crate::clusters::codec::FieldKind::Enum { name: "TriggerActivationReason", variants: &[(0, "Userinitiated"), (1, "Automation"), (2, "Emergency"), (3, "Doorbellpressed")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "time_control", kind: crate::clusters::codec::FieldKind::Struct { name: "TransportMotionTriggerTimeControlStruct" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "user_defined", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"AllocatePushTransport\" has complex args: use raw mode")),
+        0x02 => {
+        let connection_id = crate::clusters::codec::json_util::get_u8(args, "connection_id")?;
+        encode_deallocate_push_transport(connection_id)
+        }
+        0x03 => Err(anyhow::anyhow!("command \"ModifyPushTransport\" has complex args: use raw mode")),
+        0x04 => {
+        let connection_id = crate::clusters::codec::json_util::get_opt_u8(args, "connection_id")?;
+        let transport_status = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "transport_status")?;
+            TransportStatus::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TransportStatus: {}", n))?
+        };
+        encode_set_transport_status(connection_id, transport_status)
+        }
+        0x05 => Err(anyhow::anyhow!("command \"ManuallyTriggerTransport\" has complex args: use raw mode")),
+        0x06 => {
+        let connection_id = crate::clusters::codec::json_util::get_opt_u8(args, "connection_id")?;
+        encode_find_transport(connection_id)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AllocatePushTransportResponse {
     pub transport_configuration: Option<TransportConfiguration>,

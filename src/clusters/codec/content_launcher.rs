@@ -459,6 +459,50 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "LaunchContent"),
+        (0x01, "LaunchURL"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("LaunchContent"),
+        0x01 => Some("LaunchURL"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "search", kind: crate::clusters::codec::FieldKind::Struct { name: "ContentSearchStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "auto_play", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "data", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "playback_preferences", kind: crate::clusters::codec::FieldKind::Struct { name: "PlaybackPreferencesStruct" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "use_current_context", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "content_url", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "display_string", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "branding_information", kind: crate::clusters::codec::FieldKind::Struct { name: "BrandingInformationStruct" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "playback_preferences", kind: crate::clusters::codec::FieldKind::Struct { name: "PlaybackPreferencesStruct" }, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, _args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"LaunchContent\" has complex args: use raw mode")),
+        0x01 => Err(anyhow::anyhow!("command \"LaunchURL\" has complex args: use raw mode")),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct LauncherResponse {
     pub status: Option<Status>,

@@ -376,6 +376,110 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "MPTZSetPosition"),
+        (0x01, "MPTZRelativeMove"),
+        (0x02, "MPTZMoveToPreset"),
+        (0x03, "MPTZSavePreset"),
+        (0x04, "MPTZRemovePreset"),
+        (0x05, "DPTZSetViewport"),
+        (0x06, "DPTZRelativeMove"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("MPTZSetPosition"),
+        0x01 => Some("MPTZRelativeMove"),
+        0x02 => Some("MPTZMoveToPreset"),
+        0x03 => Some("MPTZSavePreset"),
+        0x04 => Some("MPTZRemovePreset"),
+        0x05 => Some("DPTZSetViewport"),
+        0x06 => Some("DPTZRelativeMove"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "pan", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "tilt", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "zoom", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "pan_delta", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "tilt_delta", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "zoom_delta", kind: crate::clusters::codec::FieldKind::I8, optional: true, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "preset_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "preset_id", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "preset_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "delta_x", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "delta_y", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "zoom_delta", kind: crate::clusters::codec::FieldKind::I8, optional: true, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let pan = crate::clusters::codec::json_util::get_i16(args, "pan")?;
+        let tilt = crate::clusters::codec::json_util::get_i16(args, "tilt")?;
+        let zoom = crate::clusters::codec::json_util::get_u8(args, "zoom")?;
+        encode_mptz_set_position(pan, tilt, zoom)
+        }
+        0x01 => {
+        let pan_delta = crate::clusters::codec::json_util::get_i16(args, "pan_delta")?;
+        let tilt_delta = crate::clusters::codec::json_util::get_i16(args, "tilt_delta")?;
+        let zoom_delta = crate::clusters::codec::json_util::get_i8(args, "zoom_delta")?;
+        encode_mptz_relative_move(pan_delta, tilt_delta, zoom_delta)
+        }
+        0x02 => {
+        let preset_id = crate::clusters::codec::json_util::get_u8(args, "preset_id")?;
+        encode_mptz_move_to_preset(preset_id)
+        }
+        0x03 => {
+        let preset_id = crate::clusters::codec::json_util::get_u8(args, "preset_id")?;
+        let name = crate::clusters::codec::json_util::get_string(args, "name")?;
+        encode_mptz_save_preset(preset_id, name)
+        }
+        0x04 => {
+        let preset_id = crate::clusters::codec::json_util::get_u8(args, "preset_id")?;
+        encode_mptz_remove_preset(preset_id)
+        }
+        0x05 => {
+        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        encode_dptz_set_viewport(video_stream_id)
+        }
+        0x06 => {
+        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        let delta_x = crate::clusters::codec::json_util::get_i16(args, "delta_x")?;
+        let delta_y = crate::clusters::codec::json_util::get_i16(args, "delta_y")?;
+        let zoom_delta = crate::clusters::codec::json_util::get_i8(args, "zoom_delta")?;
+        encode_dptz_relative_move(video_stream_id, delta_x, delta_y, zoom_delta)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `MPTZSetPosition` command on cluster `Camera AV Settings User Level Management`.

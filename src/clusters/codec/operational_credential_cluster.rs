@@ -409,6 +409,142 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AttestationRequest"),
+        (0x02, "CertificateChainRequest"),
+        (0x04, "CSRRequest"),
+        (0x06, "AddNOC"),
+        (0x07, "UpdateNOC"),
+        (0x09, "UpdateFabricLabel"),
+        (0x0A, "RemoveFabric"),
+        (0x0B, "AddTrustedRootCertificate"),
+        (0x0C, "SetVIDVerificationStatement"),
+        (0x0D, "SignVIDVerificationRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AttestationRequest"),
+        0x02 => Some("CertificateChainRequest"),
+        0x04 => Some("CSRRequest"),
+        0x06 => Some("AddNOC"),
+        0x07 => Some("UpdateNOC"),
+        0x09 => Some("UpdateFabricLabel"),
+        0x0A => Some("RemoveFabric"),
+        0x0B => Some("AddTrustedRootCertificate"),
+        0x0C => Some("SetVIDVerificationStatement"),
+        0x0D => Some("SignVIDVerificationRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "attestation_nonce", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "certificate_type", kind: crate::clusters::codec::FieldKind::Enum { name: "CertificateChainType", variants: &[(1, "Daccertificate"), (2, "Paicertificate")] }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "csr_nonce", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "is_for_update_noc", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "noc_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "icac_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "ipk_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "case_admin_subject", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "admin_vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "noc_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "icac_value", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "label", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "fabric_index", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "root_ca_certificate", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "vid_verification_statement", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "vvsc", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x0D => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "fabric_index", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "client_challenge", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let attestation_nonce = crate::clusters::codec::json_util::get_octstr(args, "attestation_nonce")?;
+        encode_attestation_request(attestation_nonce)
+        }
+        0x02 => {
+        let certificate_type = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "certificate_type")?;
+            CertificateChainType::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid CertificateChainType: {}", n))?
+        };
+        encode_certificate_chain_request(certificate_type)
+        }
+        0x04 => {
+        let csr_nonce = crate::clusters::codec::json_util::get_octstr(args, "csr_nonce")?;
+        let is_for_update_noc = crate::clusters::codec::json_util::get_bool(args, "is_for_update_noc")?;
+        encode_csr_request(csr_nonce, is_for_update_noc)
+        }
+        0x06 => {
+        let noc_value = crate::clusters::codec::json_util::get_octstr(args, "noc_value")?;
+        let icac_value = crate::clusters::codec::json_util::get_octstr(args, "icac_value")?;
+        let ipk_value = crate::clusters::codec::json_util::get_octstr(args, "ipk_value")?;
+        let case_admin_subject = crate::clusters::codec::json_util::get_u64(args, "case_admin_subject")?;
+        let admin_vendor_id = crate::clusters::codec::json_util::get_u16(args, "admin_vendor_id")?;
+        encode_add_noc(noc_value, icac_value, ipk_value, case_admin_subject, admin_vendor_id)
+        }
+        0x07 => {
+        let noc_value = crate::clusters::codec::json_util::get_octstr(args, "noc_value")?;
+        let icac_value = crate::clusters::codec::json_util::get_octstr(args, "icac_value")?;
+        encode_update_noc(noc_value, icac_value)
+        }
+        0x09 => {
+        let label = crate::clusters::codec::json_util::get_string(args, "label")?;
+        encode_update_fabric_label(label)
+        }
+        0x0A => {
+        let fabric_index = crate::clusters::codec::json_util::get_u8(args, "fabric_index")?;
+        encode_remove_fabric(fabric_index)
+        }
+        0x0B => {
+        let root_ca_certificate = crate::clusters::codec::json_util::get_octstr(args, "root_ca_certificate")?;
+        encode_add_trusted_root_certificate(root_ca_certificate)
+        }
+        0x0C => {
+        let vendor_id = crate::clusters::codec::json_util::get_u16(args, "vendor_id")?;
+        let vid_verification_statement = crate::clusters::codec::json_util::get_octstr(args, "vid_verification_statement")?;
+        let vvsc = crate::clusters::codec::json_util::get_octstr(args, "vvsc")?;
+        encode_set_vid_verification_statement(vendor_id, vid_verification_statement, vvsc)
+        }
+        0x0D => {
+        let fabric_index = crate::clusters::codec::json_util::get_u8(args, "fabric_index")?;
+        let client_challenge = crate::clusters::codec::json_util::get_octstr(args, "client_challenge")?;
+        encode_sign_vid_verification_request(fabric_index, client_challenge)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AttestationResponse {
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]

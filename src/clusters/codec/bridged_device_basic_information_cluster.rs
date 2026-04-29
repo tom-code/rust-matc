@@ -599,6 +599,42 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x80, "KeepActive"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x80 => Some("KeepActive"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x80 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "stay_active_duration", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "timeout_ms", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x80 => {
+        let stay_active_duration = crate::clusters::codec::json_util::get_u32(args, "stay_active_duration")?;
+        let timeout_ms = crate::clusters::codec::json_util::get_u32(args, "timeout_ms")?;
+        encode_keep_active(stay_active_duration, timeout_ms)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `KeepActive` command on cluster `Bridged Device Basic Information`.

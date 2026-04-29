@@ -255,6 +255,49 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "PresentMessagesRequest"),
+        (0x01, "CancelMessagesRequest"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("PresentMessagesRequest"),
+        0x01 => Some("CancelMessagesRequest"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "message_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "priority", kind: crate::clusters::codec::FieldKind::Enum { name: "MessagePriority", variants: &[(0, "Low"), (1, "Medium"), (2, "High"), (3, "Critical")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "message_control", kind: crate::clusters::codec::FieldKind::Bitmap { name: "MessageControl", bits: &[(1, "CONFIRMATION_REQUIRED"), (2, "RESPONSE_REQUIRED"), (4, "REPLY_MESSAGE"), (8, "MESSAGE_CONFIRMED"), (16, "MESSAGE_PROTECTED")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "start_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "duration", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "message_text", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "responses", kind: crate::clusters::codec::FieldKind::List { entry_type: "MessageResponseOptionStruct" }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "message_i_ds", kind: crate::clusters::codec::FieldKind::List { entry_type: "message-id" }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, _args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"PresentMessagesRequest\" has complex args: use raw mode")),
+        0x01 => Err(anyhow::anyhow!("command \"CancelMessagesRequest\" has complex args: use raw mode")),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `PresentMessagesRequest` command on cluster `Messages`.

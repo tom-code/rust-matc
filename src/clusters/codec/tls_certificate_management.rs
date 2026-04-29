@@ -252,6 +252,115 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "ProvisionRootCertificate"),
+        (0x02, "FindRootCertificate"),
+        (0x04, "LookupRootCertificate"),
+        (0x06, "RemoveRootCertificate"),
+        (0x07, "ClientCSR"),
+        (0x09, "ProvisionClientCertificate"),
+        (0x0A, "FindClientCertificate"),
+        (0x0C, "LookupClientCertificate"),
+        (0x0E, "RemoveClientCertificate"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("ProvisionRootCertificate"),
+        0x02 => Some("FindRootCertificate"),
+        0x04 => Some("LookupRootCertificate"),
+        0x06 => Some("RemoveRootCertificate"),
+        0x07 => Some("ClientCSR"),
+        0x09 => Some("ProvisionClientCertificate"),
+        0x0A => Some("FindClientCertificate"),
+        0x0C => Some("LookupClientCertificate"),
+        0x0E => Some("RemoveClientCertificate"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "certificate", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "fingerprint", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "nonce", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "client_certificate", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "intermediate_certificates", kind: crate::clusters::codec::FieldKind::List { entry_type: "octstr" }, optional: false, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "fingerprint", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x0E => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let certificate = crate::clusters::codec::json_util::get_octstr(args, "certificate")?;
+        let caid = crate::clusters::codec::json_util::get_opt_u8(args, "caid")?;
+        encode_provision_root_certificate(certificate, caid)
+        }
+        0x02 => {
+        let caid = crate::clusters::codec::json_util::get_opt_u8(args, "caid")?;
+        encode_find_root_certificate(caid)
+        }
+        0x04 => {
+        let fingerprint = crate::clusters::codec::json_util::get_octstr(args, "fingerprint")?;
+        encode_lookup_root_certificate(fingerprint)
+        }
+        0x06 => {
+        let caid = crate::clusters::codec::json_util::get_u8(args, "caid")?;
+        encode_remove_root_certificate(caid)
+        }
+        0x07 => {
+        let nonce = crate::clusters::codec::json_util::get_octstr(args, "nonce")?;
+        let ccdid = crate::clusters::codec::json_util::get_opt_u8(args, "ccdid")?;
+        encode_client_csr(nonce, ccdid)
+        }
+        0x09 => Err(anyhow::anyhow!("command \"ProvisionClientCertificate\" has complex args: use raw mode")),
+        0x0A => {
+        let ccdid = crate::clusters::codec::json_util::get_opt_u8(args, "ccdid")?;
+        encode_find_client_certificate(ccdid)
+        }
+        0x0C => {
+        let fingerprint = crate::clusters::codec::json_util::get_octstr(args, "fingerprint")?;
+        encode_lookup_client_certificate(fingerprint)
+        }
+        0x0E => {
+        let ccdid = crate::clusters::codec::json_util::get_u8(args, "ccdid")?;
+        encode_remove_client_certificate(ccdid)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct ProvisionRootCertificateResponse {
     pub caid: Option<u8>,

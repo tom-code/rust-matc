@@ -190,6 +190,61 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "OpenCommissioningWindow"),
+        (0x01, "OpenBasicCommissioningWindow"),
+        (0x02, "RevokeCommissioning"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("OpenCommissioningWindow"),
+        0x01 => Some("OpenBasicCommissioningWindow"),
+        0x02 => Some("RevokeCommissioning"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "commissioning_timeout", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "pake_passcode_verifier", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "discriminator", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "iterations", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "salt", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "commissioning_timeout", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let commissioning_timeout = crate::clusters::codec::json_util::get_u16(args, "commissioning_timeout")?;
+        let pake_passcode_verifier = crate::clusters::codec::json_util::get_octstr(args, "pake_passcode_verifier")?;
+        let discriminator = crate::clusters::codec::json_util::get_u16(args, "discriminator")?;
+        let iterations = crate::clusters::codec::json_util::get_u32(args, "iterations")?;
+        let salt = crate::clusters::codec::json_util::get_octstr(args, "salt")?;
+        encode_open_commissioning_window(commissioning_timeout, pake_passcode_verifier, discriminator, iterations, salt)
+        }
+        0x01 => {
+        let commissioning_timeout = crate::clusters::codec::json_util::get_u16(args, "commissioning_timeout")?;
+        encode_open_basic_commissioning_window(commissioning_timeout)
+        }
+        0x02 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `OpenCommissioningWindow` command on cluster `Administrator Commissioning`.

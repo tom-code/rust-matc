@@ -213,6 +213,50 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "LaunchApp"),
+        (0x01, "StopApp"),
+        (0x02, "HideApp"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("LaunchApp"),
+        0x01 => Some("StopApp"),
+        0x02 => Some("HideApp"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "application", kind: crate::clusters::codec::FieldKind::Struct { name: "ApplicationStruct" }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "data", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "application", kind: crate::clusters::codec::FieldKind::Struct { name: "ApplicationStruct" }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "application", kind: crate::clusters::codec::FieldKind::Struct { name: "ApplicationStruct" }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, _args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"LaunchApp\" has complex args: use raw mode")),
+        0x01 => Err(anyhow::anyhow!("command \"StopApp\" has complex args: use raw mode")),
+        0x02 => Err(anyhow::anyhow!("command \"HideApp\" has complex args: use raw mode")),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct LauncherResponse {
     pub status: Option<Status>,

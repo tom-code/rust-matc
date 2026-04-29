@@ -218,6 +218,49 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SuppressAlarm"),
+        (0x01, "EnableDisableAlarm"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("SuppressAlarm"),
+        0x01 => Some("EnableDisableAlarm"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "alarms_to_suppress", kind: crate::clusters::codec::FieldKind::Bitmap { name: "AlarmMode", bits: &[(1, "VISUAL"), (2, "AUDIBLE")] }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "alarms_to_enable_disable", kind: crate::clusters::codec::FieldKind::Bitmap { name: "AlarmMode", bits: &[(1, "VISUAL"), (2, "AUDIBLE")] }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let alarms_to_suppress = crate::clusters::codec::json_util::get_u8(args, "alarms_to_suppress")?;
+        encode_suppress_alarm(alarms_to_suppress)
+        }
+        0x01 => {
+        let alarms_to_enable_disable = crate::clusters::codec::json_util::get_u8(args, "alarms_to_enable_disable")?;
+        encode_enable_disable_alarm(alarms_to_enable_disable)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `SuppressAlarm` command on cluster `Boolean State Configuration`.

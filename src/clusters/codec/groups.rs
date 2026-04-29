@@ -130,6 +130,81 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AddGroup"),
+        (0x01, "ViewGroup"),
+        (0x02, "GetGroupMembership"),
+        (0x03, "RemoveGroup"),
+        (0x04, "RemoveAllGroups"),
+        (0x05, "AddGroupIfIdentifying"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AddGroup"),
+        0x01 => Some("ViewGroup"),
+        0x02 => Some("GetGroupMembership"),
+        0x03 => Some("RemoveGroup"),
+        0x04 => Some("RemoveAllGroups"),
+        0x05 => Some("AddGroupIfIdentifying"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "group_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_list", kind: crate::clusters::codec::FieldKind::List { entry_type: "group-id" }, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "group_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_name = crate::clusters::codec::json_util::get_string(args, "group_name")?;
+        encode_add_group(group_id, group_name)
+        }
+        0x01 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_view_group(group_id)
+        }
+        0x02 => Err(anyhow::anyhow!("command \"GetGroupMembership\" has complex args: use raw mode")),
+        0x03 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_remove_group(group_id)
+        }
+        0x04 => Ok(vec![]),
+        0x05 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_name = crate::clusters::codec::json_util::get_string(args, "group_name")?;
+        encode_add_group_if_identifying(group_id, group_name)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AddGroupResponse {
     pub status: Option<u8>,

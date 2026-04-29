@@ -523,6 +523,61 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "UpOrOpen"),
+        (0x01, "DownOrClose"),
+        (0x02, "StopMotion"),
+        (0x05, "GoToLiftPercentage"),
+        (0x08, "GoToTiltPercentage"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("UpOrOpen"),
+        0x01 => Some("DownOrClose"),
+        0x02 => Some("StopMotion"),
+        0x05 => Some("GoToLiftPercentage"),
+        0x08 => Some("GoToTiltPercentage"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![]),
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "lift_percent100ths_value", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "tilt_percent100ths_value", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Ok(vec![]),
+        0x01 => Ok(vec![]),
+        0x02 => Ok(vec![]),
+        0x05 => {
+        let lift_percent100ths_value = crate::clusters::codec::json_util::get_u8(args, "lift_percent100ths_value")?;
+        encode_go_to_lift_percentage(lift_percent100ths_value)
+        }
+        0x08 => {
+        let tilt_percent100ths_value = crate::clusters::codec::json_util::get_u8(args, "tilt_percent100ths_value")?;
+        encode_go_to_tilt_percentage(tilt_percent100ths_value)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `UpOrOpen` command on cluster `Window Covering`.

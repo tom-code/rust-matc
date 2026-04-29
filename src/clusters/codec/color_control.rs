@@ -1482,6 +1482,382 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "MoveToHue"),
+        (0x01, "MoveHue"),
+        (0x02, "StepHue"),
+        (0x03, "MoveToSaturation"),
+        (0x04, "MoveSaturation"),
+        (0x05, "StepSaturation"),
+        (0x06, "MoveToHueAndSaturation"),
+        (0x07, "MoveToColor"),
+        (0x08, "MoveColor"),
+        (0x09, "StepColor"),
+        (0x0A, "MoveToColorTemperature"),
+        (0x40, "EnhancedMoveToHue"),
+        (0x41, "EnhancedMoveHue"),
+        (0x42, "EnhancedStepHue"),
+        (0x43, "EnhancedMoveToHueAndSaturation"),
+        (0x44, "ColorLoopSet"),
+        (0x47, "StopMoveStep"),
+        (0x4B, "MoveColorTemperature"),
+        (0x4C, "StepColorTemperature"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("MoveToHue"),
+        0x01 => Some("MoveHue"),
+        0x02 => Some("StepHue"),
+        0x03 => Some("MoveToSaturation"),
+        0x04 => Some("MoveSaturation"),
+        0x05 => Some("StepSaturation"),
+        0x06 => Some("MoveToHueAndSaturation"),
+        0x07 => Some("MoveToColor"),
+        0x08 => Some("MoveColor"),
+        0x09 => Some("StepColor"),
+        0x0A => Some("MoveToColorTemperature"),
+        0x40 => Some("EnhancedMoveToHue"),
+        0x41 => Some("EnhancedMoveHue"),
+        0x42 => Some("EnhancedStepHue"),
+        0x43 => Some("EnhancedMoveToHueAndSaturation"),
+        0x44 => Some("ColorLoopSet"),
+        0x47 => Some("StopMoveStep"),
+        0x4B => Some("MoveColorTemperature"),
+        0x4C => Some("StepColorTemperature"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "hue", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "direction", kind: crate::clusters::codec::FieldKind::Enum { name: "Direction", variants: &[(0, "Shortest"), (1, "Longest"), (2, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "move_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "MoveMode", variants: &[(0, "Stop"), (1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "StepMode", variants: &[(1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_size", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "saturation", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "move_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "MoveMode", variants: &[(0, "Stop"), (1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "StepMode", variants: &[(1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_size", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "hue", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "saturation", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "color_x", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "color_y", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "rate_x", kind: crate::clusters::codec::FieldKind::I16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate_y", kind: crate::clusters::codec::FieldKind::I16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_x", kind: crate::clusters::codec::FieldKind::I16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_y", kind: crate::clusters::codec::FieldKind::I16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "color_temperature_mireds", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x40 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "enhanced_hue", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "direction", kind: crate::clusters::codec::FieldKind::Enum { name: "Direction", variants: &[(0, "Shortest"), (1, "Longest"), (2, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x41 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "move_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "MoveMode", variants: &[(0, "Stop"), (1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x42 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "StepMode", variants: &[(1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_size", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x43 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "enhanced_hue", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "saturation", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x44 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "update_flags", kind: crate::clusters::codec::FieldKind::Bitmap { name: "UpdateFlags", bits: &[(1, "UPDATE_ACTION"), (2, "UPDATE_DIRECTION"), (4, "UPDATE_TIME"), (8, "UPDATE_START_HUE")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "action", kind: crate::clusters::codec::FieldKind::Enum { name: "ColorLoopAction", variants: &[(0, "Deactivate"), (1, "Activatefromcolorloopstartenhancedhue"), (2, "Activatefromenhancedcurrenthue")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "direction", kind: crate::clusters::codec::FieldKind::Enum { name: "ColorLoopDirection", variants: &[(0, "Decrement"), (1, "Increment")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "start_hue", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x47 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x4B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "move_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "MoveMode", variants: &[(0, "Stop"), (1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "rate", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "color_temperature_minimum_mireds", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "color_temperature_maximum_mireds", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        0x4C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "step_mode", kind: crate::clusters::codec::FieldKind::Enum { name: "StepMode", variants: &[(1, "Up"), (3, "Down")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "step_size", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "color_temperature_minimum_mireds", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "color_temperature_maximum_mireds", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 5, name: "options_mask", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 6, name: "options_override", kind: crate::clusters::codec::FieldKind::Bitmap { name: "Options", bits: &[(1, "EXECUTE_IF_OFF")] }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let hue = crate::clusters::codec::json_util::get_u8(args, "hue")?;
+        let direction = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "direction")?;
+            Direction::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid Direction: {}", n))?
+        };
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_hue(hue, direction, transition_time, options_mask, options_override)
+        }
+        0x01 => {
+        let move_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "move_mode")?;
+            MoveMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid MoveMode: {}", n))?
+        };
+        let rate = crate::clusters::codec::json_util::get_u8(args, "rate")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_hue(move_mode, rate, options_mask, options_override)
+        }
+        0x02 => {
+        let step_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "step_mode")?;
+            StepMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepMode: {}", n))?
+        };
+        let step_size = crate::clusters::codec::json_util::get_u8(args, "step_size")?;
+        let transition_time = crate::clusters::codec::json_util::get_u8(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_step_hue(step_mode, step_size, transition_time, options_mask, options_override)
+        }
+        0x03 => {
+        let saturation = crate::clusters::codec::json_util::get_u8(args, "saturation")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_saturation(saturation, transition_time, options_mask, options_override)
+        }
+        0x04 => {
+        let move_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "move_mode")?;
+            MoveMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid MoveMode: {}", n))?
+        };
+        let rate = crate::clusters::codec::json_util::get_u8(args, "rate")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_saturation(move_mode, rate, options_mask, options_override)
+        }
+        0x05 => {
+        let step_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "step_mode")?;
+            StepMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepMode: {}", n))?
+        };
+        let step_size = crate::clusters::codec::json_util::get_u8(args, "step_size")?;
+        let transition_time = crate::clusters::codec::json_util::get_u8(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_step_saturation(step_mode, step_size, transition_time, options_mask, options_override)
+        }
+        0x06 => {
+        let hue = crate::clusters::codec::json_util::get_u8(args, "hue")?;
+        let saturation = crate::clusters::codec::json_util::get_u8(args, "saturation")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_hue_and_saturation(hue, saturation, transition_time, options_mask, options_override)
+        }
+        0x07 => {
+        let color_x = crate::clusters::codec::json_util::get_u16(args, "color_x")?;
+        let color_y = crate::clusters::codec::json_util::get_u16(args, "color_y")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_color(color_x, color_y, transition_time, options_mask, options_override)
+        }
+        0x08 => {
+        let rate_x = crate::clusters::codec::json_util::get_i16(args, "rate_x")?;
+        let rate_y = crate::clusters::codec::json_util::get_i16(args, "rate_y")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_color(rate_x, rate_y, options_mask, options_override)
+        }
+        0x09 => {
+        let step_x = crate::clusters::codec::json_util::get_i16(args, "step_x")?;
+        let step_y = crate::clusters::codec::json_util::get_i16(args, "step_y")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_step_color(step_x, step_y, transition_time, options_mask, options_override)
+        }
+        0x0A => {
+        let color_temperature_mireds = crate::clusters::codec::json_util::get_u16(args, "color_temperature_mireds")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_to_color_temperature(color_temperature_mireds, transition_time, options_mask, options_override)
+        }
+        0x40 => {
+        let enhanced_hue = crate::clusters::codec::json_util::get_u16(args, "enhanced_hue")?;
+        let direction = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "direction")?;
+            Direction::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid Direction: {}", n))?
+        };
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_enhanced_move_to_hue(enhanced_hue, direction, transition_time, options_mask, options_override)
+        }
+        0x41 => {
+        let move_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "move_mode")?;
+            MoveMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid MoveMode: {}", n))?
+        };
+        let rate = crate::clusters::codec::json_util::get_u16(args, "rate")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_enhanced_move_hue(move_mode, rate, options_mask, options_override)
+        }
+        0x42 => {
+        let step_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "step_mode")?;
+            StepMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepMode: {}", n))?
+        };
+        let step_size = crate::clusters::codec::json_util::get_u16(args, "step_size")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_enhanced_step_hue(step_mode, step_size, transition_time, options_mask, options_override)
+        }
+        0x43 => {
+        let enhanced_hue = crate::clusters::codec::json_util::get_u16(args, "enhanced_hue")?;
+        let saturation = crate::clusters::codec::json_util::get_u8(args, "saturation")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_enhanced_move_to_hue_and_saturation(enhanced_hue, saturation, transition_time, options_mask, options_override)
+        }
+        0x44 => {
+        let update_flags = crate::clusters::codec::json_util::get_u8(args, "update_flags")?;
+        let action = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "action")?;
+            ColorLoopAction::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid ColorLoopAction: {}", n))?
+        };
+        let direction = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "direction")?;
+            ColorLoopDirection::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid ColorLoopDirection: {}", n))?
+        };
+        let time = crate::clusters::codec::json_util::get_u16(args, "time")?;
+        let start_hue = crate::clusters::codec::json_util::get_u16(args, "start_hue")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_color_loop_set(update_flags, action, direction, time, start_hue, options_mask, options_override)
+        }
+        0x47 => {
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_stop_move_step(options_mask, options_override)
+        }
+        0x4B => {
+        let move_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "move_mode")?;
+            MoveMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid MoveMode: {}", n))?
+        };
+        let rate = crate::clusters::codec::json_util::get_u16(args, "rate")?;
+        let color_temperature_minimum_mireds = crate::clusters::codec::json_util::get_u16(args, "color_temperature_minimum_mireds")?;
+        let color_temperature_maximum_mireds = crate::clusters::codec::json_util::get_u16(args, "color_temperature_maximum_mireds")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_move_color_temperature(move_mode, rate, color_temperature_minimum_mireds, color_temperature_maximum_mireds, options_mask, options_override)
+        }
+        0x4C => {
+        let step_mode = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "step_mode")?;
+            StepMode::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepMode: {}", n))?
+        };
+        let step_size = crate::clusters::codec::json_util::get_u16(args, "step_size")?;
+        let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
+        let color_temperature_minimum_mireds = crate::clusters::codec::json_util::get_u16(args, "color_temperature_minimum_mireds")?;
+        let color_temperature_maximum_mireds = crate::clusters::codec::json_util::get_u16(args, "color_temperature_maximum_mireds")?;
+        let options_mask = crate::clusters::codec::json_util::get_u8(args, "options_mask")?;
+        let options_override = crate::clusters::codec::json_util::get_u8(args, "options_override")?;
+        encode_step_color_temperature(step_mode, step_size, transition_time, color_temperature_minimum_mireds, color_temperature_maximum_mireds, options_mask, options_override)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `MoveToHue` command on cluster `Color Control`.

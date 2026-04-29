@@ -216,6 +216,57 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Identify"),
+        (0x40, "TriggerEffect"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Identify"),
+        0x40 => Some("TriggerEffect"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "identify_time", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x40 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "effect_identifier", kind: crate::clusters::codec::FieldKind::Enum { name: "EffectIdentifier", variants: &[(0, "Blink"), (1, "Breathe"), (2, "Okay"), (11, "Channelchange"), (254, "Finisheffect"), (255, "Stopeffect")] }, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "effect_variant", kind: crate::clusters::codec::FieldKind::Enum { name: "EffectVariant", variants: &[(0, "Default")] }, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => {
+        let identify_time = crate::clusters::codec::json_util::get_u16(args, "identify_time")?;
+        encode_identify(identify_time)
+        }
+        0x40 => {
+        let effect_identifier = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "effect_identifier")?;
+            EffectIdentifier::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid EffectIdentifier: {}", n))?
+        };
+        let effect_variant = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "effect_variant")?;
+            EffectVariant::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid EffectVariant: {}", n))?
+        };
+        encode_trigger_effect(effect_identifier, effect_variant)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `Identify` command on cluster `Identify`.

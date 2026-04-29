@@ -1068,6 +1068,258 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
     ]
 }
 
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "AddKeySet"),
+        (0x01, "UpdateKeySet"),
+        (0x02, "RemoveKeySet"),
+        (0x03, "AddGroup"),
+        (0x04, "UpdateGroup"),
+        (0x05, "RemoveGroup"),
+        (0x06, "AddAdmin"),
+        (0x07, "UpdateAdmin"),
+        (0x08, "RemoveAdmin"),
+        (0x09, "AddPendingNode"),
+        (0x0A, "RefreshNode"),
+        (0x0B, "UpdateNode"),
+        (0x0C, "RemoveNode"),
+        (0x0D, "UpdateEndpointForNode"),
+        (0x0E, "AddGroupIDToEndpointForNode"),
+        (0x0F, "RemoveGroupIDFromEndpointForNode"),
+        (0x10, "AddBindingToEndpointForNode"),
+        (0x11, "RemoveBindingFromEndpointForNode"),
+        (0x12, "AddACLToNode"),
+        (0x13, "RemoveACLFromNode"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("AddKeySet"),
+        0x01 => Some("UpdateKeySet"),
+        0x02 => Some("RemoveKeySet"),
+        0x03 => Some("AddGroup"),
+        0x04 => Some("UpdateGroup"),
+        0x05 => Some("RemoveGroup"),
+        0x06 => Some("AddAdmin"),
+        0x07 => Some("UpdateAdmin"),
+        0x08 => Some("RemoveAdmin"),
+        0x09 => Some("AddPendingNode"),
+        0x0A => Some("RefreshNode"),
+        0x0B => Some("UpdateNode"),
+        0x0C => Some("RemoveNode"),
+        0x0D => Some("UpdateEndpointForNode"),
+        0x0E => Some("AddGroupIDToEndpointForNode"),
+        0x0F => Some("RemoveGroupIDFromEndpointForNode"),
+        0x10 => Some("AddBindingToEndpointForNode"),
+        0x11 => Some("RemoveBindingFromEndpointForNode"),
+        0x12 => Some("AddACLToNode"),
+        0x13 => Some("RemoveACLFromNode"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_key_set", kind: crate::clusters::codec::FieldKind::Struct { name: "DatastoreGroupKeySetStruct" }, optional: false, nullable: false },
+        ]),
+        0x01 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_key_set", kind: crate::clusters::codec::FieldKind::Struct { name: "DatastoreGroupKeySetStruct" }, optional: false, nullable: false },
+        ]),
+        0x02 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x03 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "group_cat", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "group_cat_version", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (2, "Proxyview"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: false },
+        ]),
+        0x04 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "group_cat", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "group_cat_version", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (2, "Proxyview"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: true },
+        ]),
+        0x05 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x06 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 1, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "vendor_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "icac", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "icac", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: true },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x09 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0A => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x0B => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0C => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x0D => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
+        ]),
+        0x0E => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x0F => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+        ]),
+        0x10 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "binding", kind: crate::clusters::codec::FieldKind::Struct { name: "DatastoreBindingTargetStruct" }, optional: false, nullable: false },
+        ]),
+        0x11 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "list_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        0x12 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "acl_entry", kind: crate::clusters::codec::FieldKind::Struct { name: "DatastoreAccessControlEntryStruct" }, optional: false, nullable: false },
+        ]),
+        0x13 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "list_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
+        ]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Err(anyhow::anyhow!("command \"AddKeySet\" has complex args: use raw mode")),
+        0x01 => Err(anyhow::anyhow!("command \"UpdateKeySet\" has complex args: use raw mode")),
+        0x02 => {
+        let group_key_set_id = crate::clusters::codec::json_util::get_u16(args, "group_key_set_id")?;
+        encode_remove_key_set(group_key_set_id)
+        }
+        0x03 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_string(args, "friendly_name")?;
+        let group_key_set_id = crate::clusters::codec::json_util::get_opt_u16(args, "group_key_set_id")?;
+        let group_cat = crate::clusters::codec::json_util::get_opt_u16(args, "group_cat")?;
+        let group_cat_version = crate::clusters::codec::json_util::get_opt_u16(args, "group_cat_version")?;
+        let group_permission = {
+            let n = crate::clusters::codec::json_util::get_u64(args, "group_permission")?;
+            DatastoreAccessControlEntryPrivilege::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid DatastoreAccessControlEntryPrivilege: {}", n))?
+        };
+        encode_add_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)
+        }
+        0x04 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_opt_string(args, "friendly_name")?;
+        let group_key_set_id = crate::clusters::codec::json_util::get_opt_u16(args, "group_key_set_id")?;
+        let group_cat = crate::clusters::codec::json_util::get_opt_u16(args, "group_cat")?;
+        let group_cat_version = crate::clusters::codec::json_util::get_opt_u16(args, "group_cat_version")?;
+        let group_permission = crate::clusters::codec::json_util::get_opt_u64(args, "group_permission")?
+            .and_then(|n| DatastoreAccessControlEntryPrivilege::from_u8(n as u8));
+        encode_update_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)
+        }
+        0x05 => {
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_remove_group(group_id)
+        }
+        0x06 => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_string(args, "friendly_name")?;
+        let vendor_id = crate::clusters::codec::json_util::get_u16(args, "vendor_id")?;
+        let icac = crate::clusters::codec::json_util::get_octstr(args, "icac")?;
+        encode_add_admin(node_id, friendly_name, vendor_id, icac)
+        }
+        0x07 => {
+        let node_id = crate::clusters::codec::json_util::get_opt_u64(args, "node_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_opt_string(args, "friendly_name")?;
+        let icac = crate::clusters::codec::json_util::get_opt_octstr(args, "icac")?;
+        encode_update_admin(node_id, friendly_name, icac)
+        }
+        0x08 => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        encode_remove_admin(node_id)
+        }
+        0x09 => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_string(args, "friendly_name")?;
+        encode_add_pending_node(node_id, friendly_name)
+        }
+        0x0A => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        encode_refresh_node(node_id)
+        }
+        0x0B => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_string(args, "friendly_name")?;
+        encode_update_node(node_id, friendly_name)
+        }
+        0x0C => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        encode_remove_node(node_id)
+        }
+        0x0D => {
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        let friendly_name = crate::clusters::codec::json_util::get_string(args, "friendly_name")?;
+        encode_update_endpoint_for_node(endpoint_id, node_id, friendly_name)
+        }
+        0x0E => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_add_group_id_to_endpoint_for_node(node_id, endpoint_id, group_id)
+        }
+        0x0F => {
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        encode_remove_group_id_from_endpoint_for_node(node_id, endpoint_id, group_id)
+        }
+        0x10 => Err(anyhow::anyhow!("command \"AddBindingToEndpointForNode\" has complex args: use raw mode")),
+        0x11 => {
+        let list_id = crate::clusters::codec::json_util::get_u16(args, "list_id")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        encode_remove_binding_from_endpoint_for_node(list_id, endpoint_id, node_id)
+        }
+        0x12 => Err(anyhow::anyhow!("command \"AddACLToNode\" has complex args: use raw mode")),
+        0x13 => {
+        let list_id = crate::clusters::codec::json_util::get_u16(args, "list_id")?;
+        let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
+        encode_remove_acl_from_node(list_id, node_id)
+        }
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
 // Typed facade (invokes + reads)
 
 /// Invoke `AddKeySet` command on cluster `Joint Fabric Datastore`.

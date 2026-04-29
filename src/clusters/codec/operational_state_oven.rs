@@ -5,9 +5,56 @@
 
 #![allow(clippy::too_many_arguments)]
 
+use anyhow;
+use serde_json;
 
 
 // Command encoders
+
+// Command listing
+
+pub fn get_command_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "Pause"),
+        (0x01, "Stop"),
+        (0x02, "Start"),
+        (0x03, "Resume"),
+        (0x04, "OperationalCommandResponse"),
+    ]
+}
+
+pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
+    match cmd_id {
+        0x00 => Some("Pause"),
+        0x01 => Some("Stop"),
+        0x02 => Some("Start"),
+        0x03 => Some("Resume"),
+        0x04 => Some("OperationalCommandResponse"),
+        _ => None,
+    }
+}
+
+pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
+    match cmd_id {
+        0x00 => Some(vec![]),
+        0x01 => Some(vec![]),
+        0x02 => Some(vec![]),
+        0x03 => Some(vec![]),
+        0x04 => Some(vec![]),
+        _ => None,
+    }
+}
+
+pub fn encode_command_json(cmd_id: u32, _args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+    match cmd_id {
+        0x00 => Ok(vec![]),
+        0x01 => Ok(vec![]),
+        0x02 => Ok(vec![]),
+        0x03 => Ok(vec![]),
+        0x04 => Ok(vec![]),
+        _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
 
 // Typed facade (invokes + reads)
 
