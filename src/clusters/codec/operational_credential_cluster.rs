@@ -156,40 +156,40 @@ pub fn encode_certificate_chain_request(certificate_type: CertificateChainType) 
 }
 
 /// Encode CSRRequest command (0x04)
-pub fn encode_csr_request(csr_nonce: Vec<u8>, is_for_update_noc: bool) -> anyhow::Result<Vec<u8>> {
+pub fn encode_csr_request(csr_nonce: Vec<u8>, is_for_update_noc: Option<bool>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(csr_nonce)).into());
+    if let Some(x) = is_for_update_noc { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(csr_nonce)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(is_for_update_noc)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode AddNOC command (0x06)
-pub fn encode_add_noc(noc_value: Vec<u8>, icac_value: Vec<u8>, ipk_value: Vec<u8>, case_admin_subject: u64, admin_vendor_id: u16) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_noc(noc_value: Vec<u8>, icac_value: Option<Vec<u8>>, ipk_value: Vec<u8>, case_admin_subject: u64, admin_vendor_id: u16) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(noc_value)).into());
+    if let Some(x) = icac_value { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
+    tlv_fields.push((2, tlv::TlvItemValueEnc::OctetString(ipk_value)).into());
+    tlv_fields.push((3, tlv::TlvItemValueEnc::UInt64(case_admin_subject)).into());
+    tlv_fields.push((4, tlv::TlvItemValueEnc::UInt16(admin_vendor_id)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(noc_value)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(icac_value)).into(),
-        (2, tlv::TlvItemValueEnc::OctetString(ipk_value)).into(),
-        (3, tlv::TlvItemValueEnc::UInt64(case_admin_subject)).into(),
-        (4, tlv::TlvItemValueEnc::UInt16(admin_vendor_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode UpdateNOC command (0x07)
-pub fn encode_update_noc(noc_value: Vec<u8>, icac_value: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_update_noc(noc_value: Vec<u8>, icac_value: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(noc_value)).into());
+    if let Some(x) = icac_value { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(noc_value)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(icac_value)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -228,14 +228,14 @@ pub fn encode_add_trusted_root_certificate(root_ca_certificate: Vec<u8>) -> anyh
 }
 
 /// Encode SetVIDVerificationStatement command (0x0C)
-pub fn encode_set_vid_verification_statement(vendor_id: u16, vid_verification_statement: Vec<u8>, vvsc: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_vid_verification_statement(vendor_id: Option<u16>, vid_verification_statement: Option<Vec<u8>>, vvsc: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = vendor_id { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+    if let Some(x) = vid_verification_statement { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
+    if let Some(x) = vvsc { tlv_fields.push((2, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(vendor_id)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(vid_verification_statement)).into(),
-        (2, tlv::TlvItemValueEnc::OctetString(vvsc)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -502,12 +502,12 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         }
         0x04 => {
         let csr_nonce = crate::clusters::codec::json_util::get_octstr(args, "csr_nonce")?;
-        let is_for_update_noc = crate::clusters::codec::json_util::get_bool(args, "is_for_update_noc")?;
+        let is_for_update_noc = crate::clusters::codec::json_util::get_opt_bool(args, "is_for_update_noc")?;
         encode_csr_request(csr_nonce, is_for_update_noc)
         }
         0x06 => {
         let noc_value = crate::clusters::codec::json_util::get_octstr(args, "noc_value")?;
-        let icac_value = crate::clusters::codec::json_util::get_octstr(args, "icac_value")?;
+        let icac_value = crate::clusters::codec::json_util::get_opt_octstr(args, "icac_value")?;
         let ipk_value = crate::clusters::codec::json_util::get_octstr(args, "ipk_value")?;
         let case_admin_subject = crate::clusters::codec::json_util::get_u64(args, "case_admin_subject")?;
         let admin_vendor_id = crate::clusters::codec::json_util::get_u16(args, "admin_vendor_id")?;
@@ -515,7 +515,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         }
         0x07 => {
         let noc_value = crate::clusters::codec::json_util::get_octstr(args, "noc_value")?;
-        let icac_value = crate::clusters::codec::json_util::get_octstr(args, "icac_value")?;
+        let icac_value = crate::clusters::codec::json_util::get_opt_octstr(args, "icac_value")?;
         encode_update_noc(noc_value, icac_value)
         }
         0x09 => {
@@ -531,9 +531,9 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_add_trusted_root_certificate(root_ca_certificate)
         }
         0x0C => {
-        let vendor_id = crate::clusters::codec::json_util::get_u16(args, "vendor_id")?;
-        let vid_verification_statement = crate::clusters::codec::json_util::get_octstr(args, "vid_verification_statement")?;
-        let vvsc = crate::clusters::codec::json_util::get_octstr(args, "vvsc")?;
+        let vendor_id = crate::clusters::codec::json_util::get_opt_u16(args, "vendor_id")?;
+        let vid_verification_statement = crate::clusters::codec::json_util::get_opt_octstr(args, "vid_verification_statement")?;
+        let vvsc = crate::clusters::codec::json_util::get_opt_octstr(args, "vvsc")?;
         encode_set_vid_verification_statement(vendor_id, vid_verification_statement, vvsc)
         }
         0x0D => {
@@ -665,19 +665,19 @@ pub async fn certificate_chain_request(conn: &crate::controller::Connection, end
 }
 
 /// Invoke `CSRRequest` command on cluster `Operational Credentials`.
-pub async fn csr_request(conn: &crate::controller::Connection, endpoint: u16, csr_nonce: Vec<u8>, is_for_update_noc: bool) -> anyhow::Result<CSRResponse> {
+pub async fn csr_request(conn: &crate::controller::Connection, endpoint: u16, csr_nonce: Vec<u8>, is_for_update_noc: Option<bool>) -> anyhow::Result<CSRResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_CSRREQUEST, &encode_csr_request(csr_nonce, is_for_update_noc)?).await?;
     decode_csr_response(&tlv)
 }
 
 /// Invoke `AddNOC` command on cluster `Operational Credentials`.
-pub async fn add_noc(conn: &crate::controller::Connection, endpoint: u16, noc_value: Vec<u8>, icac_value: Vec<u8>, ipk_value: Vec<u8>, case_admin_subject: u64, admin_vendor_id: u16) -> anyhow::Result<NOCResponse> {
+pub async fn add_noc(conn: &crate::controller::Connection, endpoint: u16, noc_value: Vec<u8>, icac_value: Option<Vec<u8>>, ipk_value: Vec<u8>, case_admin_subject: u64, admin_vendor_id: u16) -> anyhow::Result<NOCResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_ADDNOC, &encode_add_noc(noc_value, icac_value, ipk_value, case_admin_subject, admin_vendor_id)?).await?;
     decode_noc_response(&tlv)
 }
 
 /// Invoke `UpdateNOC` command on cluster `Operational Credentials`.
-pub async fn update_noc(conn: &crate::controller::Connection, endpoint: u16, noc_value: Vec<u8>, icac_value: Vec<u8>) -> anyhow::Result<NOCResponse> {
+pub async fn update_noc(conn: &crate::controller::Connection, endpoint: u16, noc_value: Vec<u8>, icac_value: Option<Vec<u8>>) -> anyhow::Result<NOCResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_UPDATENOC, &encode_update_noc(noc_value, icac_value)?).await?;
     decode_noc_response(&tlv)
 }
@@ -701,7 +701,7 @@ pub async fn add_trusted_root_certificate(conn: &crate::controller::Connection, 
 }
 
 /// Invoke `SetVIDVerificationStatement` command on cluster `Operational Credentials`.
-pub async fn set_vid_verification_statement(conn: &crate::controller::Connection, endpoint: u16, vendor_id: u16, vid_verification_statement: Vec<u8>, vvsc: Vec<u8>) -> anyhow::Result<()> {
+pub async fn set_vid_verification_statement(conn: &crate::controller::Connection, endpoint: u16, vendor_id: Option<u16>, vid_verification_statement: Option<Vec<u8>>, vvsc: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OPERATIONAL_CREDENTIALS, crate::clusters::defs::CLUSTER_OPERATIONAL_CREDENTIALS_CMD_ID_SETVIDVERIFICATIONSTATEMENT, &encode_set_vid_verification_statement(vendor_id, vid_verification_statement, vvsc)?).await?;
     Ok(())
 }

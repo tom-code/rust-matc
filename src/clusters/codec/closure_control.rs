@@ -217,14 +217,14 @@ pub struct OverallTargetState {
 // Command encoders
 
 /// Encode MoveTo command (0x01)
-pub fn encode_move_to(position: TargetPosition, latch: bool, speed: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_move_to(position: Option<TargetPosition>, latch: Option<bool>, speed: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = position { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
+    if let Some(x) = latch { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
+    if let Some(x) = speed { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(position.to_u8())).into(),
-        (1, tlv::TlvItemValueEnc::Bool(latch)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(speed)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -422,12 +422,10 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => Ok(vec![]),
         0x01 => {
-        let position = {
-            let n = crate::clusters::codec::json_util::get_u64(args, "position")?;
-            TargetPosition::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TargetPosition: {}", n))?
-        };
-        let latch = crate::clusters::codec::json_util::get_bool(args, "latch")?;
-        let speed = crate::clusters::codec::json_util::get_u8(args, "speed")?;
+        let position = crate::clusters::codec::json_util::get_opt_u64(args, "position")?
+            .and_then(|n| TargetPosition::from_u8(n as u8));
+        let latch = crate::clusters::codec::json_util::get_opt_bool(args, "latch")?;
+        let speed = crate::clusters::codec::json_util::get_opt_u8(args, "speed")?;
         encode_move_to(position, latch, speed)
         }
         0x02 => Ok(vec![]),
@@ -444,7 +442,7 @@ pub async fn stop(conn: &crate::controller::Connection, endpoint: u16) -> anyhow
 }
 
 /// Invoke `MoveTo` command on cluster `Closure Control`.
-pub async fn move_to(conn: &crate::controller::Connection, endpoint: u16, position: TargetPosition, latch: bool, speed: u8) -> anyhow::Result<()> {
+pub async fn move_to(conn: &crate::controller::Connection, endpoint: u16, position: Option<TargetPosition>, latch: Option<bool>, speed: Option<u8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_CONTROL, crate::clusters::defs::CLUSTER_CLOSURE_CONTROL_CMD_ID_MOVETO, &encode_move_to(position, latch, speed)?).await?;
     Ok(())
 }

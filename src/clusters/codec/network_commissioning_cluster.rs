@@ -194,75 +194,75 @@ pub struct WiFiInterfaceScanResult {
 // Command encoders
 
 /// Encode ScanNetworks command (0x00)
-pub fn encode_scan_networks(ssid: Option<Vec<u8>>, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_scan_networks(ssid: Option<Vec<u8>>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(ssid.unwrap_or_default())).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(ssid.unwrap_or_default())).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode AddOrUpdateWiFiNetwork command (0x02)
-pub fn encode_add_or_update_wifi_network(ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_or_update_wifi_network(ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(ssid)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(credentials)).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(ssid)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(credentials)).into(),
-        (2, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode AddOrUpdateThreadNetwork command (0x03)
-pub fn encode_add_or_update_thread_network(operational_dataset: Vec<u8>, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_or_update_thread_network(operational_dataset: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(operational_dataset)).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(operational_dataset)).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode RemoveNetwork command (0x04)
-pub fn encode_remove_network(network_id: Vec<u8>, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_network(network_id: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(network_id)).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(network_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode ConnectNetwork command (0x06)
-pub fn encode_connect_network(network_id: Vec<u8>, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_connect_network(network_id: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(network_id)).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(network_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode ReorderNetwork command (0x08)
-pub fn encode_reorder_network(network_id: Vec<u8>, network_index: u8, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_reorder_network(network_id: Vec<u8>, network_index: u8, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(network_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt8(network_index)).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(network_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(network_index)).into(),
-        (2, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -549,34 +549,34 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => {
         let ssid = crate::clusters::codec::json_util::get_opt_octstr(args, "ssid")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_scan_networks(ssid, breadcrumb)
         }
         0x02 => {
         let ssid = crate::clusters::codec::json_util::get_octstr(args, "ssid")?;
         let credentials = crate::clusters::codec::json_util::get_octstr(args, "credentials")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_add_or_update_wifi_network(ssid, credentials, breadcrumb)
         }
         0x03 => {
         let operational_dataset = crate::clusters::codec::json_util::get_octstr(args, "operational_dataset")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_add_or_update_thread_network(operational_dataset, breadcrumb)
         }
         0x04 => {
         let network_id = crate::clusters::codec::json_util::get_octstr(args, "network_id")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_remove_network(network_id, breadcrumb)
         }
         0x06 => {
         let network_id = crate::clusters::codec::json_util::get_octstr(args, "network_id")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_connect_network(network_id, breadcrumb)
         }
         0x08 => {
         let network_id = crate::clusters::codec::json_util::get_octstr(args, "network_id")?;
         let network_index = crate::clusters::codec::json_util::get_u8(args, "network_index")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_reorder_network(network_id, network_index, breadcrumb)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -689,37 +689,37 @@ pub fn decode_connect_network_response(inp: &tlv::TlvItemValue) -> anyhow::Resul
 // Typed facade (invokes + reads)
 
 /// Invoke `ScanNetworks` command on cluster `Network Commissioning`.
-pub async fn scan_networks(conn: &crate::controller::Connection, endpoint: u16, ssid: Option<Vec<u8>>, breadcrumb: u64) -> anyhow::Result<ScanNetworksResponse> {
+pub async fn scan_networks(conn: &crate::controller::Connection, endpoint: u16, ssid: Option<Vec<u8>>, breadcrumb: Option<u64>) -> anyhow::Result<ScanNetworksResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_SCANNETWORKS, &encode_scan_networks(ssid, breadcrumb)?).await?;
     decode_scan_networks_response(&tlv)
 }
 
 /// Invoke `AddOrUpdateWiFiNetwork` command on cluster `Network Commissioning`.
-pub async fn add_or_update_wifi_network(conn: &crate::controller::Connection, endpoint: u16, ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+pub async fn add_or_update_wifi_network(conn: &crate::controller::Connection, endpoint: u16, ssid: Vec<u8>, credentials: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<NetworkConfigResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_ADDORUPDATEWIFINETWORK, &encode_add_or_update_wifi_network(ssid, credentials, breadcrumb)?).await?;
     decode_network_config_response(&tlv)
 }
 
 /// Invoke `AddOrUpdateThreadNetwork` command on cluster `Network Commissioning`.
-pub async fn add_or_update_thread_network(conn: &crate::controller::Connection, endpoint: u16, operational_dataset: Vec<u8>, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+pub async fn add_or_update_thread_network(conn: &crate::controller::Connection, endpoint: u16, operational_dataset: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<NetworkConfigResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_ADDORUPDATETHREADNETWORK, &encode_add_or_update_thread_network(operational_dataset, breadcrumb)?).await?;
     decode_network_config_response(&tlv)
 }
 
 /// Invoke `RemoveNetwork` command on cluster `Network Commissioning`.
-pub async fn remove_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+pub async fn remove_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<NetworkConfigResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_REMOVENETWORK, &encode_remove_network(network_id, breadcrumb)?).await?;
     decode_network_config_response(&tlv)
 }
 
 /// Invoke `ConnectNetwork` command on cluster `Network Commissioning`.
-pub async fn connect_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, breadcrumb: u64) -> anyhow::Result<ConnectNetworkResponse> {
+pub async fn connect_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<ConnectNetworkResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_CONNECTNETWORK, &encode_connect_network(network_id, breadcrumb)?).await?;
     decode_connect_network_response(&tlv)
 }
 
 /// Invoke `ReorderNetwork` command on cluster `Network Commissioning`.
-pub async fn reorder_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, network_index: u8, breadcrumb: u64) -> anyhow::Result<NetworkConfigResponse> {
+pub async fn reorder_network(conn: &crate::controller::Connection, endpoint: u16, network_id: Vec<u8>, network_index: u8, breadcrumb: Option<u64>) -> anyhow::Result<NetworkConfigResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_NETWORK_COMMISSIONING, crate::clusters::defs::CLUSTER_NETWORK_COMMISSIONING_CMD_ID_REORDERNETWORK, &encode_reorder_network(network_id, network_index, breadcrumb)?).await?;
     decode_network_config_response(&tlv)
 }

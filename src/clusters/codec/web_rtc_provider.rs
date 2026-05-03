@@ -32,33 +32,39 @@ pub struct SolicitOfferParams {
     pub originating_endpoint_id: u16,
     pub video_stream_id: Option<u8>,
     pub audio_stream_id: Option<u8>,
-    pub ice_transport_policy: String,
+    pub ice_transport_policy: Option<String>,
     pub metadata_enabled: bool,
-    pub s_frame_config: SFrame,
-    pub video_streams: Vec<u8>,
-    pub audio_streams: Vec<u8>,
+    pub s_frame_config: Option<SFrame>,
+    pub video_streams: Option<Vec<u8>>,
+    pub audio_streams: Option<Vec<u8>>,
 }
 
 /// Encode SolicitOffer command (0x00)
 pub fn encode_solicit_offer(params: SolicitOfferParams) -> anyhow::Result<Vec<u8>> {
-            // Encode struct SFrameStruct
-            let mut s_frame_config_fields = Vec::new();
-            if let Some(x) = params.s_frame_config.cipher_suite { s_frame_config_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-            if let Some(x) = params.s_frame_config.base_key { s_frame_config_fields.push((1, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-            if let Some(x) = params.s_frame_config.kid { s_frame_config_fields.push((2, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(params.stream_usage)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt16(params.originating_endpoint_id)).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(params.video_stream_id.unwrap_or(0))).into());
+    tlv_fields.push((3, tlv::TlvItemValueEnc::UInt8(params.audio_stream_id.unwrap_or(0))).into());
+    if let Some(x) = params.ice_transport_policy { tlv_fields.push((5, tlv::TlvItemValueEnc::String(x)).into()); }
+    tlv_fields.push((6, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into());
+    if let Some(s_frame_config) = params.s_frame_config {
+        // Encode struct SFrameStruct
+        let mut s_frame_config_fields = Vec::new();
+        if let Some(x) = s_frame_config.cipher_suite { s_frame_config_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+        if let Some(x) = s_frame_config.base_key { s_frame_config_fields.push((1, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
+        if let Some(x) = s_frame_config.kid { s_frame_config_fields.push((2, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
+        tlv_fields.push((7, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into());
+    }
+    if let Some(video_streams) = params.video_streams {
+        tlv_fields.push((8, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+    }
+    if let Some(audio_streams) = params.audio_streams {
+        tlv_fields.push((9, tlv::TlvItemValueEnc::StructAnon(audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+    }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(params.stream_usage)).into(),
-        (1, tlv::TlvItemValueEnc::UInt16(params.originating_endpoint_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(params.video_stream_id.unwrap_or(0))).into(),
-        (3, tlv::TlvItemValueEnc::UInt8(params.audio_stream_id.unwrap_or(0))).into(),
-        (5, tlv::TlvItemValueEnc::String(params.ice_transport_policy)).into(),
-        (6, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into(),
-        (7, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into(),
-        (8, tlv::TlvItemValueEnc::StructAnon(params.video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into(),
-        (9, tlv::TlvItemValueEnc::StructAnon(params.audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -71,35 +77,41 @@ pub struct ProvideOfferParams {
     pub originating_endpoint_id: u16,
     pub video_stream_id: Option<u8>,
     pub audio_stream_id: Option<u8>,
-    pub ice_transport_policy: String,
+    pub ice_transport_policy: Option<String>,
     pub metadata_enabled: bool,
-    pub s_frame_config: SFrame,
-    pub video_streams: Vec<u8>,
-    pub audio_streams: Vec<u8>,
+    pub s_frame_config: Option<SFrame>,
+    pub video_streams: Option<Vec<u8>>,
+    pub audio_streams: Option<Vec<u8>>,
 }
 
 /// Encode ProvideOffer command (0x02)
 pub fn encode_provide_offer(params: ProvideOfferParams) -> anyhow::Result<Vec<u8>> {
-            // Encode struct SFrameStruct
-            let mut s_frame_config_fields = Vec::new();
-            if let Some(x) = params.s_frame_config.cipher_suite { s_frame_config_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-            if let Some(x) = params.s_frame_config.base_key { s_frame_config_fields.push((1, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
-            if let Some(x) = params.s_frame_config.kid { s_frame_config_fields.push((2, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(params.web_rtc_session_id.unwrap_or(0))).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::String(params.sdp)).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(params.stream_usage)).into());
+    tlv_fields.push((3, tlv::TlvItemValueEnc::UInt16(params.originating_endpoint_id)).into());
+    tlv_fields.push((4, tlv::TlvItemValueEnc::UInt8(params.video_stream_id.unwrap_or(0))).into());
+    tlv_fields.push((5, tlv::TlvItemValueEnc::UInt8(params.audio_stream_id.unwrap_or(0))).into());
+    if let Some(x) = params.ice_transport_policy { tlv_fields.push((7, tlv::TlvItemValueEnc::String(x)).into()); }
+    tlv_fields.push((8, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into());
+    if let Some(s_frame_config) = params.s_frame_config {
+        // Encode struct SFrameStruct
+        let mut s_frame_config_fields = Vec::new();
+        if let Some(x) = s_frame_config.cipher_suite { s_frame_config_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+        if let Some(x) = s_frame_config.base_key { s_frame_config_fields.push((1, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
+        if let Some(x) = s_frame_config.kid { s_frame_config_fields.push((2, tlv::TlvItemValueEnc::OctetString(x.clone())).into()); }
+        tlv_fields.push((9, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into());
+    }
+    if let Some(video_streams) = params.video_streams {
+        tlv_fields.push((10, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+    }
+    if let Some(audio_streams) = params.audio_streams {
+        tlv_fields.push((11, tlv::TlvItemValueEnc::StructAnon(audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+    }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(params.web_rtc_session_id.unwrap_or(0))).into(),
-        (1, tlv::TlvItemValueEnc::String(params.sdp)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(params.stream_usage)).into(),
-        (3, tlv::TlvItemValueEnc::UInt16(params.originating_endpoint_id)).into(),
-        (4, tlv::TlvItemValueEnc::UInt8(params.video_stream_id.unwrap_or(0))).into(),
-        (5, tlv::TlvItemValueEnc::UInt8(params.audio_stream_id.unwrap_or(0))).into(),
-        (7, tlv::TlvItemValueEnc::String(params.ice_transport_policy)).into(),
-        (8, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into(),
-        (9, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into(),
-        (10, tlv::TlvItemValueEnc::StructAnon(params.video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into(),
-        (11, tlv::TlvItemValueEnc::StructAnon(params.audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }

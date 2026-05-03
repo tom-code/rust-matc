@@ -291,7 +291,7 @@ pub fn encode_set_targets(charging_target_schedules: Vec<ChargingTargetSchedule>
                         let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                             let mut nested_fields = Vec::new();
                                 if let Some(x) = inner.target_time_minutes_past_midnight { nested_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-                                // TODO: encoding for field target_so_c (percent) not implemented
+                                if let Some(x) = inner.target_so_c { nested_fields.push((1, tlv::TlvItemValueEnc::UInt8(x)).into()); }
                                 if let Some(x) = inner.added_energy { nested_fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
                             (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                         }).collect();

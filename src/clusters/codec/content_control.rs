@@ -142,13 +142,13 @@ pub fn encode_update_pin(old_pin: String, new_pin: String) -> anyhow::Result<Vec
 }
 
 /// Encode AddBonusTime command (0x05)
-pub fn encode_add_bonus_time(pin_code: String, bonus_time: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_bonus_time(pin_code: Option<String>, bonus_time: u32) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = pin_code { tlv_fields.push((0, tlv::TlvItemValueEnc::String(x)).into()); }
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(bonus_time)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::String(pin_code)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(bonus_time)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -639,7 +639,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x03 => Ok(vec![]),
         0x04 => Ok(vec![]),
         0x05 => {
-        let pin_code = crate::clusters::codec::json_util::get_string(args, "pin_code")?;
+        let pin_code = crate::clusters::codec::json_util::get_opt_string(args, "pin_code")?;
         let bonus_time = crate::clusters::codec::json_util::get_u32(args, "bonus_time")?;
         encode_add_bonus_time(pin_code, bonus_time)
         }
@@ -713,7 +713,7 @@ pub async fn disable(conn: &crate::controller::Connection, endpoint: u16) -> any
 }
 
 /// Invoke `AddBonusTime` command on cluster `Content Control`.
-pub async fn add_bonus_time(conn: &crate::controller::Connection, endpoint: u16, pin_code: String, bonus_time: u32) -> anyhow::Result<()> {
+pub async fn add_bonus_time(conn: &crate::controller::Connection, endpoint: u16, pin_code: Option<String>, bonus_time: u32) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_CONTROL, crate::clusters::defs::CLUSTER_CONTENT_CONTROL_CMD_ID_ADDBONUSTIME, &encode_add_bonus_time(pin_code, bonus_time)?).await?;
     Ok(())
 }

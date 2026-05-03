@@ -123,14 +123,14 @@ impl From<TransferProtocol> for u8 {
 // Command encoders
 
 /// Encode RetrieveLogsRequest command (0x00)
-pub fn encode_retrieve_logs_request(intent: Intent, requested_protocol: TransferProtocol, transfer_file_designator: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_retrieve_logs_request(intent: Intent, requested_protocol: TransferProtocol, transfer_file_designator: Option<String>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(intent.to_u8())).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt8(requested_protocol.to_u8())).into());
+    if let Some(x) = transfer_file_designator { tlv_fields.push((2, tlv::TlvItemValueEnc::String(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(intent.to_u8())).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(requested_protocol.to_u8())).into(),
-        (2, tlv::TlvItemValueEnc::String(transfer_file_designator)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -172,7 +172,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
             let n = crate::clusters::codec::json_util::get_u64(args, "requested_protocol")?;
             TransferProtocol::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TransferProtocol: {}", n))?
         };
-        let transfer_file_designator = crate::clusters::codec::json_util::get_string(args, "transfer_file_designator")?;
+        let transfer_file_designator = crate::clusters::codec::json_util::get_opt_string(args, "transfer_file_designator")?;
         encode_retrieve_logs_request(intent, requested_protocol, transfer_file_designator)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -208,7 +208,7 @@ pub fn decode_retrieve_logs_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
 // Typed facade (invokes + reads)
 
 /// Invoke `RetrieveLogsRequest` command on cluster `Diagnostic Logs`.
-pub async fn retrieve_logs_request(conn: &crate::controller::Connection, endpoint: u16, intent: Intent, requested_protocol: TransferProtocol, transfer_file_designator: String) -> anyhow::Result<RetrieveLogsResponse> {
+pub async fn retrieve_logs_request(conn: &crate::controller::Connection, endpoint: u16, intent: Intent, requested_protocol: TransferProtocol, transfer_file_designator: Option<String>) -> anyhow::Result<RetrieveLogsResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_DIAGNOSTIC_LOGS, crate::clusters::defs::CLUSTER_DIAGNOSTIC_LOGS_CMD_ID_RETRIEVELOGSREQUEST, &encode_retrieve_logs_request(intent, requested_protocol, transfer_file_designator)?).await?;
     decode_retrieve_logs_response(&tlv)
 }

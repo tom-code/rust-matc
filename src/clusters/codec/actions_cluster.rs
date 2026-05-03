@@ -216,150 +216,150 @@ pub struct EndpointList {
 // Command encoders
 
 /// Encode InstantAction command (0x00)
-pub fn encode_instant_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_instant_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode InstantActionWithTransition command (0x01)
-pub fn encode_instant_action_with_transition(action_id: u16, invoke_id: u32, transition_time: u16) -> anyhow::Result<Vec<u8>> {
+pub fn encode_instant_action_with_transition(action_id: u16, invoke_id: Option<u32>, transition_time: u16) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt16(transition_time)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt16(transition_time)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode StartAction command (0x02)
-pub fn encode_start_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_start_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode StartActionWithDuration command (0x03)
-pub fn encode_start_action_with_duration(action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_start_action_with_duration(action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt32(duration)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt32(duration)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode StopAction command (0x04)
-pub fn encode_stop_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_stop_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode PauseAction command (0x05)
-pub fn encode_pause_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_pause_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode PauseActionWithDuration command (0x06)
-pub fn encode_pause_action_with_duration(action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_pause_action_with_duration(action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt32(duration)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt32(duration)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode ResumeAction command (0x07)
-pub fn encode_resume_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_resume_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode EnableAction command (0x08)
-pub fn encode_enable_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enable_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode EnableActionWithDuration command (0x09)
-pub fn encode_enable_action_with_duration(action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_enable_action_with_duration(action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt32(duration)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt32(duration)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode DisableAction command (0x0A)
-pub fn encode_disable_action(action_id: u16, invoke_id: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_disable_action(action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode DisableActionWithDuration command (0x0B)
-pub fn encode_disable_action_with_duration(action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<Vec<u8>> {
+pub fn encode_disable_action_with_duration(action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(action_id)).into());
+    if let Some(x) = invoke_id { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt32(duration)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(action_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(invoke_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt32(duration)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -569,66 +569,66 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_instant_action(action_id, invoke_id)
         }
         0x01 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         let transition_time = crate::clusters::codec::json_util::get_u16(args, "transition_time")?;
         encode_instant_action_with_transition(action_id, invoke_id, transition_time)
         }
         0x02 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_start_action(action_id, invoke_id)
         }
         0x03 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
         encode_start_action_with_duration(action_id, invoke_id, duration)
         }
         0x04 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_stop_action(action_id, invoke_id)
         }
         0x05 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_pause_action(action_id, invoke_id)
         }
         0x06 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
         encode_pause_action_with_duration(action_id, invoke_id, duration)
         }
         0x07 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_resume_action(action_id, invoke_id)
         }
         0x08 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_enable_action(action_id, invoke_id)
         }
         0x09 => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
         encode_enable_action_with_duration(action_id, invoke_id, duration)
         }
         0x0A => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         encode_disable_action(action_id, invoke_id)
         }
         0x0B => {
         let action_id = crate::clusters::codec::json_util::get_u16(args, "action_id")?;
-        let invoke_id = crate::clusters::codec::json_util::get_u32(args, "invoke_id")?;
+        let invoke_id = crate::clusters::codec::json_util::get_opt_u32(args, "invoke_id")?;
         let duration = crate::clusters::codec::json_util::get_u32(args, "duration")?;
         encode_disable_action_with_duration(action_id, invoke_id, duration)
         }
@@ -639,73 +639,73 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `InstantAction` command on cluster `Actions`.
-pub async fn instant_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn instant_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_INSTANTACTION, &encode_instant_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `InstantActionWithTransition` command on cluster `Actions`.
-pub async fn instant_action_with_transition(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, transition_time: u16) -> anyhow::Result<()> {
+pub async fn instant_action_with_transition(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>, transition_time: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_INSTANTACTIONWITHTRANSITION, &encode_instant_action_with_transition(action_id, invoke_id, transition_time)?).await?;
     Ok(())
 }
 
 /// Invoke `StartAction` command on cluster `Actions`.
-pub async fn start_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn start_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_STARTACTION, &encode_start_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `StartActionWithDuration` command on cluster `Actions`.
-pub async fn start_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+pub async fn start_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_STARTACTIONWITHDURATION, &encode_start_action_with_duration(action_id, invoke_id, duration)?).await?;
     Ok(())
 }
 
 /// Invoke `StopAction` command on cluster `Actions`.
-pub async fn stop_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn stop_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_STOPACTION, &encode_stop_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `PauseAction` command on cluster `Actions`.
-pub async fn pause_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn pause_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_PAUSEACTION, &encode_pause_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `PauseActionWithDuration` command on cluster `Actions`.
-pub async fn pause_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+pub async fn pause_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_PAUSEACTIONWITHDURATION, &encode_pause_action_with_duration(action_id, invoke_id, duration)?).await?;
     Ok(())
 }
 
 /// Invoke `ResumeAction` command on cluster `Actions`.
-pub async fn resume_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn resume_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_RESUMEACTION, &encode_resume_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `EnableAction` command on cluster `Actions`.
-pub async fn enable_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn enable_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_ENABLEACTION, &encode_enable_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `EnableActionWithDuration` command on cluster `Actions`.
-pub async fn enable_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+pub async fn enable_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_ENABLEACTIONWITHDURATION, &encode_enable_action_with_duration(action_id, invoke_id, duration)?).await?;
     Ok(())
 }
 
 /// Invoke `DisableAction` command on cluster `Actions`.
-pub async fn disable_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32) -> anyhow::Result<()> {
+pub async fn disable_action(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_DISABLEACTION, &encode_disable_action(action_id, invoke_id)?).await?;
     Ok(())
 }
 
 /// Invoke `DisableActionWithDuration` command on cluster `Actions`.
-pub async fn disable_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: u32, duration: u32) -> anyhow::Result<()> {
+pub async fn disable_action_with_duration(conn: &crate::controller::Connection, endpoint: u16, action_id: u16, invoke_id: Option<u32>, duration: u32) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACTIONS, crate::clusters::defs::CLUSTER_ACTIONS_CMD_ID_DISABLEACTIONWITHDURATION, &encode_disable_action_with_duration(action_id, invoke_id, duration)?).await?;
     Ok(())
 }

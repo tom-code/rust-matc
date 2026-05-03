@@ -131,26 +131,26 @@ pub struct QueryImageParams {
     pub product_id: u16,
     pub software_version: u32,
     pub protocols_supported: Vec<DownloadProtocol>,
-    pub hardware_version: u16,
-    pub location: String,
-    pub requestor_can_consent: bool,
-    pub metadata_for_provider: Vec<u8>,
+    pub hardware_version: Option<u16>,
+    pub location: Option<String>,
+    pub requestor_can_consent: Option<bool>,
+    pub metadata_for_provider: Option<Vec<u8>>,
 }
 
 /// Encode QueryImage command (0x00)
 pub fn encode_query_image(params: QueryImageParams) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(params.vendor_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt16(params.product_id)).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt32(params.software_version)).into());
+    tlv_fields.push((3, tlv::TlvItemValueEnc::StructAnon(params.protocols_supported.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v.to_u8())).into()).collect())).into());
+    if let Some(x) = params.hardware_version { tlv_fields.push((4, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+    if let Some(x) = params.location { tlv_fields.push((5, tlv::TlvItemValueEnc::String(x)).into()); }
+    if let Some(x) = params.requestor_can_consent { tlv_fields.push((6, tlv::TlvItemValueEnc::Bool(x)).into()); }
+    if let Some(x) = params.metadata_for_provider { tlv_fields.push((7, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(params.vendor_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt16(params.product_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt32(params.software_version)).into(),
-        (3, tlv::TlvItemValueEnc::StructAnon(params.protocols_supported.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v.to_u8())).into()).collect())).into(),
-        (4, tlv::TlvItemValueEnc::UInt16(params.hardware_version)).into(),
-        (5, tlv::TlvItemValueEnc::String(params.location)).into(),
-        (6, tlv::TlvItemValueEnc::Bool(params.requestor_can_consent)).into(),
-        (7, tlv::TlvItemValueEnc::OctetString(params.metadata_for_provider)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }

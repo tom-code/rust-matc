@@ -60,13 +60,13 @@ pub struct TargetInfo {
 // Command encoders
 
 /// Encode NavigateTarget command (0x00)
-pub fn encode_navigate_target(target: u8, data: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_navigate_target(target: u8, data: Option<String>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(target)).into());
+    if let Some(x) = data { tlv_fields.push((1, tlv::TlvItemValueEnc::String(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(target)).into(),
-        (1, tlv::TlvItemValueEnc::String(data)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -171,7 +171,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => {
         let target = crate::clusters::codec::json_util::get_u8(args, "target")?;
-        let data = crate::clusters::codec::json_util::get_string(args, "data")?;
+        let data = crate::clusters::codec::json_util::get_opt_string(args, "data")?;
         encode_navigate_target(target, data)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -202,7 +202,7 @@ pub fn decode_navigate_target_response(inp: &tlv::TlvItemValue) -> anyhow::Resul
 // Typed facade (invokes + reads)
 
 /// Invoke `NavigateTarget` command on cluster `Target Navigator`.
-pub async fn navigate_target(conn: &crate::controller::Connection, endpoint: u16, target: u8, data: String) -> anyhow::Result<NavigateTargetResponse> {
+pub async fn navigate_target(conn: &crate::controller::Connection, endpoint: u16, target: u8, data: Option<String>) -> anyhow::Result<NavigateTargetResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TARGET_NAVIGATOR, crate::clusters::defs::CLUSTER_TARGET_NAVIGATOR_CMD_ID_NAVIGATETARGET, &encode_navigate_target(target, data)?).await?;
     decode_navigate_target_response(&tlv)
 }

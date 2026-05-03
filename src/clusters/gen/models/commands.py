@@ -14,12 +14,19 @@ from ..type_mapping import MatterType
 from .tlv_helpers import (
     _generate_struct_field_assignments,
     generate_field_tlv_encoding,
+    generate_optional_field_push,
 )
 from .field import MatterField
 
 if TYPE_CHECKING:
     from .enums import MatterEnum, MatterBitmap
     from .structs import MatterStruct
+
+
+def _element_to_push(element_str: str) -> str:
+    """Convert a vec![] TLV element string to a tlv_fields.push() statement."""
+    stripped = element_str.strip().rstrip(',')
+    return f"tlv_fields.push({stripped});"
 
 
 class MatterCommand:
@@ -93,7 +100,10 @@ class MatterCommand:
                 # Use MatterType mapping (handles primitive lists when is_list=True)
                 rust_type = MatterType.get_rust_type(field.entry_type if field.is_list and field.entry_type else field.field_type, field.is_list, enums=enums, bitmaps=bitmaps)
 
-            if field.nullable:
+            # Wrap in Option when nullable or optional. For optional struct/list fields,
+            # the encoder will use shadowed `if let Some(name) = name` to reuse the
+            # existing struct/list encoder unchanged.
+            if field.nullable or not field.mandatory:
                 rust_type = f"Option<{rust_type}>"
 
             param_fields.append((param_name, rust_type))
@@ -118,9 +128,23 @@ class MatterCommand:
             param_str = ", ".join(params) if params else ""
             param_prefix = ""
 
+        # If any field is truly optional (not mandatory, not nullable) we must use
+        # a Vec accumulator body so those fields can be omitted from TLV when absent.
+        # Skip cross-cluster struct/list-of-struct fields (they would be `continue`d below).
+        def _is_supported_optional(f):
+            if f.mandatory or f.nullable:
+                return False
+            if f.field_type.endswith('Struct') and (not structs or f.field_type not in structs):
+                return False
+            if f.is_list and f.entry_type and f.entry_type.endswith('Struct') and (not structs or f.entry_type not in structs):
+                return False
+            return True
+        has_truly_optional = any(_is_supported_optional(f) for f in self.fields)
+
         # Generate TLV encoding - collect both pre-statements and field encodings
-        pre_statements = []  # Statements that need to go before vec![]
-        tlv_fields = []  # Field encodings that go inside vec![]
+        pre_statements = []  # Statements that need to go before the body
+        tlv_fields = []      # Elements for vec![] (used only when not has_truly_optional)
+        push_statements = [] # Push statements for Vec accumulator (used when has_truly_optional)
 
         for field in self.fields:
             # Skip fields with undefined cross-cluster struct types (consistent with param generation)
@@ -130,25 +154,40 @@ class MatterCommand:
             param_name = field.get_rust_param_name()
             # Prepend prefix if using parameter struct
             full_param_name = f"{param_prefix}{param_name}"
-            encoding_result = generate_field_tlv_encoding(field, full_param_name, structs, enums, bitmaps)
 
-            # Skip empty encoding results (from cross-cluster struct skipping)
-            if not encoding_result:
-                continue
-
-            # Check if this is a multi-line struct encoding that needs pre-statements
-            if '\n' in encoding_result and field.field_type.endswith('Struct'):
-                # Split into pre-statements and the final field line
-                lines = encoding_result.split('\n')
-                # First line is comment, middle lines are statements, last line is the field push
-                pre_statements.extend(lines[:-1])  # Everything except last line
-                tlv_fields.append(lines[-1])  # Last line
+            if has_truly_optional:
+                if not field.mandatory and not field.nullable:
+                    # Truly optional (any type): emit only when Some
+                    push_stmt = generate_optional_field_push(field, full_param_name, structs, enums, bitmaps)
+                    if push_stmt:
+                        push_statements.append(push_stmt)
+                else:
+                    # Mandatory or nullable: encode normally, convert element to push call
+                    encoding_result = generate_field_tlv_encoding(field, full_param_name, structs, enums, bitmaps)
+                    if not encoding_result:
+                        continue
+                    # Only split struct-field multi-line results (same guard as the vec![] path).
+                    # List fields also produce multi-line strings but are a single expression.
+                    if '\n' in encoding_result and field.field_type.endswith('Struct'):
+                        lines = encoding_result.split('\n')
+                        pre_statements.extend(lines[:-1])
+                        push_statements.append(_element_to_push(lines[-1]))
+                    else:
+                        push_statements.append(_element_to_push(encoding_result))
             else:
-                tlv_fields.append(encoding_result)
-
-        # Generate pre-statement block (if any)
-        pre_stmt_str = "\n    ".join(pre_statements) if pre_statements else ""
-        tlv_fields_str = "\n".join(tlv_fields) if tlv_fields else "        // No fields"
+                encoding_result = generate_field_tlv_encoding(field, full_param_name, structs, enums, bitmaps)
+                # Skip empty encoding results (from cross-cluster struct skipping)
+                if not encoding_result:
+                    continue
+                # Check if this is a multi-line struct encoding that needs pre-statements
+                if '\n' in encoding_result and field.field_type.endswith('Struct'):
+                    # Split into pre-statements and the final field line
+                    lines = encoding_result.split('\n')
+                    # First line is comment, middle lines are statements, last line is the field push
+                    pre_statements.extend(lines[:-1])  # Everything except last line
+                    tlv_fields.append(lines[-1])  # Last line
+                else:
+                    tlv_fields.append(encoding_result)
 
         # Clean up command ID format
         clean_id = self.id
@@ -165,7 +204,23 @@ pub struct {struct_name} {{
 '''
 
         # Generate function
-        if pre_statements:
+        if has_truly_optional:
+            pre_stmt_str = "\n    ".join(pre_statements) if pre_statements else ""
+            pre_block = f"\n    {pre_stmt_str}" if pre_statements else ""
+            push_stmts_str = "\n    ".join(push_statements) if push_statements else "// No fields"
+            function = f'''{struct_def}/// Encode {self.name} command ({clean_id})
+pub fn {func_name}({param_str}) -> anyhow::Result<Vec<u8>> {{{pre_block}
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    {push_stmts_str}
+    let tlv = tlv::TlvItemEnc {{
+        tag: 0,
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
+    }};
+    Ok(tlv.encode()?)
+}}'''
+        elif pre_statements:
+            pre_stmt_str = "\n    ".join(pre_statements)
+            tlv_fields_str = "\n".join(tlv_fields) if tlv_fields else "        // No fields"
             function = f'''{struct_def}/// Encode {self.name} command ({clean_id})
 pub fn {func_name}({param_str}) -> anyhow::Result<Vec<u8>> {{
     {pre_stmt_str}
@@ -178,6 +233,7 @@ pub fn {func_name}({param_str}) -> anyhow::Result<Vec<u8>> {{
     Ok(tlv.encode()?)
 }}'''
         else:
+            tlv_fields_str = "\n".join(tlv_fields) if tlv_fields else "        // No fields"
             function = f'''{struct_def}/// Encode {self.name} command ({clean_id})
 pub fn {func_name}({param_str}) -> anyhow::Result<Vec<u8>> {{
     let tlv = tlv::TlvItemEnc {{

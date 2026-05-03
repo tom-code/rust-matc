@@ -244,22 +244,22 @@ pub mod safetystatus {
 // Command encoders
 
 /// Encode GoToLiftPercentage command (0x05)
-pub fn encode_go_to_lift_percentage(lift_percent100ths_value: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_go_to_lift_percentage(lift_percent100ths_value: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(lift_percent100ths_value)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(lift_percent100ths_value)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode GoToTiltPercentage command (0x08)
-pub fn encode_go_to_tilt_percentage(tilt_percent100ths_value: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_go_to_tilt_percentage(tilt_percent100ths_value: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(tilt_percent100ths_value)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(tilt_percent100ths_value)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -331,18 +331,18 @@ pub fn decode_operational_status(inp: &tlv::TlvItemValue) -> anyhow::Result<Oper
 }
 
 /// Decode TargetPositionLiftPercent100ths attribute (0x000B)
-pub fn decode_target_position_lift_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_target_position_lift_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u16>> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(Some(*v as u16))
     } else {
         Ok(None)
     }
 }
 
 /// Decode TargetPositionTiltPercent100ths attribute (0x000C)
-pub fn decode_target_position_tilt_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_target_position_tilt_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u16>> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(Some(*v as u16))
     } else {
         Ok(None)
     }
@@ -358,18 +358,18 @@ pub fn decode_end_product_type(inp: &tlv::TlvItemValue) -> anyhow::Result<EndPro
 }
 
 /// Decode CurrentPositionLiftPercent100ths attribute (0x000E)
-pub fn decode_current_position_lift_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_current_position_lift_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u16>> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(Some(*v as u16))
     } else {
         Ok(None)
     }
 }
 
 /// Decode CurrentPositionTiltPercent100ths attribute (0x000F)
-pub fn decode_current_position_tilt_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u8>> {
+pub fn decode_current_position_tilt_percent100ths(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u16>> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(Some(*v as u8))
+        Ok(Some(*v as u16))
     } else {
         Ok(None)
     }
@@ -567,11 +567,11 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x01 => Ok(vec![]),
         0x02 => Ok(vec![]),
         0x05 => {
-        let lift_percent100ths_value = crate::clusters::codec::json_util::get_u8(args, "lift_percent100ths_value")?;
+        let lift_percent100ths_value = crate::clusters::codec::json_util::get_u16(args, "lift_percent100ths_value")?;
         encode_go_to_lift_percentage(lift_percent100ths_value)
         }
         0x08 => {
-        let tilt_percent100ths_value = crate::clusters::codec::json_util::get_u8(args, "tilt_percent100ths_value")?;
+        let tilt_percent100ths_value = crate::clusters::codec::json_util::get_u16(args, "tilt_percent100ths_value")?;
         encode_go_to_tilt_percentage(tilt_percent100ths_value)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -599,13 +599,13 @@ pub async fn stop_motion(conn: &crate::controller::Connection, endpoint: u16) ->
 }
 
 /// Invoke `GoToLiftPercentage` command on cluster `Window Covering`.
-pub async fn go_to_lift_percentage(conn: &crate::controller::Connection, endpoint: u16, lift_percent100ths_value: u8) -> anyhow::Result<()> {
+pub async fn go_to_lift_percentage(conn: &crate::controller::Connection, endpoint: u16, lift_percent100ths_value: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_GOTOLIFTPERCENTAGE, &encode_go_to_lift_percentage(lift_percent100ths_value)?).await?;
     Ok(())
 }
 
 /// Invoke `GoToTiltPercentage` command on cluster `Window Covering`.
-pub async fn go_to_tilt_percentage(conn: &crate::controller::Connection, endpoint: u16, tilt_percent100ths_value: u8) -> anyhow::Result<()> {
+pub async fn go_to_tilt_percentage(conn: &crate::controller::Connection, endpoint: u16, tilt_percent100ths_value: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_CMD_ID_GOTOTILTPERCENTAGE, &encode_go_to_tilt_percentage(tilt_percent100ths_value)?).await?;
     Ok(())
 }
@@ -653,13 +653,13 @@ pub async fn read_operational_status(conn: &crate::controller::Connection, endpo
 }
 
 /// Read `TargetPositionLiftPercent100ths` attribute from cluster `Window Covering`.
-pub async fn read_target_position_lift_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_target_position_lift_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_TARGETPOSITIONLIFTPERCENT100THS).await?;
     decode_target_position_lift_percent100ths(&tlv)
 }
 
 /// Read `TargetPositionTiltPercent100ths` attribute from cluster `Window Covering`.
-pub async fn read_target_position_tilt_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_target_position_tilt_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_TARGETPOSITIONTILTPERCENT100THS).await?;
     decode_target_position_tilt_percent100ths(&tlv)
 }
@@ -671,13 +671,13 @@ pub async fn read_end_product_type(conn: &crate::controller::Connection, endpoin
 }
 
 /// Read `CurrentPositionLiftPercent100ths` attribute from cluster `Window Covering`.
-pub async fn read_current_position_lift_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_current_position_lift_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CURRENTPOSITIONLIFTPERCENT100THS).await?;
     decode_current_position_lift_percent100ths(&tlv)
 }
 
 /// Read `CurrentPositionTiltPercent100ths` attribute from cluster `Window Covering`.
-pub async fn read_current_position_tilt_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u8>> {
+pub async fn read_current_position_tilt_percent100ths(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u16>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_WINDOW_COVERING, crate::clusters::defs::CLUSTER_WINDOW_COVERING_ATTR_ID_CURRENTPOSITIONTILTPERCENT100THS).await?;
     decode_current_position_tilt_percent100ths(&tlv)
 }

@@ -536,6 +536,76 @@ def _generate_single_field_encoding(
     return lines
 
 
+def _push_from_element(element_str: str) -> str:
+    """Convert an encoded TLV element string (e.g. '(tag, value).into(),') into a tlv_fields.push() call."""
+    return f"tlv_fields.push({element_str.strip().rstrip(',')});"
+
+
+def generate_optional_field_push(field: 'MatterField', param_name: str, structs: Dict[str, 'MatterStruct'], enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None) -> str:
+    """Generate an if-let-some push statement for a truly optional (not mandatory, not nullable) field.
+
+    Scalar fields produce a single-line:
+        if let Some(x) = param_name { tlv_fields.push((tag, TlvItemValueEnc::Type(x)).into()); }
+
+    Struct and list fields shadow the param name and reuse the existing struct/list
+    encoder, wrapped in `if let Some(name) = param_name { ... }`.
+    """
+    field_id = field.id
+    field_type = field.field_type
+
+    # Use a shadowed bare name so the existing encoders (which assume the variable
+    # holds the unwrapped value) work unchanged inside the if-let-Some block.
+    bare_name = param_name.split('.')[-1] if '.' in param_name else param_name
+
+    # Optional struct: reuse generate_field_tlv_encoding with the shadow name
+    if field_type.endswith('Struct'):
+        if not structs or field_type not in structs:
+            return ""  # Cross-cluster struct - skip
+        encoding_result = generate_field_tlv_encoding(field, bare_name, structs, enums, bitmaps)
+        if not encoding_result:
+            return ""
+        # Multi-line struct encoder: pre-statements + final element line.
+        # Re-indent each line to 8 spaces (one level deeper than the if-let block at 4 spaces)
+        # and convert the trailing element to a push call.
+        lines = encoding_result.split('\n')
+        body_lines = [ln.lstrip() for ln in lines[:-1]]
+        push_line = _push_from_element(lines[-1])
+        body = "\n        ".join(body_lines + [push_line])
+        return f"if let Some({bare_name}) = {param_name} {{\n        {body}\n    }}"
+
+    # Optional list: reuse generate_field_tlv_encoding with the shadow name
+    if field.is_list:
+        if field.entry_type and field.entry_type.endswith('Struct') and (not structs or field.entry_type not in structs):
+            return ""  # Cross-cluster struct entry - skip
+        encoding_result = generate_field_tlv_encoding(field, bare_name, structs, enums, bitmaps)
+        if not encoding_result:
+            return ""
+        # List encoder returns a single expression (possibly multi-line for struct entries).
+        # Strip the leading 8-space indent on the first line and convert to push.
+        push_line = _push_from_element(encoding_result.lstrip())
+        return f"if let Some({bare_name}) = {param_name} {{\n        {push_line}\n    }}"
+
+    # Scalar types
+    tlv_type = MatterType.get_tlv_type(field_type, bitmaps=bitmaps)
+
+    if field_type == 'string':
+        return f"if let Some(x) = {param_name} {{ tlv_fields.push(({field_id}, tlv::TlvItemValueEnc::String(x)).into()); }}"
+    elif field_type == 'octstr':
+        return f"if let Some(x) = {param_name} {{ tlv_fields.push(({field_id}, tlv::TlvItemValueEnc::OctetString(x)).into()); }}"
+    elif field_type == 'bool':
+        return f"if let Some(x) = {param_name} {{ tlv_fields.push(({field_id}, tlv::TlvItemValueEnc::Bool(x)).into()); }}"
+    elif field_type.endswith('Enum'):
+        if enums and field_type in enums:
+            return f"if let Some(x) = {param_name} {{ tlv_fields.push(({field_id}, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }}"
+        else:
+            return f"if let Some(x) = {param_name} {{ tlv_fields.push(({field_id}, tlv::TlvItemValueEnc::{tlv_type}(x)).into()); }}"
+    elif field_type.endswith('Bitmap') or is_numeric_or_id_type(field_type):
+        cast = _get_value_cast_expr('x', field_type, enums, bitmaps)
+        return f"if let Some(x) = {param_name} {{ tlv_fields.push(({field_id}, tlv::TlvItemValueEnc::{tlv_type}({cast})).into()); }}"
+    else:
+        return f"// TODO: optional field {field.name} (tag {field_id}) type {field_type} encoding not implemented"
+
+
 def generate_field_tlv_encoding(field: 'MatterField', param_name: str, structs: Dict[str, 'MatterStruct'], enums: Optional[Dict[str, 'MatterEnum']] = None, bitmaps: Optional[Dict[str, 'MatterBitmap']] = None) -> str:
     """Generate TLV encoding line for a field.
 

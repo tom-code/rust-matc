@@ -130,28 +130,28 @@ pub struct MonitoringRegistration {
 // Command encoders
 
 /// Encode RegisterClient command (0x00)
-pub fn encode_register_client(check_in_node_id: u64, monitored_subject: u64, key: Vec<u8>, verification_key: Vec<u8>, client_type: ClientType) -> anyhow::Result<Vec<u8>> {
+pub fn encode_register_client(check_in_node_id: u64, monitored_subject: u64, key: Vec<u8>, verification_key: Option<Vec<u8>>, client_type: ClientType) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(check_in_node_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(monitored_subject)).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::OctetString(key)).into());
+    if let Some(x) = verification_key { tlv_fields.push((3, tlv::TlvItemValueEnc::OctetString(x)).into()); }
+    tlv_fields.push((4, tlv::TlvItemValueEnc::UInt8(client_type.to_u8())).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(check_in_node_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(monitored_subject)).into(),
-        (2, tlv::TlvItemValueEnc::OctetString(key)).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(verification_key)).into(),
-        (4, tlv::TlvItemValueEnc::UInt8(client_type.to_u8())).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode UnregisterClient command (0x02)
-pub fn encode_unregister_client(check_in_node_id: u64, verification_key: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_unregister_client(check_in_node_id: u64, verification_key: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(check_in_node_id)).into());
+    if let Some(x) = verification_key { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(check_in_node_id)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(verification_key)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -413,7 +413,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         let check_in_node_id = crate::clusters::codec::json_util::get_u64(args, "check_in_node_id")?;
         let monitored_subject = crate::clusters::codec::json_util::get_u64(args, "monitored_subject")?;
         let key = crate::clusters::codec::json_util::get_octstr(args, "key")?;
-        let verification_key = crate::clusters::codec::json_util::get_octstr(args, "verification_key")?;
+        let verification_key = crate::clusters::codec::json_util::get_opt_octstr(args, "verification_key")?;
         let client_type = {
             let n = crate::clusters::codec::json_util::get_u64(args, "client_type")?;
             ClientType::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid ClientType: {}", n))?
@@ -422,7 +422,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         }
         0x02 => {
         let check_in_node_id = crate::clusters::codec::json_util::get_u64(args, "check_in_node_id")?;
-        let verification_key = crate::clusters::codec::json_util::get_octstr(args, "verification_key")?;
+        let verification_key = crate::clusters::codec::json_util::get_opt_octstr(args, "verification_key")?;
         encode_unregister_client(check_in_node_id, verification_key)
         }
         0x03 => {
@@ -472,13 +472,13 @@ pub fn decode_stay_active_response(inp: &tlv::TlvItemValue) -> anyhow::Result<St
 // Typed facade (invokes + reads)
 
 /// Invoke `RegisterClient` command on cluster `ICD Management`.
-pub async fn register_client(conn: &crate::controller::Connection, endpoint: u16, check_in_node_id: u64, monitored_subject: u64, key: Vec<u8>, verification_key: Vec<u8>, client_type: ClientType) -> anyhow::Result<RegisterClientResponse> {
+pub async fn register_client(conn: &crate::controller::Connection, endpoint: u16, check_in_node_id: u64, monitored_subject: u64, key: Vec<u8>, verification_key: Option<Vec<u8>>, client_type: ClientType) -> anyhow::Result<RegisterClientResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_CMD_ID_REGISTERCLIENT, &encode_register_client(check_in_node_id, monitored_subject, key, verification_key, client_type)?).await?;
     decode_register_client_response(&tlv)
 }
 
 /// Invoke `UnregisterClient` command on cluster `ICD Management`.
-pub async fn unregister_client(conn: &crate::controller::Connection, endpoint: u16, check_in_node_id: u64, verification_key: Vec<u8>) -> anyhow::Result<()> {
+pub async fn unregister_client(conn: &crate::controller::Connection, endpoint: u16, check_in_node_id: u64, verification_key: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ICD_MANAGEMENT, crate::clusters::defs::CLUSTER_ICD_MANAGEMENT_CMD_ID_UNREGISTERCLIENT, &encode_unregister_client(check_in_node_id, verification_key)?).await?;
     Ok(())
 }

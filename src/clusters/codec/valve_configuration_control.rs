@@ -98,13 +98,13 @@ pub mod valvefault {
 // Command encoders
 
 /// Encode Open command (0x00)
-pub fn encode_open(open_duration: Option<u32>, target_level: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_open(open_duration: Option<u32>, target_level: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt32(open_duration.unwrap_or(0))).into());
+    if let Some(x) = target_level { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt32(open_duration.unwrap_or(0))).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(target_level)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -351,7 +351,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => {
         let open_duration = crate::clusters::codec::json_util::get_opt_u32(args, "open_duration")?;
-        let target_level = crate::clusters::codec::json_util::get_u8(args, "target_level")?;
+        let target_level = crate::clusters::codec::json_util::get_opt_u8(args, "target_level")?;
         encode_open(open_duration, target_level)
         }
         0x01 => Ok(vec![]),
@@ -362,7 +362,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `Open` command on cluster `Valve Configuration and Control`.
-pub async fn open(conn: &crate::controller::Connection, endpoint: u16, open_duration: Option<u32>, target_level: u8) -> anyhow::Result<()> {
+pub async fn open(conn: &crate::controller::Connection, endpoint: u16, open_duration: Option<u32>, target_level: Option<u8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_VALVE_CONFIGURATION_AND_CONTROL, crate::clusters::defs::CLUSTER_VALVE_CONFIGURATION_AND_CONTROL_CMD_ID_OPEN, &encode_open(open_duration, target_level)?).await?;
     Ok(())
 }

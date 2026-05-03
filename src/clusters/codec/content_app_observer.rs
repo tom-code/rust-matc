@@ -46,13 +46,13 @@ impl From<Status> for u8 {
 // Command encoders
 
 /// Encode ContentAppMessage command (0x00)
-pub fn encode_content_app_message(data: String, encoding_hint: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_content_app_message(data: String, encoding_hint: Option<String>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::String(data)).into());
+    if let Some(x) = encoding_hint { tlv_fields.push((1, tlv::TlvItemValueEnc::String(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::String(data)).into(),
-        (1, tlv::TlvItemValueEnc::String(encoding_hint)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -86,7 +86,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => {
         let data = crate::clusters::codec::json_util::get_string(args, "data")?;
-        let encoding_hint = crate::clusters::codec::json_util::get_string(args, "encoding_hint")?;
+        let encoding_hint = crate::clusters::codec::json_util::get_opt_string(args, "encoding_hint")?;
         encode_content_app_message(data, encoding_hint)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -119,7 +119,7 @@ pub fn decode_content_app_message_response(inp: &tlv::TlvItemValue) -> anyhow::R
 // Typed facade (invokes + reads)
 
 /// Invoke `ContentAppMessage` command on cluster `Content App Observer`.
-pub async fn content_app_message(conn: &crate::controller::Connection, endpoint: u16, data: String, encoding_hint: String) -> anyhow::Result<ContentAppMessageResponse> {
+pub async fn content_app_message(conn: &crate::controller::Connection, endpoint: u16, data: String, encoding_hint: Option<String>) -> anyhow::Result<ContentAppMessageResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_APP_OBSERVER, crate::clusters::defs::CLUSTER_CONTENT_APP_OBSERVER_CMD_ID_CONTENTAPPMESSAGE, &encode_content_app_message(data, encoding_hint)?).await?;
     decode_content_app_message_response(&tlv)
 }

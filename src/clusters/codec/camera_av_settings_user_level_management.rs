@@ -67,27 +67,27 @@ pub struct MPTZ {
 // Command encoders
 
 /// Encode MPTZSetPosition command (0x00)
-pub fn encode_mptz_set_position(pan: i16, tilt: i16, zoom: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_mptz_set_position(pan: Option<i16>, tilt: Option<i16>, zoom: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = pan { tlv_fields.push((0, tlv::TlvItemValueEnc::Int16(x)).into()); }
+    if let Some(x) = tilt { tlv_fields.push((1, tlv::TlvItemValueEnc::Int16(x)).into()); }
+    if let Some(x) = zoom { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::Int16(pan)).into(),
-        (1, tlv::TlvItemValueEnc::Int16(tilt)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(zoom)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode MPTZRelativeMove command (0x01)
-pub fn encode_mptz_relative_move(pan_delta: i16, tilt_delta: i16, zoom_delta: i8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_mptz_relative_move(pan_delta: Option<i16>, tilt_delta: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = pan_delta { tlv_fields.push((0, tlv::TlvItemValueEnc::Int16(x)).into()); }
+    if let Some(x) = tilt_delta { tlv_fields.push((1, tlv::TlvItemValueEnc::Int16(x)).into()); }
+    if let Some(x) = zoom_delta { tlv_fields.push((2, tlv::TlvItemValueEnc::Int8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::Int16(pan_delta)).into(),
-        (1, tlv::TlvItemValueEnc::Int16(tilt_delta)).into(),
-        (2, tlv::TlvItemValueEnc::Int8(zoom_delta)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -104,13 +104,13 @@ pub fn encode_mptz_move_to_preset(preset_id: u8) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode MPTZSavePreset command (0x03)
-pub fn encode_mptz_save_preset(preset_id: u8, name: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_mptz_save_preset(preset_id: Option<u8>, name: String) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = preset_id { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+    tlv_fields.push((1, tlv::TlvItemValueEnc::String(name)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(preset_id)).into(),
-        (1, tlv::TlvItemValueEnc::String(name)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -138,15 +138,15 @@ pub fn encode_dptz_set_viewport(video_stream_id: u8) -> anyhow::Result<Vec<u8>> 
 }
 
 /// Encode DPTZRelativeMove command (0x06)
-pub fn encode_dptz_relative_move(video_stream_id: u8, delta_x: i16, delta_y: i16, zoom_delta: i8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_dptz_relative_move(video_stream_id: u8, delta_x: Option<i16>, delta_y: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into());
+    if let Some(x) = delta_x { tlv_fields.push((1, tlv::TlvItemValueEnc::Int16(x)).into()); }
+    if let Some(x) = delta_y { tlv_fields.push((2, tlv::TlvItemValueEnc::Int16(x)).into()); }
+    if let Some(x) = zoom_delta { tlv_fields.push((3, tlv::TlvItemValueEnc::Int8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into(),
-        (1, tlv::TlvItemValueEnc::Int16(delta_x)).into(),
-        (2, tlv::TlvItemValueEnc::Int16(delta_y)).into(),
-        (3, tlv::TlvItemValueEnc::Int8(zoom_delta)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -441,15 +441,15 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
 pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cmd_id {
         0x00 => {
-        let pan = crate::clusters::codec::json_util::get_i16(args, "pan")?;
-        let tilt = crate::clusters::codec::json_util::get_i16(args, "tilt")?;
-        let zoom = crate::clusters::codec::json_util::get_u8(args, "zoom")?;
+        let pan = crate::clusters::codec::json_util::get_opt_i16(args, "pan")?;
+        let tilt = crate::clusters::codec::json_util::get_opt_i16(args, "tilt")?;
+        let zoom = crate::clusters::codec::json_util::get_opt_u8(args, "zoom")?;
         encode_mptz_set_position(pan, tilt, zoom)
         }
         0x01 => {
-        let pan_delta = crate::clusters::codec::json_util::get_i16(args, "pan_delta")?;
-        let tilt_delta = crate::clusters::codec::json_util::get_i16(args, "tilt_delta")?;
-        let zoom_delta = crate::clusters::codec::json_util::get_i8(args, "zoom_delta")?;
+        let pan_delta = crate::clusters::codec::json_util::get_opt_i16(args, "pan_delta")?;
+        let tilt_delta = crate::clusters::codec::json_util::get_opt_i16(args, "tilt_delta")?;
+        let zoom_delta = crate::clusters::codec::json_util::get_opt_i8(args, "zoom_delta")?;
         encode_mptz_relative_move(pan_delta, tilt_delta, zoom_delta)
         }
         0x02 => {
@@ -457,7 +457,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_mptz_move_to_preset(preset_id)
         }
         0x03 => {
-        let preset_id = crate::clusters::codec::json_util::get_u8(args, "preset_id")?;
+        let preset_id = crate::clusters::codec::json_util::get_opt_u8(args, "preset_id")?;
         let name = crate::clusters::codec::json_util::get_string(args, "name")?;
         encode_mptz_save_preset(preset_id, name)
         }
@@ -471,9 +471,9 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         }
         0x06 => {
         let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
-        let delta_x = crate::clusters::codec::json_util::get_i16(args, "delta_x")?;
-        let delta_y = crate::clusters::codec::json_util::get_i16(args, "delta_y")?;
-        let zoom_delta = crate::clusters::codec::json_util::get_i8(args, "zoom_delta")?;
+        let delta_x = crate::clusters::codec::json_util::get_opt_i16(args, "delta_x")?;
+        let delta_y = crate::clusters::codec::json_util::get_opt_i16(args, "delta_y")?;
+        let zoom_delta = crate::clusters::codec::json_util::get_opt_i8(args, "zoom_delta")?;
         encode_dptz_relative_move(video_stream_id, delta_x, delta_y, zoom_delta)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -483,13 +483,13 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `MPTZSetPosition` command on cluster `Camera AV Settings User Level Management`.
-pub async fn mptz_set_position(conn: &crate::controller::Connection, endpoint: u16, pan: i16, tilt: i16, zoom: u8) -> anyhow::Result<()> {
+pub async fn mptz_set_position(conn: &crate::controller::Connection, endpoint: u16, pan: Option<i16>, tilt: Option<i16>, zoom: Option<u8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZSETPOSITION, &encode_mptz_set_position(pan, tilt, zoom)?).await?;
     Ok(())
 }
 
 /// Invoke `MPTZRelativeMove` command on cluster `Camera AV Settings User Level Management`.
-pub async fn mptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, pan_delta: i16, tilt_delta: i16, zoom_delta: i8) -> anyhow::Result<()> {
+pub async fn mptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, pan_delta: Option<i16>, tilt_delta: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZRELATIVEMOVE, &encode_mptz_relative_move(pan_delta, tilt_delta, zoom_delta)?).await?;
     Ok(())
 }
@@ -501,7 +501,7 @@ pub async fn mptz_move_to_preset(conn: &crate::controller::Connection, endpoint:
 }
 
 /// Invoke `MPTZSavePreset` command on cluster `Camera AV Settings User Level Management`.
-pub async fn mptz_save_preset(conn: &crate::controller::Connection, endpoint: u16, preset_id: u8, name: String) -> anyhow::Result<()> {
+pub async fn mptz_save_preset(conn: &crate::controller::Connection, endpoint: u16, preset_id: Option<u8>, name: String) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_MPTZSAVEPRESET, &encode_mptz_save_preset(preset_id, name)?).await?;
     Ok(())
 }
@@ -519,7 +519,7 @@ pub async fn dptz_set_viewport(conn: &crate::controller::Connection, endpoint: u
 }
 
 /// Invoke `DPTZRelativeMove` command on cluster `Camera AV Settings User Level Management`.
-pub async fn dptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, delta_x: i16, delta_y: i16, zoom_delta: i8) -> anyhow::Result<()> {
+pub async fn dptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, delta_x: Option<i16>, delta_y: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_DPTZRELATIVEMOVE, &encode_dptz_relative_move(video_stream_id, delta_x, delta_y, zoom_delta)?).await?;
     Ok(())
 }

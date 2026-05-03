@@ -233,7 +233,7 @@ pub struct TrackPreference {
 // Command encoders
 
 /// Encode LaunchContent command (0x00)
-pub fn encode_launch_content(search: ContentSearch, auto_play: bool, data: String, playback_preferences: PlaybackPreferences, use_current_context: bool) -> anyhow::Result<Vec<u8>> {
+pub fn encode_launch_content(search: ContentSearch, auto_play: bool, data: Option<String>, playback_preferences: Option<PlaybackPreferences>, use_current_context: Option<bool>) -> anyhow::Result<Vec<u8>> {
             // Encode struct ContentSearchStruct
             let mut search_fields = Vec::new();
             if let Some(listv) = search.parameter_list {
@@ -254,137 +254,143 @@ pub fn encode_launch_content(search: ContentSearch, auto_play: bool, data: Strin
                 }).collect();
                 search_fields.push((0, tlv::TlvItemValueEnc::Array(inner_vec)).into());
             }
-            // Encode struct PlaybackPreferencesStruct
-            let mut playback_preferences_fields = Vec::new();
-            if let Some(x) = playback_preferences.playback_position { playback_preferences_fields.push((0, tlv::TlvItemValueEnc::UInt64(x)).into()); }
-            if let Some(inner) = playback_preferences.text_track {
-                let mut text_track_nested_fields = Vec::new();
-                if let Some(x) = inner.language_code { text_track_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(listv) = inner.characteristics { text_track_nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
-                if let Some(x) = inner.audio_output_index { text_track_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
-                playback_preferences_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(text_track_nested_fields)).into());
-            }
-            if let Some(listv) = playback_preferences.audio_tracks {
-                let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
-                    let mut nested_fields = Vec::new();
-                        if let Some(x) = inner.language_code { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                        if let Some(listv) = inner.characteristics { nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
-                        if let Some(x) = inner.audio_output_index { nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
-                    (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
-                }).collect();
-                playback_preferences_fields.push((2, tlv::TlvItemValueEnc::Array(inner_vec)).into());
-            }
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::StructInvisible(search_fields)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(auto_play)).into());
+    if let Some(x) = data { tlv_fields.push((2, tlv::TlvItemValueEnc::String(x)).into()); }
+    if let Some(playback_preferences) = playback_preferences {
+        // Encode struct PlaybackPreferencesStruct
+        let mut playback_preferences_fields = Vec::new();
+        if let Some(x) = playback_preferences.playback_position { playback_preferences_fields.push((0, tlv::TlvItemValueEnc::UInt64(x)).into()); }
+        if let Some(inner) = playback_preferences.text_track {
+        let mut text_track_nested_fields = Vec::new();
+        if let Some(x) = inner.language_code { text_track_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(listv) = inner.characteristics { text_track_nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
+        if let Some(x) = inner.audio_output_index { text_track_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+        playback_preferences_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(text_track_nested_fields)).into());
+        }
+        if let Some(listv) = playback_preferences.audio_tracks {
+        let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
+        let mut nested_fields = Vec::new();
+        if let Some(x) = inner.language_code { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(listv) = inner.characteristics { nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
+        if let Some(x) = inner.audio_output_index { nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+        (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
+        }).collect();
+        playback_preferences_fields.push((2, tlv::TlvItemValueEnc::Array(inner_vec)).into());
+        }
+        tlv_fields.push((3, tlv::TlvItemValueEnc::StructInvisible(playback_preferences_fields)).into());
+    }
+    if let Some(x) = use_current_context { tlv_fields.push((4, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructInvisible(search_fields)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(auto_play)).into(),
-        (2, tlv::TlvItemValueEnc::String(data)).into(),
-        (3, tlv::TlvItemValueEnc::StructInvisible(playback_preferences_fields)).into(),
-        (4, tlv::TlvItemValueEnc::Bool(use_current_context)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode LaunchURL command (0x01)
-pub fn encode_launch_url(content_url: String, display_string: String, branding_information: BrandingInformation, playback_preferences: PlaybackPreferences) -> anyhow::Result<Vec<u8>> {
-            // Encode struct BrandingInformationStruct
-            let mut branding_information_fields = Vec::new();
-            if let Some(x) = branding_information.provider_name { branding_information_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-            if let Some(inner) = branding_information.background {
-                let mut background_nested_fields = Vec::new();
-                if let Some(x) = inner.image_url { background_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(x) = inner.color { background_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(inner) = inner.size {
-                    let mut size_nested_fields = Vec::new();
-                    // TODO: encoding for field width (double) not implemented
-                    // TODO: encoding for field height (double) not implemented
-                    if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
-                    background_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
-                }
-                branding_information_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(background_nested_fields)).into());
-            }
-            if let Some(inner) = branding_information.logo {
-                let mut logo_nested_fields = Vec::new();
-                if let Some(x) = inner.image_url { logo_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(x) = inner.color { logo_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(inner) = inner.size {
-                    let mut size_nested_fields = Vec::new();
-                    // TODO: encoding for field width (double) not implemented
-                    // TODO: encoding for field height (double) not implemented
-                    if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
-                    logo_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
-                }
-                branding_information_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(logo_nested_fields)).into());
-            }
-            if let Some(inner) = branding_information.progress_bar {
-                let mut progress_bar_nested_fields = Vec::new();
-                if let Some(x) = inner.image_url { progress_bar_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(x) = inner.color { progress_bar_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(inner) = inner.size {
-                    let mut size_nested_fields = Vec::new();
-                    // TODO: encoding for field width (double) not implemented
-                    // TODO: encoding for field height (double) not implemented
-                    if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
-                    progress_bar_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
-                }
-                branding_information_fields.push((3, tlv::TlvItemValueEnc::StructInvisible(progress_bar_nested_fields)).into());
-            }
-            if let Some(inner) = branding_information.splash {
-                let mut splash_nested_fields = Vec::new();
-                if let Some(x) = inner.image_url { splash_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(x) = inner.color { splash_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(inner) = inner.size {
-                    let mut size_nested_fields = Vec::new();
-                    // TODO: encoding for field width (double) not implemented
-                    // TODO: encoding for field height (double) not implemented
-                    if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
-                    splash_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
-                }
-                branding_information_fields.push((4, tlv::TlvItemValueEnc::StructInvisible(splash_nested_fields)).into());
-            }
-            if let Some(inner) = branding_information.water_mark {
-                let mut water_mark_nested_fields = Vec::new();
-                if let Some(x) = inner.image_url { water_mark_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(x) = inner.color { water_mark_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(inner) = inner.size {
-                    let mut size_nested_fields = Vec::new();
-                    // TODO: encoding for field width (double) not implemented
-                    // TODO: encoding for field height (double) not implemented
-                    if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
-                    water_mark_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
-                }
-                branding_information_fields.push((5, tlv::TlvItemValueEnc::StructInvisible(water_mark_nested_fields)).into());
-            }
-            // Encode struct PlaybackPreferencesStruct
-            let mut playback_preferences_fields = Vec::new();
-            if let Some(x) = playback_preferences.playback_position { playback_preferences_fields.push((0, tlv::TlvItemValueEnc::UInt64(x)).into()); }
-            if let Some(inner) = playback_preferences.text_track {
-                let mut text_track_nested_fields = Vec::new();
-                if let Some(x) = inner.language_code { text_track_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                if let Some(listv) = inner.characteristics { text_track_nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
-                if let Some(x) = inner.audio_output_index { text_track_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
-                playback_preferences_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(text_track_nested_fields)).into());
-            }
-            if let Some(listv) = playback_preferences.audio_tracks {
-                let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
-                    let mut nested_fields = Vec::new();
-                        if let Some(x) = inner.language_code { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                        if let Some(listv) = inner.characteristics { nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
-                        if let Some(x) = inner.audio_output_index { nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
-                    (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
-                }).collect();
-                playback_preferences_fields.push((2, tlv::TlvItemValueEnc::Array(inner_vec)).into());
-            }
+pub fn encode_launch_url(content_url: String, display_string: Option<String>, branding_information: Option<BrandingInformation>, playback_preferences: Option<PlaybackPreferences>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::String(content_url)).into());
+    if let Some(x) = display_string { tlv_fields.push((1, tlv::TlvItemValueEnc::String(x)).into()); }
+    if let Some(branding_information) = branding_information {
+        // Encode struct BrandingInformationStruct
+        let mut branding_information_fields = Vec::new();
+        if let Some(x) = branding_information.provider_name { branding_information_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(inner) = branding_information.background {
+        let mut background_nested_fields = Vec::new();
+        if let Some(x) = inner.image_url { background_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(x) = inner.color { background_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(inner) = inner.size {
+        let mut size_nested_fields = Vec::new();
+        // TODO: encoding for field width (double) not implemented
+        // TODO: encoding for field height (double) not implemented
+        if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
+        background_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
+        }
+        branding_information_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(background_nested_fields)).into());
+        }
+        if let Some(inner) = branding_information.logo {
+        let mut logo_nested_fields = Vec::new();
+        if let Some(x) = inner.image_url { logo_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(x) = inner.color { logo_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(inner) = inner.size {
+        let mut size_nested_fields = Vec::new();
+        // TODO: encoding for field width (double) not implemented
+        // TODO: encoding for field height (double) not implemented
+        if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
+        logo_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
+        }
+        branding_information_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(logo_nested_fields)).into());
+        }
+        if let Some(inner) = branding_information.progress_bar {
+        let mut progress_bar_nested_fields = Vec::new();
+        if let Some(x) = inner.image_url { progress_bar_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(x) = inner.color { progress_bar_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(inner) = inner.size {
+        let mut size_nested_fields = Vec::new();
+        // TODO: encoding for field width (double) not implemented
+        // TODO: encoding for field height (double) not implemented
+        if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
+        progress_bar_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
+        }
+        branding_information_fields.push((3, tlv::TlvItemValueEnc::StructInvisible(progress_bar_nested_fields)).into());
+        }
+        if let Some(inner) = branding_information.splash {
+        let mut splash_nested_fields = Vec::new();
+        if let Some(x) = inner.image_url { splash_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(x) = inner.color { splash_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(inner) = inner.size {
+        let mut size_nested_fields = Vec::new();
+        // TODO: encoding for field width (double) not implemented
+        // TODO: encoding for field height (double) not implemented
+        if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
+        splash_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
+        }
+        branding_information_fields.push((4, tlv::TlvItemValueEnc::StructInvisible(splash_nested_fields)).into());
+        }
+        if let Some(inner) = branding_information.water_mark {
+        let mut water_mark_nested_fields = Vec::new();
+        if let Some(x) = inner.image_url { water_mark_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(x) = inner.color { water_mark_nested_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(inner) = inner.size {
+        let mut size_nested_fields = Vec::new();
+        // TODO: encoding for field width (double) not implemented
+        // TODO: encoding for field height (double) not implemented
+        if let Some(x) = inner.metric { size_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
+        water_mark_nested_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(size_nested_fields)).into());
+        }
+        branding_information_fields.push((5, tlv::TlvItemValueEnc::StructInvisible(water_mark_nested_fields)).into());
+        }
+        tlv_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(branding_information_fields)).into());
+    }
+    if let Some(playback_preferences) = playback_preferences {
+        // Encode struct PlaybackPreferencesStruct
+        let mut playback_preferences_fields = Vec::new();
+        if let Some(x) = playback_preferences.playback_position { playback_preferences_fields.push((0, tlv::TlvItemValueEnc::UInt64(x)).into()); }
+        if let Some(inner) = playback_preferences.text_track {
+        let mut text_track_nested_fields = Vec::new();
+        if let Some(x) = inner.language_code { text_track_nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(listv) = inner.characteristics { text_track_nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
+        if let Some(x) = inner.audio_output_index { text_track_nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+        playback_preferences_fields.push((1, tlv::TlvItemValueEnc::StructInvisible(text_track_nested_fields)).into());
+        }
+        if let Some(listv) = playback_preferences.audio_tracks {
+        let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
+        let mut nested_fields = Vec::new();
+        if let Some(x) = inner.language_code { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+        if let Some(listv) = inner.characteristics { nested_fields.push((1, tlv::TlvItemValueEnc::StructAnon(listv.into_iter().map(|x| (0, tlv::TlvItemValueEnc::UInt8(x)).into()).collect())).into()); }
+        if let Some(x) = inner.audio_output_index { nested_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+        (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
+        }).collect();
+        playback_preferences_fields.push((2, tlv::TlvItemValueEnc::Array(inner_vec)).into());
+        }
+        tlv_fields.push((3, tlv::TlvItemValueEnc::StructInvisible(playback_preferences_fields)).into());
+    }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::String(content_url)).into(),
-        (1, tlv::TlvItemValueEnc::String(display_string)).into(),
-        (2, tlv::TlvItemValueEnc::StructInvisible(branding_information_fields)).into(),
-        (3, tlv::TlvItemValueEnc::StructInvisible(playback_preferences_fields)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -527,13 +533,13 @@ pub fn decode_launcher_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Launc
 // Typed facade (invokes + reads)
 
 /// Invoke `LaunchContent` command on cluster `Content Launcher`.
-pub async fn launch_content(conn: &crate::controller::Connection, endpoint: u16, search: ContentSearch, auto_play: bool, data: String, playback_preferences: PlaybackPreferences, use_current_context: bool) -> anyhow::Result<LauncherResponse> {
+pub async fn launch_content(conn: &crate::controller::Connection, endpoint: u16, search: ContentSearch, auto_play: bool, data: Option<String>, playback_preferences: Option<PlaybackPreferences>, use_current_context: Option<bool>) -> anyhow::Result<LauncherResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_LAUNCHER, crate::clusters::defs::CLUSTER_CONTENT_LAUNCHER_CMD_ID_LAUNCHCONTENT, &encode_launch_content(search, auto_play, data, playback_preferences, use_current_context)?).await?;
     decode_launcher_response(&tlv)
 }
 
 /// Invoke `LaunchURL` command on cluster `Content Launcher`.
-pub async fn launch_url(conn: &crate::controller::Connection, endpoint: u16, content_url: String, display_string: String, branding_information: BrandingInformation, playback_preferences: PlaybackPreferences) -> anyhow::Result<LauncherResponse> {
+pub async fn launch_url(conn: &crate::controller::Connection, endpoint: u16, content_url: String, display_string: Option<String>, branding_information: Option<BrandingInformation>, playback_preferences: Option<PlaybackPreferences>) -> anyhow::Result<LauncherResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CONTENT_LAUNCHER, crate::clusters::defs::CLUSTER_CONTENT_LAUNCHER_CMD_ID_LAUNCHURL, &encode_launch_url(content_url, display_string, branding_information, playback_preferences)?).await?;
     decode_launcher_response(&tlv)
 }

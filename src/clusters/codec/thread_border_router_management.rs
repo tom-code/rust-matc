@@ -16,13 +16,13 @@ use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
 // Command encoders
 
 /// Encode SetActiveDatasetRequest command (0x03)
-pub fn encode_set_active_dataset_request(active_dataset: Vec<u8>, breadcrumb: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_active_dataset_request(active_dataset: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(active_dataset)).into());
+    if let Some(x) = breadcrumb { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(active_dataset)).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(breadcrumb)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -210,7 +210,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x01 => Ok(vec![]),
         0x03 => {
         let active_dataset = crate::clusters::codec::json_util::get_octstr(args, "active_dataset")?;
-        let breadcrumb = crate::clusters::codec::json_util::get_u64(args, "breadcrumb")?;
+        let breadcrumb = crate::clusters::codec::json_util::get_opt_u64(args, "breadcrumb")?;
         encode_set_active_dataset_request(active_dataset, breadcrumb)
         }
         0x04 => {
@@ -256,7 +256,7 @@ pub async fn get_pending_dataset_request(conn: &crate::controller::Connection, e
 }
 
 /// Invoke `SetActiveDatasetRequest` command on cluster `Thread Border Router Management`.
-pub async fn set_active_dataset_request(conn: &crate::controller::Connection, endpoint: u16, active_dataset: Vec<u8>, breadcrumb: u64) -> anyhow::Result<()> {
+pub async fn set_active_dataset_request(conn: &crate::controller::Connection, endpoint: u16, active_dataset: Vec<u8>, breadcrumb: Option<u64>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THREAD_BORDER_ROUTER_MANAGEMENT, crate::clusters::defs::CLUSTER_THREAD_BORDER_ROUTER_MANAGEMENT_CMD_ID_SETACTIVEDATASETREQUEST, &encode_set_active_dataset_request(active_dataset, breadcrumb)?).await?;
     Ok(())
 }

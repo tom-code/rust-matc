@@ -27,15 +27,15 @@ pub mod supporteddevicecategory {
 // Command encoders
 
 /// Encode RequestCommissioningApproval command (0x00)
-pub fn encode_request_commissioning_approval(request_id: u64, vendor_id: u16, product_id: u16, label: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_request_commissioning_approval(request_id: u64, vendor_id: u16, product_id: u16, label: Option<String>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(request_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt16(vendor_id)).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt16(product_id)).into());
+    if let Some(x) = label { tlv_fields.push((3, tlv::TlvItemValueEnc::String(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(request_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt16(vendor_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt16(product_id)).into(),
-        (3, tlv::TlvItemValueEnc::String(label)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -141,7 +141,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         let request_id = crate::clusters::codec::json_util::get_u64(args, "request_id")?;
         let vendor_id = crate::clusters::codec::json_util::get_u16(args, "vendor_id")?;
         let product_id = crate::clusters::codec::json_util::get_u16(args, "product_id")?;
-        let label = crate::clusters::codec::json_util::get_string(args, "label")?;
+        let label = crate::clusters::codec::json_util::get_opt_string(args, "label")?;
         encode_request_commissioning_approval(request_id, vendor_id, product_id, label)
         }
         0x01 => {
@@ -185,7 +185,7 @@ pub fn decode_reverse_open_commissioning_window(inp: &tlv::TlvItemValue) -> anyh
 // Typed facade (invokes + reads)
 
 /// Invoke `RequestCommissioningApproval` command on cluster `Commissioner Control`.
-pub async fn request_commissioning_approval(conn: &crate::controller::Connection, endpoint: u16, request_id: u64, vendor_id: u16, product_id: u16, label: String) -> anyhow::Result<()> {
+pub async fn request_commissioning_approval(conn: &crate::controller::Connection, endpoint: u16, request_id: u64, vendor_id: u16, product_id: u16, label: Option<String>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_COMMISSIONER_CONTROL, crate::clusters::defs::CLUSTER_COMMISSIONER_CONTROL_CMD_ID_REQUESTCOMMISSIONINGAPPROVAL, &encode_request_commissioning_approval(request_id, vendor_id, product_id, label)?).await?;
     Ok(())
 }

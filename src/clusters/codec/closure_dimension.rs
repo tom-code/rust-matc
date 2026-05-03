@@ -308,15 +308,15 @@ pub mod latchcontrolmodes {
 
 #[derive(Debug, serde::Serialize)]
 pub struct DimensionState {
-    pub position: Option<u8>,
+    pub position: Option<u16>,
     pub latch: Option<bool>,
     pub speed: Option<u8>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct RangePercent {
-    pub min: Option<u8>,
-    pub max: Option<u8>,
+    pub min: Option<u16>,
+    pub max: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -328,27 +328,27 @@ pub struct UnitRange {
 // Command encoders
 
 /// Encode SetTarget command (0x00)
-pub fn encode_set_target(position: u8, latch: bool, speed: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_target(position: Option<u16>, latch: Option<bool>, speed: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = position { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+    if let Some(x) = latch { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
+    if let Some(x) = speed { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(position)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(latch)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(speed)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode Step command (0x01)
-pub fn encode_step(direction: StepDirection, number_of_steps: u16, speed: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step(direction: StepDirection, number_of_steps: u16, speed: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(direction.to_u8())).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt16(number_of_steps)).into());
+    if let Some(x) = speed { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(direction.to_u8())).into(),
-        (1, tlv::TlvItemValueEnc::UInt16(number_of_steps)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(speed)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -361,7 +361,7 @@ pub fn decode_current_state(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Di
         // Struct with fields
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(Some(DimensionState {
-                position: item.get_int(&[0]).map(|v| v as u8),
+                position: item.get_int(&[0]).map(|v| v as u16),
                 latch: item.get_bool(&[1]),
                 speed: item.get_int(&[2]).map(|v| v as u8),
         }))
@@ -380,7 +380,7 @@ pub fn decode_target_state(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Dim
         // Struct with fields
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(Some(DimensionState {
-                position: item.get_int(&[0]).map(|v| v as u8),
+                position: item.get_int(&[0]).map(|v| v as u16),
                 latch: item.get_bool(&[1]),
                 speed: item.get_int(&[2]).map(|v| v as u8),
         }))
@@ -394,20 +394,20 @@ pub fn decode_target_state(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<Dim
 }
 
 /// Decode Resolution attribute (0x0002)
-pub fn decode_resolution(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_resolution(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as u16)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected UInt16"))
     }
 }
 
 /// Decode StepValue attribute (0x0003)
-pub fn decode_step_value(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_step_value(inp: &tlv::TlvItemValue) -> anyhow::Result<u16> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as u16)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected UInt16"))
     }
 }
 
@@ -444,8 +444,8 @@ pub fn decode_limit_range(inp: &tlv::TlvItemValue) -> anyhow::Result<RangePercen
         // Struct with fields
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(RangePercent {
-                min: item.get_int(&[0]).map(|v| v as u8),
-                max: item.get_int(&[1]).map(|v| v as u8),
+                min: item.get_int(&[0]).map(|v| v as u16),
+                max: item.get_int(&[1]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -649,9 +649,9 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
 pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cmd_id {
         0x00 => {
-        let position = crate::clusters::codec::json_util::get_u8(args, "position")?;
-        let latch = crate::clusters::codec::json_util::get_bool(args, "latch")?;
-        let speed = crate::clusters::codec::json_util::get_u8(args, "speed")?;
+        let position = crate::clusters::codec::json_util::get_opt_u16(args, "position")?;
+        let latch = crate::clusters::codec::json_util::get_opt_bool(args, "latch")?;
+        let speed = crate::clusters::codec::json_util::get_opt_u8(args, "speed")?;
         encode_set_target(position, latch, speed)
         }
         0x01 => {
@@ -660,7 +660,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
             StepDirection::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepDirection: {}", n))?
         };
         let number_of_steps = crate::clusters::codec::json_util::get_u16(args, "number_of_steps")?;
-        let speed = crate::clusters::codec::json_util::get_u8(args, "speed")?;
+        let speed = crate::clusters::codec::json_util::get_opt_u8(args, "speed")?;
         encode_step(direction, number_of_steps, speed)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -670,13 +670,13 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `SetTarget` command on cluster `Closure Dimension`.
-pub async fn set_target(conn: &crate::controller::Connection, endpoint: u16, position: u8, latch: bool, speed: u8) -> anyhow::Result<()> {
+pub async fn set_target(conn: &crate::controller::Connection, endpoint: u16, position: Option<u16>, latch: Option<bool>, speed: Option<u8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_CMD_ID_SETTARGET, &encode_set_target(position, latch, speed)?).await?;
     Ok(())
 }
 
 /// Invoke `Step` command on cluster `Closure Dimension`.
-pub async fn step(conn: &crate::controller::Connection, endpoint: u16, direction: StepDirection, number_of_steps: u16, speed: u8) -> anyhow::Result<()> {
+pub async fn step(conn: &crate::controller::Connection, endpoint: u16, direction: StepDirection, number_of_steps: u16, speed: Option<u8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_CMD_ID_STEP, &encode_step(direction, number_of_steps, speed)?).await?;
     Ok(())
 }
@@ -694,13 +694,13 @@ pub async fn read_target_state(conn: &crate::controller::Connection, endpoint: u
 }
 
 /// Read `Resolution` attribute from cluster `Closure Dimension`.
-pub async fn read_resolution(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+pub async fn read_resolution(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_RESOLUTION).await?;
     decode_resolution(&tlv)
 }
 
 /// Read `StepValue` attribute from cluster `Closure Dimension`.
-pub async fn read_step_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+pub async fn read_step_value(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CLOSURE_DIMENSION, crate::clusters::defs::CLUSTER_CLOSURE_DIMENSION_ATTR_ID_STEPVALUE).await?;
     decode_step_value(&tlv)
 }

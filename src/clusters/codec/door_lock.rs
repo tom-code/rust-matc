@@ -907,35 +907,35 @@ pub struct Credential {
 // Command encoders
 
 /// Encode LockDoor command (0x00)
-pub fn encode_lock_door(pin_code: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_lock_door(pin_code: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = pin_code { tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(pin_code)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode UnlockDoor command (0x01)
-pub fn encode_unlock_door(pin_code: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_unlock_door(pin_code: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = pin_code { tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(pin_code)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode UnlockWithTimeout command (0x03)
-pub fn encode_unlock_with_timeout(timeout: u16, pin_code: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_unlock_with_timeout(timeout: u16, pin_code: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(timeout)).into());
+    if let Some(x) = pin_code { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt16(timeout)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(pin_code)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -1150,12 +1150,12 @@ pub fn encode_clear_credential(credential: Option<Credential>) -> anyhow::Result
 }
 
 /// Encode UnboltDoor command (0x27)
-pub fn encode_unbolt_door(pin_code: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_unbolt_door(pin_code: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = pin_code { tlv_fields.push((0, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::OctetString(pin_code)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -2127,17 +2127,17 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
 pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cmd_id {
         0x00 => {
-        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        let pin_code = crate::clusters::codec::json_util::get_opt_octstr(args, "pin_code")?;
         encode_lock_door(pin_code)
         }
         0x01 => {
-        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        let pin_code = crate::clusters::codec::json_util::get_opt_octstr(args, "pin_code")?;
         encode_unlock_door(pin_code)
         }
         0x02 => Ok(vec![]),
         0x03 => {
         let timeout = crate::clusters::codec::json_util::get_u16(args, "timeout")?;
-        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        let pin_code = crate::clusters::codec::json_util::get_opt_octstr(args, "pin_code")?;
         encode_unlock_with_timeout(timeout, pin_code)
         }
         0x0B => {
@@ -2223,7 +2223,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x24 => Err(anyhow::anyhow!("command \"GetCredentialStatus\" has complex args: use raw mode")),
         0x26 => Err(anyhow::anyhow!("command \"ClearCredential\" has complex args: use raw mode")),
         0x27 => {
-        let pin_code = crate::clusters::codec::json_util::get_octstr(args, "pin_code")?;
+        let pin_code = crate::clusters::codec::json_util::get_opt_octstr(args, "pin_code")?;
         encode_unbolt_door(pin_code)
         }
         0x28 => {
@@ -2421,13 +2421,13 @@ pub fn decode_get_credential_status_response(inp: &tlv::TlvItemValue) -> anyhow:
 // Typed facade (invokes + reads)
 
 /// Invoke `LockDoor` command on cluster `Door Lock`.
-pub async fn lock_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+pub async fn lock_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_LOCKDOOR, &encode_lock_door(pin_code)?).await?;
     Ok(())
 }
 
 /// Invoke `UnlockDoor` command on cluster `Door Lock`.
-pub async fn unlock_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+pub async fn unlock_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_UNLOCKDOOR, &encode_unlock_door(pin_code)?).await?;
     Ok(())
 }
@@ -2439,7 +2439,7 @@ pub async fn toggle(conn: &crate::controller::Connection, endpoint: u16) -> anyh
 }
 
 /// Invoke `UnlockWithTimeout` command on cluster `Door Lock`.
-pub async fn unlock_with_timeout(conn: &crate::controller::Connection, endpoint: u16, timeout: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+pub async fn unlock_with_timeout(conn: &crate::controller::Connection, endpoint: u16, timeout: u16, pin_code: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_UNLOCKWITHTIMEOUT, &encode_unlock_with_timeout(timeout, pin_code)?).await?;
     Ok(())
 }
@@ -2535,7 +2535,7 @@ pub async fn clear_credential(conn: &crate::controller::Connection, endpoint: u1
 }
 
 /// Invoke `UnboltDoor` command on cluster `Door Lock`.
-pub async fn unbolt_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Vec<u8>) -> anyhow::Result<()> {
+pub async fn unbolt_door(conn: &crate::controller::Connection, endpoint: u16, pin_code: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_DOOR_LOCK, crate::clusters::defs::CLUSTER_DOOR_LOCK_CMD_ID_UNBOLTDOOR, &encode_unbolt_door(pin_code)?).await?;
     Ok(())
 }

@@ -538,21 +538,23 @@ pub fn encode_set_transport_status(connection_id: Option<u8>, transport_status: 
 }
 
 /// Encode ManuallyTriggerTransport command (0x05)
-pub fn encode_manually_trigger_transport(connection_id: u8, activation_reason: TriggerActivationReason, time_control: TransportMotionTriggerTimeControl, user_defined: Vec<u8>) -> anyhow::Result<Vec<u8>> {
-            // Encode struct TransportMotionTriggerTimeControlStruct
-            let mut time_control_fields = Vec::new();
-            if let Some(x) = time_control.initial_duration { time_control_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-            if let Some(x) = time_control.augmentation_duration { time_control_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
-            if let Some(x) = time_control.max_duration { time_control_fields.push((2, tlv::TlvItemValueEnc::UInt32(x)).into()); }
-            if let Some(x) = time_control.blind_duration { time_control_fields.push((3, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+pub fn encode_manually_trigger_transport(connection_id: u8, activation_reason: TriggerActivationReason, time_control: Option<TransportMotionTriggerTimeControl>, user_defined: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(connection_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt8(activation_reason.to_u8())).into());
+    if let Some(time_control) = time_control {
+        // Encode struct TransportMotionTriggerTimeControlStruct
+        let mut time_control_fields = Vec::new();
+        if let Some(x) = time_control.initial_duration { time_control_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+        if let Some(x) = time_control.augmentation_duration { time_control_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+        if let Some(x) = time_control.max_duration { time_control_fields.push((2, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+        if let Some(x) = time_control.blind_duration { time_control_fields.push((3, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+        tlv_fields.push((2, tlv::TlvItemValueEnc::StructInvisible(time_control_fields)).into());
+    }
+    if let Some(x) = user_defined { tlv_fields.push((3, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(connection_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(activation_reason.to_u8())).into(),
-        (2, tlv::TlvItemValueEnc::StructInvisible(time_control_fields)).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(user_defined)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -1203,7 +1205,7 @@ pub async fn set_transport_status(conn: &crate::controller::Connection, endpoint
 }
 
 /// Invoke `ManuallyTriggerTransport` command on cluster `Push AV Stream Transport`.
-pub async fn manually_trigger_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8, activation_reason: TriggerActivationReason, time_control: TransportMotionTriggerTimeControl, user_defined: Vec<u8>) -> anyhow::Result<()> {
+pub async fn manually_trigger_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8, activation_reason: TriggerActivationReason, time_control: Option<TransportMotionTriggerTimeControl>, user_defined: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_MANUALLYTRIGGERTRANSPORT, &encode_manually_trigger_transport(connection_id, activation_reason, time_control, user_defined)?).await?;
     Ok(())
 }

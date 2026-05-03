@@ -13,16 +13,16 @@ use serde_json;
 // Command encoders
 
 /// Encode SetCookingParameters command (0x00)
-pub fn encode_set_cooking_parameters(cook_mode: u8, cook_time: u32, power_setting: u8, watt_setting_index: u8, start_after_setting: bool) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_cooking_parameters(cook_mode: Option<u8>, cook_time: Option<u32>, power_setting: Option<u8>, watt_setting_index: Option<u8>, start_after_setting: Option<bool>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = cook_mode { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+    if let Some(x) = cook_time { tlv_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
+    if let Some(x) = power_setting { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+    if let Some(x) = watt_setting_index { tlv_fields.push((3, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+    if let Some(x) = start_after_setting { tlv_fields.push((4, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(cook_mode)).into(),
-        (1, tlv::TlvItemValueEnc::UInt32(cook_time)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(power_setting)).into(),
-        (3, tlv::TlvItemValueEnc::UInt8(watt_setting_index)).into(),
-        (4, tlv::TlvItemValueEnc::Bool(start_after_setting)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -256,11 +256,11 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
 pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cmd_id {
         0x00 => {
-        let cook_mode = crate::clusters::codec::json_util::get_u8(args, "cook_mode")?;
-        let cook_time = crate::clusters::codec::json_util::get_u32(args, "cook_time")?;
-        let power_setting = crate::clusters::codec::json_util::get_u8(args, "power_setting")?;
-        let watt_setting_index = crate::clusters::codec::json_util::get_u8(args, "watt_setting_index")?;
-        let start_after_setting = crate::clusters::codec::json_util::get_bool(args, "start_after_setting")?;
+        let cook_mode = crate::clusters::codec::json_util::get_opt_u8(args, "cook_mode")?;
+        let cook_time = crate::clusters::codec::json_util::get_opt_u32(args, "cook_time")?;
+        let power_setting = crate::clusters::codec::json_util::get_opt_u8(args, "power_setting")?;
+        let watt_setting_index = crate::clusters::codec::json_util::get_opt_u8(args, "watt_setting_index")?;
+        let start_after_setting = crate::clusters::codec::json_util::get_opt_bool(args, "start_after_setting")?;
         encode_set_cooking_parameters(cook_mode, cook_time, power_setting, watt_setting_index, start_after_setting)
         }
         0x01 => {
@@ -274,7 +274,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `SetCookingParameters` command on cluster `Microwave Oven Control`.
-pub async fn set_cooking_parameters(conn: &crate::controller::Connection, endpoint: u16, cook_mode: u8, cook_time: u32, power_setting: u8, watt_setting_index: u8, start_after_setting: bool) -> anyhow::Result<()> {
+pub async fn set_cooking_parameters(conn: &crate::controller::Connection, endpoint: u16, cook_mode: Option<u8>, cook_time: Option<u32>, power_setting: Option<u8>, watt_setting_index: Option<u8>, start_after_setting: Option<bool>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_MICROWAVE_OVEN_CONTROL, crate::clusters::defs::CLUSTER_MICROWAVE_OVEN_CONTROL_CMD_ID_SETCOOKINGPARAMETERS, &encode_set_cooking_parameters(cook_mode, cook_time, power_setting, watt_setting_index, start_after_setting)?).await?;
     Ok(())
 }

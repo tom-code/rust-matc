@@ -149,16 +149,16 @@ pub struct ProviderLocation {
 // Command encoders
 
 /// Encode AnnounceOTAProvider command (0x00)
-pub fn encode_announce_ota_provider(provider_node_id: u64, vendor_id: u16, announcement_reason: AnnouncementReason, metadata_for_node: Vec<u8>, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+pub fn encode_announce_ota_provider(provider_node_id: u64, vendor_id: u16, announcement_reason: AnnouncementReason, metadata_for_node: Option<Vec<u8>>, endpoint: u16) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(provider_node_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt16(vendor_id)).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(announcement_reason.to_u8())).into());
+    if let Some(x) = metadata_for_node { tlv_fields.push((3, tlv::TlvItemValueEnc::OctetString(x)).into()); }
+    tlv_fields.push((4, tlv::TlvItemValueEnc::UInt16(endpoint)).into());
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(provider_node_id)).into(),
-        (1, tlv::TlvItemValueEnc::UInt16(vendor_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(announcement_reason.to_u8())).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(metadata_for_node)).into(),
-        (4, tlv::TlvItemValueEnc::UInt16(endpoint)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -303,7 +303,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
             let n = crate::clusters::codec::json_util::get_u64(args, "announcement_reason")?;
             AnnouncementReason::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid AnnouncementReason: {}", n))?
         };
-        let metadata_for_node = crate::clusters::codec::json_util::get_octstr(args, "metadata_for_node")?;
+        let metadata_for_node = crate::clusters::codec::json_util::get_opt_octstr(args, "metadata_for_node")?;
         let endpoint = crate::clusters::codec::json_util::get_u16(args, "endpoint")?;
         encode_announce_ota_provider(provider_node_id, vendor_id, announcement_reason, metadata_for_node, endpoint)
         }
@@ -314,7 +314,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `AnnounceOTAProvider` command on cluster `OTA Software Update Requestor`.
-pub async fn announce_ota_provider(conn: &crate::controller::Connection, endpoint: u16, provider_node_id: u64, vendor_id: u16, announcement_reason: AnnouncementReason, metadata_for_node: Vec<u8>, endpoint_: u16) -> anyhow::Result<()> {
+pub async fn announce_ota_provider(conn: &crate::controller::Connection, endpoint: u16, provider_node_id: u64, vendor_id: u16, announcement_reason: AnnouncementReason, metadata_for_node: Option<Vec<u8>>, endpoint_: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_OTA_SOFTWARE_UPDATE_REQUESTOR, crate::clusters::defs::CLUSTER_OTA_SOFTWARE_UPDATE_REQUESTOR_CMD_ID_ANNOUNCEOTAPROVIDER, &encode_announce_ota_provider(provider_node_id, vendor_id, announcement_reason, metadata_for_node, endpoint_)?).await?;
     Ok(())
 }

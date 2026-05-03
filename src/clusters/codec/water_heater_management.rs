@@ -84,8 +84,8 @@ pub fn encode_boost(boost_info: WaterHeaterBoostInfo) -> anyhow::Result<Vec<u8>>
             if let Some(x) = boost_info.one_shot { boost_info_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
             if let Some(x) = boost_info.emergency_boost { boost_info_fields.push((2, tlv::TlvItemValueEnc::Bool(x)).into()); }
             if let Some(x) = boost_info.temporary_setpoint { boost_info_fields.push((3, tlv::TlvItemValueEnc::Int16(x)).into()); }
-            // TODO: encoding for field target_percentage (percent) not implemented
-            // TODO: encoding for field target_reheat (percent) not implemented
+            if let Some(x) = boost_info.target_percentage { boost_info_fields.push((4, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+            if let Some(x) = boost_info.target_reheat { boost_info_fields.push((5, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![

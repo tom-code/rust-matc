@@ -24,25 +24,25 @@ pub fn encode_get_setup_pin(temp_account_identifier: String) -> anyhow::Result<V
 }
 
 /// Encode Login command (0x02)
-pub fn encode_login(temp_account_identifier: String, setup_pin: String, node: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_login(temp_account_identifier: String, setup_pin: String, node: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::String(temp_account_identifier)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::String(setup_pin)).into());
+    if let Some(x) = node { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::String(temp_account_identifier)).into(),
-        (1, tlv::TlvItemValueEnc::String(setup_pin)).into(),
-        (2, tlv::TlvItemValueEnc::UInt64(node)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode Logout command (0x03)
-pub fn encode_logout(node: u64) -> anyhow::Result<Vec<u8>> {
+pub fn encode_logout(node: Option<u64>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = node { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(node)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -92,11 +92,11 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x02 => {
         let temp_account_identifier = crate::clusters::codec::json_util::get_string(args, "temp_account_identifier")?;
         let setup_pin = crate::clusters::codec::json_util::get_string(args, "setup_pin")?;
-        let node = crate::clusters::codec::json_util::get_u64(args, "node")?;
+        let node = crate::clusters::codec::json_util::get_opt_u64(args, "node")?;
         encode_login(temp_account_identifier, setup_pin, node)
         }
         0x03 => {
-        let node = crate::clusters::codec::json_util::get_u64(args, "node")?;
+        let node = crate::clusters::codec::json_util::get_opt_u64(args, "node")?;
         encode_logout(node)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -131,13 +131,13 @@ pub async fn get_setup_pin(conn: &crate::controller::Connection, endpoint: u16, 
 }
 
 /// Invoke `Login` command on cluster `Account Login`.
-pub async fn login(conn: &crate::controller::Connection, endpoint: u16, temp_account_identifier: String, setup_pin: String, node: u64) -> anyhow::Result<()> {
+pub async fn login(conn: &crate::controller::Connection, endpoint: u16, temp_account_identifier: String, setup_pin: String, node: Option<u64>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACCOUNT_LOGIN, crate::clusters::defs::CLUSTER_ACCOUNT_LOGIN_CMD_ID_LOGIN, &encode_login(temp_account_identifier, setup_pin, node)?).await?;
     Ok(())
 }
 
 /// Invoke `Logout` command on cluster `Account Login`.
-pub async fn logout(conn: &crate::controller::Connection, endpoint: u16, node: u64) -> anyhow::Result<()> {
+pub async fn logout(conn: &crate::controller::Connection, endpoint: u16, node: Option<u64>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ACCOUNT_LOGIN, crate::clusters::defs::CLUSTER_ACCOUNT_LOGIN_CMD_ID_LOGOUT, &encode_logout(node)?).await?;
     Ok(())
 }

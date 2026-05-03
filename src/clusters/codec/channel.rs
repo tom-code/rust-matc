@@ -237,7 +237,7 @@ pub fn encode_skip_channel(count: i16) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode GetProgramGuide command (0x04)
-pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Vec<ChannelInfo>, page_token: Option<PageToken>, recording_flag: Option<RecordingFlag>, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Option<Vec<ChannelInfo>>, page_token: Option<PageToken>, recording_flag: Option<RecordingFlag>, data: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
             // Encode optional struct PageTokenStruct
             let page_token_enc = if let Some(s) = page_token {
                 let mut fields = Vec::new();
@@ -248,12 +248,11 @@ pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Ve
             } else {
                 tlv::TlvItemValueEnc::StructInvisible(Vec::new())
             };
-    let tlv = tlv::TlvItemEnc {
-        tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(start_time)).into(),
-        (1, tlv::TlvItemValueEnc::UInt64(end_time)).into(),
-        (2, tlv::TlvItemValueEnc::Array(channel_list.into_iter().map(|v| {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(start_time)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt64(end_time)).into());
+    if let Some(channel_list) = channel_list {
+        tlv_fields.push((2, tlv::TlvItemValueEnc::Array(channel_list.into_iter().map(|v| {
                     let mut fields = Vec::new();
                     if let Some(x) = v.major_number { fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     if let Some(x) = v.minor_number { fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
@@ -263,37 +262,40 @@ pub fn encode_get_program_guide(start_time: u64, end_time: u64, channel_list: Ve
                     if let Some(x) = v.identifier { fields.push((5, tlv::TlvItemValueEnc::String(x.clone())).into()); }
                     if let Some(x) = v.type_ { fields.push((6, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
                     (0, tlv::TlvItemValueEnc::StructAnon(fields)).into()
-                }).collect())).into(),
-        (3, page_token_enc).into(),
-        (5, tlv::TlvItemValueEnc::UInt8(recording_flag.unwrap_or_default())).into(),
-        (7, tlv::TlvItemValueEnc::OctetString(data)).into(),
-        ]),
+                }).collect())).into());
+    }
+    tlv_fields.push((3, page_token_enc).into());
+    tlv_fields.push((5, tlv::TlvItemValueEnc::UInt8(recording_flag.unwrap_or_default())).into());
+    if let Some(x) = data { tlv_fields.push((7, tlv::TlvItemValueEnc::OctetString(x)).into()); }
+    let tlv = tlv::TlvItemEnc {
+        tag: 0,
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode RecordProgram command (0x06)
-pub fn encode_record_program(program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_record_program(program_identifier: String, should_record_series: bool, data: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::String(program_identifier)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(should_record_series)).into());
+    if let Some(x) = data { tlv_fields.push((3, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::String(program_identifier)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(should_record_series)).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(data)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode CancelRecordProgram command (0x07)
-pub fn encode_cancel_record_program(program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_cancel_record_program(program_identifier: String, should_record_series: bool, data: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::String(program_identifier)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(should_record_series)).into());
+    if let Some(x) = data { tlv_fields.push((3, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::String(program_identifier)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(should_record_series)).into(),
-        (3, tlv::TlvItemValueEnc::OctetString(data)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -493,13 +495,13 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x06 => {
         let program_identifier = crate::clusters::codec::json_util::get_string(args, "program_identifier")?;
         let should_record_series = crate::clusters::codec::json_util::get_bool(args, "should_record_series")?;
-        let data = crate::clusters::codec::json_util::get_octstr(args, "data")?;
+        let data = crate::clusters::codec::json_util::get_opt_octstr(args, "data")?;
         encode_record_program(program_identifier, should_record_series, data)
         }
         0x07 => {
         let program_identifier = crate::clusters::codec::json_util::get_string(args, "program_identifier")?;
         let should_record_series = crate::clusters::codec::json_util::get_bool(args, "should_record_series")?;
-        let data = crate::clusters::codec::json_util::get_octstr(args, "data")?;
+        let data = crate::clusters::codec::json_util::get_opt_octstr(args, "data")?;
         encode_cancel_record_program(program_identifier, should_record_series, data)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -713,19 +715,19 @@ pub async fn skip_channel(conn: &crate::controller::Connection, endpoint: u16, c
 }
 
 /// Invoke `GetProgramGuide` command on cluster `Channel`.
-pub async fn get_program_guide(conn: &crate::controller::Connection, endpoint: u16, start_time: u64, end_time: u64, channel_list: Vec<ChannelInfo>, page_token: Option<PageToken>, recording_flag: Option<RecordingFlag>, data: Vec<u8>) -> anyhow::Result<ProgramGuideResponse> {
+pub async fn get_program_guide(conn: &crate::controller::Connection, endpoint: u16, start_time: u64, end_time: u64, channel_list: Option<Vec<ChannelInfo>>, page_token: Option<PageToken>, recording_flag: Option<RecordingFlag>, data: Option<Vec<u8>>) -> anyhow::Result<ProgramGuideResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_GETPROGRAMGUIDE, &encode_get_program_guide(start_time, end_time, channel_list, page_token, recording_flag, data)?).await?;
     decode_program_guide_response(&tlv)
 }
 
 /// Invoke `RecordProgram` command on cluster `Channel`.
-pub async fn record_program(conn: &crate::controller::Connection, endpoint: u16, program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<()> {
+pub async fn record_program(conn: &crate::controller::Connection, endpoint: u16, program_identifier: String, should_record_series: bool, data: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_RECORDPROGRAM, &encode_record_program(program_identifier, should_record_series, data)?).await?;
     Ok(())
 }
 
 /// Invoke `CancelRecordProgram` command on cluster `Channel`.
-pub async fn cancel_record_program(conn: &crate::controller::Connection, endpoint: u16, program_identifier: String, should_record_series: bool, data: Vec<u8>) -> anyhow::Result<()> {
+pub async fn cancel_record_program(conn: &crate::controller::Connection, endpoint: u16, program_identifier: String, should_record_series: bool, data: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHANNEL, crate::clusters::defs::CLUSTER_CHANNEL_CMD_ID_CANCELRECORDPROGRAM, &encode_cancel_record_program(program_identifier, should_record_series, data)?).await?;
     Ok(())
 }

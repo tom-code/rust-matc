@@ -191,14 +191,14 @@ pub mod wind {
 // Command encoders
 
 /// Encode Step command (0x00)
-pub fn encode_step(direction: StepDirection, wrap: bool, lowest_off: bool) -> anyhow::Result<Vec<u8>> {
+pub fn encode_step(direction: StepDirection, wrap: Option<bool>, lowest_off: Option<bool>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(direction.to_u8())).into());
+    if let Some(x) = wrap { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
+    if let Some(x) = lowest_off { tlv_fields.push((2, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(direction.to_u8())).into(),
-        (1, tlv::TlvItemValueEnc::Bool(wrap)).into(),
-        (2, tlv::TlvItemValueEnc::Bool(lowest_off)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -462,8 +462,8 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
             let n = crate::clusters::codec::json_util::get_u64(args, "direction")?;
             StepDirection::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid StepDirection: {}", n))?
         };
-        let wrap = crate::clusters::codec::json_util::get_bool(args, "wrap")?;
-        let lowest_off = crate::clusters::codec::json_util::get_bool(args, "lowest_off")?;
+        let wrap = crate::clusters::codec::json_util::get_opt_bool(args, "wrap")?;
+        let lowest_off = crate::clusters::codec::json_util::get_opt_bool(args, "lowest_off")?;
         encode_step(direction, wrap, lowest_off)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -473,7 +473,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `Step` command on cluster `Fan Control`.
-pub async fn step(conn: &crate::controller::Connection, endpoint: u16, direction: StepDirection, wrap: bool, lowest_off: bool) -> anyhow::Result<()> {
+pub async fn step(conn: &crate::controller::Connection, endpoint: u16, direction: StepDirection, wrap: Option<bool>, lowest_off: Option<bool>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_FAN_CONTROL, crate::clusters::defs::CLUSTER_FAN_CONTROL_CMD_ID_STEP, &encode_step(direction, wrap, lowest_off)?).await?;
     Ok(())
 }

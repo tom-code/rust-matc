@@ -75,17 +75,17 @@ pub struct Application {
 // Command encoders
 
 /// Encode LaunchApp command (0x00)
-pub fn encode_launch_app(application: Application, data: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_launch_app(application: Application, data: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
             // Encode struct ApplicationStruct
             let mut application_fields = Vec::new();
             if let Some(x) = application.catalog_vendor_id { application_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
             if let Some(x) = application.application_id { application_fields.push((1, tlv::TlvItemValueEnc::String(x.clone())).into()); }
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::StructInvisible(application_fields)).into());
+    if let Some(x) = data { tlv_fields.push((1, tlv::TlvItemValueEnc::OctetString(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructInvisible(application_fields)).into(),
-        (1, tlv::TlvItemValueEnc::OctetString(data)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -282,7 +282,7 @@ pub fn decode_launcher_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Launc
 // Typed facade (invokes + reads)
 
 /// Invoke `LaunchApp` command on cluster `Application Launcher`.
-pub async fn launch_app(conn: &crate::controller::Connection, endpoint: u16, application: Application, data: Vec<u8>) -> anyhow::Result<LauncherResponse> {
+pub async fn launch_app(conn: &crate::controller::Connection, endpoint: u16, application: Application, data: Option<Vec<u8>>) -> anyhow::Result<LauncherResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_APPLICATION_LAUNCHER, crate::clusters::defs::CLUSTER_APPLICATION_LAUNCHER_CMD_ID_LAUNCHAPP, &encode_launch_app(application, data)?).await?;
     decode_launcher_response(&tlv)
 }

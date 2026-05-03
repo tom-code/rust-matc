@@ -13,14 +13,14 @@ use serde_json;
 // Command encoders
 
 /// Encode Offer command (0x00)
-pub fn encode_offer(web_rtc_session_id: u8, sdp: String, ice_transport_policy: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_offer(web_rtc_session_id: u8, sdp: String, ice_transport_policy: Option<String>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(web_rtc_session_id)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::String(sdp)).into());
+    if let Some(x) = ice_transport_policy { tlv_fields.push((3, tlv::TlvItemValueEnc::String(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(web_rtc_session_id)).into(),
-        (1, tlv::TlvItemValueEnc::String(sdp)).into(),
-        (3, tlv::TlvItemValueEnc::String(ice_transport_policy)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -162,7 +162,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x00 => {
         let web_rtc_session_id = crate::clusters::codec::json_util::get_u8(args, "web_rtc_session_id")?;
         let sdp = crate::clusters::codec::json_util::get_string(args, "sdp")?;
-        let ice_transport_policy = crate::clusters::codec::json_util::get_string(args, "ice_transport_policy")?;
+        let ice_transport_policy = crate::clusters::codec::json_util::get_opt_string(args, "ice_transport_policy")?;
         encode_offer(web_rtc_session_id, sdp, ice_transport_policy)
         }
         0x01 => {
@@ -186,7 +186,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 // Typed facade (invokes + reads)
 
 /// Invoke `Offer` command on cluster `WebRTC Transport Requestor`.
-pub async fn offer(conn: &crate::controller::Connection, endpoint: u16, web_rtc_session_id: u8, sdp: String, ice_transport_policy: String) -> anyhow::Result<()> {
+pub async fn offer(conn: &crate::controller::Connection, endpoint: u16, web_rtc_session_id: u8, sdp: String, ice_transport_policy: Option<String>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_WEBRTC_TRANSPORT_REQUESTOR, crate::clusters::defs::CLUSTER_WEBRTC_TRANSPORT_REQUESTOR_CMD_ID_OFFER, &encode_offer(web_rtc_session_id, sdp, ice_transport_policy)?).await?;
     Ok(())
 }

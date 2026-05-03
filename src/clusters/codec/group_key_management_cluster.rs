@@ -155,12 +155,12 @@ pub fn encode_key_set_remove(group_key_set_id: u16) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode KeySetReadAllIndices command (0x04)
-pub fn encode_key_set_read_all_indices(do_not_use: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_key_set_read_all_indices(do_not_use: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = do_not_use { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(do_not_use)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -332,7 +332,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_key_set_remove(group_key_set_id)
         }
         0x04 => {
-        let do_not_use = crate::clusters::codec::json_util::get_u8(args, "do_not_use")?;
+        let do_not_use = crate::clusters::codec::json_util::get_opt_u8(args, "do_not_use")?;
         encode_key_set_read_all_indices(do_not_use)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -424,7 +424,7 @@ pub async fn key_set_remove(conn: &crate::controller::Connection, endpoint: u16,
 }
 
 /// Invoke `KeySetReadAllIndices` command on cluster `Group Key Management`.
-pub async fn key_set_read_all_indices(conn: &crate::controller::Connection, endpoint: u16, do_not_use: u8) -> anyhow::Result<KeySetReadAllIndicesResponse> {
+pub async fn key_set_read_all_indices(conn: &crate::controller::Connection, endpoint: u16, do_not_use: Option<u8>) -> anyhow::Result<KeySetReadAllIndicesResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_CMD_ID_KEYSETREADALLINDICES, &encode_key_set_read_all_indices(do_not_use)?).await?;
     decode_key_set_read_all_indices_response(&tlv)
 }

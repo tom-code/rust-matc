@@ -222,14 +222,14 @@ pub struct TrustedTimeSource {
 // Command encoders
 
 /// Encode SetUTCTime command (0x00)
-pub fn encode_set_utc_time(utc_time: u64, granularity: Granularity, time_source: TimeSource) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_utc_time(utc_time: u64, granularity: Granularity, time_source: Option<TimeSource>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt64(utc_time)).into());
+    tlv_fields.push((1, tlv::TlvItemValueEnc::UInt8(granularity.to_u8())).into());
+    if let Some(x) = time_source { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x.to_u8())).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt64(utc_time)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(granularity.to_u8())).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(time_source.to_u8())).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -617,10 +617,8 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
             let n = crate::clusters::codec::json_util::get_u64(args, "granularity")?;
             Granularity::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid Granularity: {}", n))?
         };
-        let time_source = {
-            let n = crate::clusters::codec::json_util::get_u64(args, "time_source")?;
-            TimeSource::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TimeSource: {}", n))?
-        };
+        let time_source = crate::clusters::codec::json_util::get_opt_u64(args, "time_source")?
+            .and_then(|n| TimeSource::from_u8(n as u8));
         encode_set_utc_time(utc_time, granularity, time_source)
         }
         0x01 => Err(anyhow::anyhow!("command \"SetTrustedTimeSource\" has complex args: use raw mode")),
@@ -656,7 +654,7 @@ pub fn decode_set_time_zone_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
 // Typed facade (invokes + reads)
 
 /// Invoke `SetUTCTime` command on cluster `Time Synchronization`.
-pub async fn set_utc_time(conn: &crate::controller::Connection, endpoint: u16, utc_time: u64, granularity: Granularity, time_source: TimeSource) -> anyhow::Result<()> {
+pub async fn set_utc_time(conn: &crate::controller::Connection, endpoint: u16, utc_time: u64, granularity: Granularity, time_source: Option<TimeSource>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TIME_SYNCHRONIZATION, crate::clusters::defs::CLUSTER_TIME_SYNCHRONIZATION_CMD_ID_SETUTCTIME, &encode_set_utc_time(utc_time, granularity, time_source)?).await?;
     Ok(())
 }

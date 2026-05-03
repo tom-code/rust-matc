@@ -32,6 +32,8 @@ class MatterType:
         'power-mW':     ('UInt32',      'u32'),
         'energy-mWh':   ('UInt64',      'u64'),
         'temperature':  ('Int16',       'i16'),
+        'percent':      ('UInt8',       'u8'),
+        'percent100ths':('UInt16',      'u16'),
         'octstr':       ('OctetString', 'Vec<u8>'),
         'list':         ('StructAnon',  None),
         # Matter-specific ID types

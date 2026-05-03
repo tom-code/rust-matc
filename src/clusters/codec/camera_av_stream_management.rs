@@ -349,14 +349,14 @@ pub fn encode_video_stream_allocate(params: VideoStreamAllocateParams) -> anyhow
 }
 
 /// Encode VideoStreamModify command (0x05)
-pub fn encode_video_stream_modify(video_stream_id: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<Vec<u8>> {
+pub fn encode_video_stream_modify(video_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into());
+    if let Some(x) = watermark_enabled { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
+    if let Some(x) = osd_enabled { tlv_fields.push((2, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(watermark_enabled)).into(),
-        (2, tlv::TlvItemValueEnc::Bool(osd_enabled)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -398,14 +398,14 @@ pub fn encode_snapshot_stream_allocate(image_codec: ImageCodec, max_frame_rate: 
 }
 
 /// Encode SnapshotStreamModify command (0x09)
-pub fn encode_snapshot_stream_modify(snapshot_stream_id: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<Vec<u8>> {
+pub fn encode_snapshot_stream_modify(snapshot_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(snapshot_stream_id)).into());
+    if let Some(x) = watermark_enabled { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
+    if let Some(x) = osd_enabled { tlv_fields.push((2, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
-        value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(snapshot_stream_id)).into(),
-        (1, tlv::TlvItemValueEnc::Bool(watermark_enabled)).into(),
-        (2, tlv::TlvItemValueEnc::Bool(osd_enabled)).into(),
-        ]),
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
     };
     Ok(tlv.encode()?)
 }
@@ -1469,8 +1469,8 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x03 => Err(anyhow::anyhow!("command \"VideoStreamAllocate\" has complex args: use raw mode")),
         0x05 => {
         let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
-        let watermark_enabled = crate::clusters::codec::json_util::get_bool(args, "watermark_enabled")?;
-        let osd_enabled = crate::clusters::codec::json_util::get_bool(args, "osd_enabled")?;
+        let watermark_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "watermark_enabled")?;
+        let osd_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "osd_enabled")?;
         encode_video_stream_modify(video_stream_id, watermark_enabled, osd_enabled)
         }
         0x06 => {
@@ -1480,8 +1480,8 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x07 => Err(anyhow::anyhow!("command \"SnapshotStreamAllocate\" has complex args: use raw mode")),
         0x09 => {
         let snapshot_stream_id = crate::clusters::codec::json_util::get_u8(args, "snapshot_stream_id")?;
-        let watermark_enabled = crate::clusters::codec::json_util::get_bool(args, "watermark_enabled")?;
-        let osd_enabled = crate::clusters::codec::json_util::get_bool(args, "osd_enabled")?;
+        let watermark_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "watermark_enabled")?;
+        let osd_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "osd_enabled")?;
         encode_snapshot_stream_modify(snapshot_stream_id, watermark_enabled, osd_enabled)
         }
         0x0A => {
@@ -1604,7 +1604,7 @@ pub async fn video_stream_allocate(conn: &crate::controller::Connection, endpoin
 }
 
 /// Invoke `VideoStreamModify` command on cluster `Camera AV Stream Management`.
-pub async fn video_stream_modify(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<()> {
+pub async fn video_stream_modify(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_VIDEOSTREAMMODIFY, &encode_video_stream_modify(video_stream_id, watermark_enabled, osd_enabled)?).await?;
     Ok(())
 }
@@ -1622,7 +1622,7 @@ pub async fn snapshot_stream_allocate(conn: &crate::controller::Connection, endp
 }
 
 /// Invoke `SnapshotStreamModify` command on cluster `Camera AV Stream Management`.
-pub async fn snapshot_stream_modify(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u8, watermark_enabled: bool, osd_enabled: bool) -> anyhow::Result<()> {
+pub async fn snapshot_stream_modify(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SNAPSHOTSTREAMMODIFY, &encode_snapshot_stream_modify(snapshot_stream_id, watermark_enabled, osd_enabled)?).await?;
     Ok(())
 }
