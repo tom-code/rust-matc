@@ -239,7 +239,11 @@ impl DeviceManager {
                         }
                     };
                     if let Some(ref d) = matter_info.discriminator {
-                        if *d == discriminator.to_string() {
+                        let mut mdns_discriminator = d.parse::<u16>()?;
+                        if info.is_short_discriminator {
+                            mdns_discriminator &= 0xf00;
+                        }
+                        if mdns_discriminator == discriminator {
                             self.mdns.remove_query("_matterc._udp.local").await;
                             break (matter_info.ips, matter_info.port.unwrap_or(5540));
                         }
