@@ -186,7 +186,7 @@ async fn push_device_cert(
     tlv.write_octetstring(0, &noc)?;
     tlv.write_octetstring(2, &fabric.ipk_epoch_key)?;
     tlv.write_uint64(3, controller_id)?;
-    tlv.write_uint64(4, 101)?;
+    tlv.write_uint16(4, 101)?;
     let t1 = messages::im_invoke_request(
         0,
         CLUSTER_OPERATIONAL_CREDENTIALS,
