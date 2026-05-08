@@ -148,11 +148,11 @@ impl Controller {
         let compressed = fabric_tmp.compressed().context("compressed fabric ID")?;
         let instance = format!("{}-{:016X}", hex::encode_upper(&compressed), node_id);
         let expected_target = format!("{}._matter._tcp.local.", instance);
-        mdns.add_query("_matter._tcp.local", 0xff, std::time::Duration::from_secs(30)).await;
 
         let mut addresses = Vec::new();
         {
             let mut rx = mdns_receiver.lock().await;
+            mdns.active_lookup("_matter._tcp.local", 0xff).await;
             loop {
                 match tokio::time::timeout(std::time::Duration::from_secs(30), rx.recv()).await {
                     Ok(Some(crate::mdns2::MdnsEvent::ServiceDiscovered { name, records: _, target })) => {
@@ -161,7 +161,6 @@ impl Controller {
                         }
                         let info = discover::extract_matter_info(&target, mdns).await?;
                         log::debug!("Operational mDNS discovered device: {:?}", info);
-                        mdns.remove_query("_matter._tcp.local").await;
 
                         let port = info.port.unwrap_or(5540);
                         for ip in &info.ips {

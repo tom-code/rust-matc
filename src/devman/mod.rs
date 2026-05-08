@@ -222,11 +222,15 @@ impl DeviceManager {
 
         log::info!("Discovering device with discriminator {}...", discriminator);
 
-        self.mdns.add_query("_matterc._udp.local", 0xff, Duration::from_secs(5)).await;
         let mut receiver = self.mdns_receiver.lock().await;
+        self.mdns.active_lookup("_matterc._udp.local", 0xff).await;
 
+        let discovery_timeout = Duration::from_secs(10);
         let (ips, port) = loop {
-            match receiver.recv().await {
+            let event = tokio::time::timeout(discovery_timeout, receiver.recv())
+                .await
+                .map_err(|_| anyhow::anyhow!("timed out waiting for device with discriminator {}", discriminator))?;
+            match event {
                 Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
                     if svc_name != "_matterc._udp.local." {
                         continue;
@@ -244,7 +248,6 @@ impl DeviceManager {
                             mdns_discriminator &= 0xf00;
                         }
                         if mdns_discriminator == discriminator {
-                            self.mdns.remove_query("_matterc._udp.local").await;
                             break (matter_info.ips, matter_info.port.unwrap_or(5540));
                         }
                     }
@@ -341,8 +344,8 @@ impl DeviceManager {
 
         log::info!("Operational discovery for instance {}...", instance_name);
 
-        self.mdns.add_query("_matter._tcp.local", 0xff, Duration::from_secs(10)).await;
         let mut receiver = self.mdns_receiver.lock().await;
+        self.mdns.active_lookup("_matter._tcp.local", 0xff).await;
 
         let (ips, port) = loop {
             let event = tokio::time::timeout(timeout, receiver.recv())
@@ -363,7 +366,6 @@ impl DeviceManager {
                             continue;
                         }
                     };
-                    self.mdns.remove_query("_matter._tcp.local").await;
                     break (matter_info.ips, matter_info.port.unwrap_or(5540));
                 }
                 None => {
