@@ -122,6 +122,19 @@ enum Commands {
         /// Device name or node ID
         device: String,
     },
+    /// Write attribute
+    WriteAttribute {
+        /// Device name or node ID
+        device: String,
+        /// Endpoint ID
+        endpoint: u16,
+        /// Cluster ID
+        cluster: u32,
+        /// Attribute ID
+        attribute: u32,
+        /// Value to write
+        value: String,
+    },
     /// Remove device from registry
     Remove {
         /// Device name or node ID
@@ -356,6 +369,15 @@ async fn main() -> Result<()> {
             dm.rename_device(node_id, &new_name)?;
             println!("Renamed device (node {}) to '{}'", node_id, new_name);
         }
+        Commands::WriteAttribute { device, endpoint, cluster, attribute, value } => {
+            let dm = DeviceManager::load(data_dir).await?;
+            let conn = connect_by_name_or_id(&dm, &device).await?;
+            println!("Writing attribute 0x{:x} on cluster 0x{:x} at endpoint {} of device '{}'", attribute, cluster, endpoint, device);
+            let mut tlv_value = tlv::TlvBuffer::new();
+            tlv_value.write_string(2, &value)?;
+            conn.write_request(endpoint, cluster, attribute, &tlv_value.data).await?;
+            println!("Write successful");
+        },
     }
 
     Ok(())

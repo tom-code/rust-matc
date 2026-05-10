@@ -592,6 +592,36 @@ pub fn im_read_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16) ->
     Ok(tlv.data)
 }
 
+pub fn im_write_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16, data: &[u8]) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 5,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_WRITE_REQ,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: 0,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    //tlv.write_bool(0, false)?;
+    tlv.write_bool(1, false)?; // timed
+    tlv.write_array(2)?;
+    tlv.write_anon_struct()?;
+    //tlv.write_uint32(0, 0)?; // dataversion
+    tlv.write_list(1)?;
+    tlv.write_uint16(2, endpoint)?;
+    tlv.write_uint32(3, cluster)?;
+    tlv.write_uint32(4, attr)?;
+    tlv.write_struct_end()?;
+    tlv.write_raw(data)?;
+    tlv.write_struct_end()?;
+    tlv.write_struct_end()?;
+    tlv.write_bool(3, false)?;
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
 pub fn im_subscribe_request(endpoint: u16, cluster: u32, exchange: u16, event: u32) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: 5,

@@ -415,17 +415,24 @@ mod tests {
         let msg = b"hello world";
         let segs = segment(msg, 64);
         assert_eq!(segs.len(), 1);
-        let s = &segs[0];
-        assert!(s.flags & F_BEGIN != 0);
-        assert!(s.flags & F_END != 0);
-        assert_eq!(s.begin_len, Some(msg.len() as u16));
-        assert_eq!(s.payload, msg);
-        let enc = s.encode();
+        // Capture before enqueuing - enqueue moves the vec.
+        let expected_payload: Vec<u8> = msg.to_vec();
+        let expected_begin_len = segs[0].begin_len;
+        assert!(segs[0].flags & F_BEGIN != 0);
+        assert!(segs[0].flags & F_END != 0);
+        assert_eq!(expected_begin_len, Some(msg.len() as u16));
+        assert_eq!(segs[0].payload, msg as &[u8]);
+        // segment() returns placeholder seq/ack - route through State::pop_sendable
+        // so that seq and F_ACK are set consistently before encoding.
+        let mut state = State::new(8);
+        state.enqueue(segs);
+        let enc = state.pop_sendable().unwrap();
         let dec = BtpSegment::decode(&enc).unwrap();
-        assert_eq!(dec.flags, s.flags);
-        assert_eq!(dec.seq, s.seq);
-        assert_eq!(dec.begin_len, s.begin_len);
-        assert_eq!(dec.payload, s.payload);
+        assert!(dec.flags & F_BEGIN != 0);
+        assert!(dec.flags & F_END != 0);
+        assert_eq!(dec.seq, 0);
+        assert_eq!(dec.begin_len, expected_begin_len);
+        assert_eq!(dec.payload, expected_payload);
     }
 
     #[test]
@@ -436,11 +443,13 @@ mod tests {
         assert!(segs[0].flags & F_BEGIN != 0);
         assert!(segs.last().unwrap().flags & F_END != 0);
 
-        let mut state = State::new(8);
+        // Route through State on both sides so seq/ack/F_ACK are consistent.
+        let mut tx = State::new(8);
+        tx.enqueue(segs);
+        let mut rx = State::new(8);
         let mut result = None;
-        for s in segs {
-            let enc = s.encode();
-            result = state.process_rx(&enc).unwrap();
+        while let Some(enc) = tx.pop_sendable() {
+            result = rx.process_rx(&enc).unwrap();
         }
         assert_eq!(result.unwrap(), msg);
     }

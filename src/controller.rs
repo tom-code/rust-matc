@@ -286,6 +286,62 @@ impl Connection {
         Ok(o.clone())
     }
 
+    pub async fn write_request(
+        &self,
+        endpoint: u16,
+        cluster: u32,
+        attr: u32,
+        payload: &[u8],
+    ) -> Result<()> {
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "write_request exch:{} endpoint:{} cluster:{} attr:{}",
+            exchange,
+            endpoint,
+            cluster,
+            attr,
+        );
+
+        let msg = messages::im_write_request(endpoint, cluster, attr, exchange, payload)?;
+        let res = self.active.request(exchange, &msg).await?;
+        if res.status_report_info.is_some() {
+            return Err(anyhow::anyhow!(
+                "write_request failed with status {:?}",
+                res.status_report_info
+            ))
+        };
+        if res.protocol_header.protocol_id
+            == messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+            && res.protocol_header.opcode
+                == messages::ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
+        {
+            let stat = res
+                .tlv
+                .get_int(&[0])
+                .context("status not found in status response")?;
+            res.tlv.dump(1);
+            return Err(anyhow::anyhow!(
+                "response is not expected status_resp 0x{:x}",
+                stat
+            ))
+        };
+        if res.protocol_header.protocol_id
+            != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+            || res.protocol_header.opcode
+                != messages::ProtocolMessageHeader::INTERACTION_OPCODE_WRITE_RESP
+        {
+            return Err(anyhow::anyhow!(
+                "response is not expected write_resp {:?}",
+                res.protocol_header
+            ))
+        };
+        let stat = res.tlv.get_int(&[0, 0, 1, 0]).context("status not found in write response")?;
+        if stat != 0 {
+            return Err(anyhow::anyhow!("write failed with status 0x{:x}", stat));
+        }
+        Ok(())
+    }
+
     pub async fn im_subscribe_request(
         &self,
         endpoint: u16,
