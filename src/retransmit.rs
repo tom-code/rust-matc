@@ -70,15 +70,25 @@ impl<'b> RetrContext<'b> {
     pub async fn get_next_message(&mut self) -> Result<messages::Message> {
         let reliable = self.connection.is_reliable();
         if reliable {
-            let resp = self.connection.receive(RELIABLE_MAX_WAIT_TIME).await?;
-            let resp = match self.session.decode_message(&resp) {
-                Ok(resp) => resp,
-                Err(e) => {
-                    log::debug!("can't decode incoming message {:?}", e);
-                    return Err(anyhow::anyhow!("failed to receive initial message in reliable exchange: {:?}", e));
+            loop {
+                let resp = self.connection.receive(RELIABLE_MAX_WAIT_TIME).await?;
+                let resp = match self.session.decode_message(&resp) {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        log::debug!("can't decode incoming message {:?}", e);
+                        return Err(anyhow::anyhow!("failed to receive initial message in reliable exchange: {:?}", e));
+                    }
+                };
+                let decoded = messages::Message::decode(&resp)?;
+                if decoded.protocol_header.protocol_id
+                    == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+                    && decoded.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_ACK
+                {
+                    log::trace!("reliable transport: skipping standalone ack");
+                    continue;
                 }
-            };
-            return messages::Message::decode(&resp);
+                return Ok(decoded);
+            }
         }
         let start_time = tokio::time::Instant::now();
         loop {

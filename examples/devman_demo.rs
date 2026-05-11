@@ -14,6 +14,9 @@
 ///   cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble \
 ///     "MT:Y.K908..." 300 "kitchen light" HomeWifi --password "secret"
 ///
+///   # Scan for BLE commissionable devices (requires --features ble):
+///   cargo run --features ble --example devman_demo -- scan-ble --timeout-secs 5
+///
 ///   # List registered devices:
 ///   cargo run --example devman_demo -- -d ./matter-data list
 ///
@@ -32,7 +35,9 @@ use matc::{
     tlv,
 };
 #[cfg(feature = "ble")]
-use matc::NetworkCreds;
+use std::time::Duration;
+#[cfg(feature = "ble")]
+use matc::{ble, NetworkCreds};
 
 const DEFAULT_DATA_DIR: &str = "./matter-data";
 const DEFAULT_LOCAL_ADDRESS: &str = "0.0.0.0:5555";
@@ -99,6 +104,13 @@ enum Commands {
         /// Wi-Fi password to provision
         #[clap(long, default_value = "")]
         password: String,
+    },
+    /// Scan for BLE commissionable Matter devices (requires --features ble)
+    #[cfg(feature = "ble")]
+    ScanBle {
+        /// Scan duration in seconds
+        #[clap(long, default_value_t = 5)]
+        timeout_secs: u64,
     },
     /// List registered devices
     List,
@@ -299,7 +311,7 @@ async fn main() -> Result<()> {
         #[cfg(feature = "ble")]
         Commands::CommissionBle { pairing_code, node_id, name, ssid, password } => {
             let dm = DeviceManager::load(data_dir).await?;
-            println!("Scanning for BLE commissionable device (pairing code: {})…", pairing_code);
+            println!("Scanning for BLE commissionable device (pairing code: {})", pairing_code);
             let conn = dm.commission_ble_with_code(
                 &pairing_code,
                 node_id,
@@ -318,6 +330,26 @@ async fn main() -> Result<()> {
                         Some(name) => println!("  {}", name),
                         None => println!("  unknown (0x{:x})", c),
                     }
+                }
+            }
+        }
+        #[cfg(feature = "ble")]
+        Commands::ScanBle { timeout_secs } => {
+            println!("Scanning BLE for commissionable Matter devices ({}s)", timeout_secs);
+            let devices = ble::scan_commissionable(Duration::from_secs(timeout_secs)).await?;
+            if devices.is_empty() {
+                println!("No BLE commissionable devices found.");
+            } else {
+                println!("{:<6} {:<6} {:<6} {:<3} {:<5} {:<20} Address",
+                         "Disc", "VID", "PID", "CM", "RSSI", "Name");
+                println!("{}", "-".repeat(80));
+                for d in devices {
+                    let rssi = d.rssi.map(|v| v.to_string()).unwrap_or_else(|| "-".into());
+                    let name = d.name.as_deref().unwrap_or("");
+                    println!("{:<6} 0x{:04x} 0x{:04x} {:<3} {:<5} {:<20} {}",
+                             d.discriminator, d.vendor_id, d.product_id,
+                             if d.cm_flag { "y" } else { "n" },
+                             rssi, name, d.address);
                 }
             }
         }
