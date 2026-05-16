@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     active_connection::ActiveConnection,
@@ -26,6 +26,20 @@ pub struct Connection {
 //impl IsSync for Controller {}
 
 const CA_ID: u64 = 1;
+
+#[derive(Debug, Clone, Copy)]
+pub struct SigmaBusy {
+    pub wait_ms: Option<u32>,
+}
+impl std::fmt::Display for SigmaBusy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.wait_ms {
+            Some(ms) => write!(f, "responder BUSY (min wait {} ms)", ms),
+            None => write!(f, "responder BUSY"),
+        }
+    }
+}
+impl std::error::Error for SigmaBusy {}
 
 impl Controller {
     pub fn new(
@@ -87,6 +101,47 @@ impl Controller {
         Ok(Connection {
             active: ActiveConnection::new(connection.clone(), session),
         })
+    }
+
+    /// Run auth_sigma with automatic BUSY retry.
+    /// Returns only the Session so that both initial connect and in-place reauth can use it.
+    pub async fn auth_sigma_with_busy_retry(
+        &self,
+        connection: &Arc<dyn ConnectionTrait>,
+        node_id: u64,
+        controller_id: u64,
+    ) -> Result<session::Session> {
+        const MAX_BUSY_RETRIES: u32 = 5;
+        const DEFAULT_BUSY_WAIT: Duration = Duration::from_millis(3000);
+        const MAX_BUSY_WAIT: Duration = Duration::from_secs(60);
+
+        let mut busy_retries = 0u32;
+        loop {
+            match auth_sigma(connection.as_ref(), &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await {
+                Ok(ses) => return Ok(ses),
+                Err(e) => {
+                    if let Some(busy) = e.downcast_ref::<SigmaBusy>() {
+                        if busy_retries < MAX_BUSY_RETRIES {
+                            let wait = busy.wait_ms
+                                .map(|ms| Duration::from_millis(ms.into()))
+                                .unwrap_or(DEFAULT_BUSY_WAIT)
+                                .min(MAX_BUSY_WAIT);
+                            log::info!(
+                                "CASE responder BUSY, waiting {:?} before retry ({}/{})",
+                                wait, busy_retries + 1, MAX_BUSY_RETRIES
+                            );
+                            tokio::time::sleep(wait).await;
+                            busy_retries += 1;
+                            continue;
+                        }
+                        return Err(e).context(format!(
+                            "still BUSY after {} retries", MAX_BUSY_RETRIES
+                        ));
+                    }
+                    return Err(e);
+                }
+            }
+        }
     }
 
     /// Commission a device that is advertising over BLE.
@@ -206,6 +261,11 @@ impl Controller {
 
 /// Authenticated virtual connection can be used to send commands to device.
 impl Connection {
+    /// Build a Connection from a transport-layer connection and an established session.
+    pub(crate) fn from_parts(conn: Arc<dyn ConnectionTrait>, session: session::Session) -> Self {
+        Self { active: ActiveConnection::new(conn, session) }
+    }
+
     /// Read attribute from device and return parsed matter protocol response.
     pub async fn read_request(
         &self,
@@ -454,6 +514,21 @@ impl Connection {
     pub fn try_recv_event(&self) -> Option<Message> {
         self.active.try_recv_event()
     }
+
+    /// Re-run CASE over the existing transport channel without tearing it down.
+    /// Stops the active read loop, runs auth_sigma (with BUSY retry), swaps the session,
+    /// and restarts the read loop -- all on the same underlying UDP channel registration.
+    pub async fn reauth(
+        &self,
+        controller: &Controller,
+        node_id: u64,
+        controller_id: u64,
+    ) -> Result<()> {
+        let new_session = controller
+            .auth_sigma_with_busy_retry(&self.active.transport_conn, node_id, controller_id)
+            .await?;
+        self.active.reauth_with_session(new_session).await
+    }
 }
 
 pub fn pin_to_passcode(pin: u32) -> Result<Vec<u8>> {
@@ -584,7 +659,11 @@ pub(crate) async fn auth_sigma(
     if sigma2.protocol_header.protocol_id == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         && sigma2.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_STATUS
     {
-        return Err(anyhow::anyhow!("sigma2 not received, status: {}", sigma2.status_report_info.context("status report info missing")?.to_string()));
+        let sri = sigma2.status_report_info.context("status report info missing")?;
+        if sri.is_busy() {
+            return Err(anyhow::Error::new(SigmaBusy { wait_ms: sri.minimum_wait_time_ms() }));
+        }
+        return Err(anyhow::anyhow!("sigma2 not received, status: {}", sri));
     }
     ctx.sigma2_payload = sigma2.payload;
     ctx.responder_session = sigma2
@@ -617,6 +696,7 @@ pub(crate) async fn auth_sigma(
     let status = retrctx.get_next_message().await?;
     if !status
         .status_report_info
+        .as_ref()
         .context("sigma3 status resp not received")?
         .is_ok()
     {

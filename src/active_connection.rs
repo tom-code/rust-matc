@@ -5,6 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::{messages::{self, Message, ProtocolMessageHeader}, session::Session, transport::ConnectionTrait};
@@ -14,19 +15,13 @@ const RETRANSMIT_THRESHOLD: Duration = Duration::from_secs(3);
 const MAX_RETRANSMIT_AGE: Duration = Duration::from_secs(10);
 const MAX_CACHED_COUNTERS: usize = 32;
 
-/// Tracks an unacknowledged message pending retransmit.
 struct UnackedMessage {
-    /// Encoded message bytes to retransmit
     data: Vec<u8>,
-    /// When the message was first sent (for max age check)
     original_time: Instant,
-    /// When the message was last sent (for retransmit interval)
     last_sent: Instant,
-    /// Associated exchange ID for timeout signaling
     exchange_id: Option<u16>,
 }
 
-/// Bounded set for tracking received message counters to detect duplicates
 struct ReceivedCounters {
     set: HashSet<u32>,
     order: VecDeque<u32>,
@@ -42,14 +37,11 @@ impl ReceivedCounters {
         }
     }
 
-    /// Returns true if counter was new (not a duplicate)
     fn insert(&mut self, counter: u32) -> bool {
         if !self.set.insert(counter) {
-            return false; // duplicate
+            return false;
         }
         self.order.push_back(counter);
-
-        // Evict oldest if over limit
         while self.order.len() > self.max_size {
             if let Some(old) = self.order.pop_front() {
                 self.set.remove(&old);
@@ -57,31 +49,30 @@ impl ReceivedCounters {
         }
         true
     }
+}
 
-    /*fn remove(&mut self, counter: &u32) {
-        self.set.remove(counter);
-    }*/
+struct ReadLoopState {
+    // Child of the permanent cancel token; firing this stops the current loop iteration.
+    pause: CancellationToken,
+    handle: JoinHandle<()>,
 }
 
 /// Active connection with background read task for continuous message handling.
 pub struct ActiveConnection {
-    transport_conn: Arc<dyn ConnectionTrait>,
-    session: Arc<Session>,
+    pub(crate) transport_conn: Arc<dyn ConnectionTrait>,
+    // Stores the current session Arc; updated atomically on reauth.
+    session_holder: std::sync::Mutex<Arc<Session>>,
 
-    /// Routing responses to waiting callers by exchange ID
     pending_exchanges: Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
-
-    /// Retransmit tracking
     unacked: Arc<Mutex<HashMap<u32, UnackedMessage>>>,
 
-    /// Duplicate detection
-    //received_counters: Arc<std::sync::Mutex<ReceivedCounters>>,
-
-    /// Events channel (unsolicited messages)
+    event_tx: mpsc::Sender<Message>,
     event_rx: Mutex<mpsc::Receiver<Message>>,
-    //event_tx: mpsc::Sender<Message>,
 
+    // Fired by Drop to permanently shut down the read loop.
     cancel: CancellationToken,
+    // Current read loop task; replaced on each reauth.
+    read_loop_state: Mutex<Option<ReadLoopState>>,
 }
 
 impl ActiveConnection {
@@ -90,49 +81,80 @@ impl ActiveConnection {
     pub fn new(conn: Arc<dyn ConnectionTrait>, session: Session) -> Self {
         let (event_tx, event_rx) = mpsc::channel(32);
         let cancel = CancellationToken::new();
-
-        let session = Arc::new(session);
+        let session_arc = Arc::new(session);
+        let session_holder = std::sync::Mutex::new(session_arc.clone());
         let pending_exchanges = Arc::new(std::sync::Mutex::new(HashMap::new()));
         let unacked = Arc::new(Mutex::new(HashMap::new()));
         let received_counters = Arc::new(std::sync::Mutex::new(ReceivedCounters::new(MAX_CACHED_COUNTERS)));
 
-        // Spawn background read loop
-        let read_loop_conn = conn.clone();
-        let read_loop_session = session.clone();
-        let read_loop_pending = pending_exchanges.clone();
-        let read_loop_unacked = unacked.clone();
-        let read_loop_received = received_counters.clone();
-        let read_loop_event_tx = event_tx.clone();
-        let read_loop_cancel = cancel.clone();
-
-        tokio::spawn(async move {
-            connection_read_loop(
-                read_loop_conn,
-                read_loop_session,
-                read_loop_pending,
-                read_loop_unacked,
-                read_loop_received,
-                read_loop_event_tx,
-                read_loop_cancel,
-            )
-            .await;
-        });
+        // The read loop is cancelled by either this pause token or the parent cancel token.
+        let pause = cancel.child_token();
+        let handle = tokio::spawn(connection_read_loop(
+            conn.clone(),
+            session_arc,
+            pending_exchanges.clone(),
+            unacked.clone(),
+            received_counters,
+            event_tx.clone(),
+            pause.clone(),
+        ));
 
         Self {
             transport_conn: conn,
-            session,
+            session_holder,
             pending_exchanges,
             unacked,
-            //received_counters,
+            event_tx,
             event_rx: Mutex::new(event_rx),
-            //event_tx,
             cancel,
+            read_loop_state: Mutex::new(Some(ReadLoopState { pause, handle })),
         }
     }
 
-    /// Encode, send and add to retransmit buffer
+    /// Replace the CASE session in place without tearing down the transport channel.
+    /// 1. Stops the current read loop (up to 1 s latency for RECEIVE_TIMEOUT to fire).
+    /// 2. Clears stale in-flight exchange state.
+    /// 3. Installs the new session.
+    /// 4. Spawns a fresh read loop on the same transport connection.
+    pub async fn reauth_with_session(&self, new_session: Session) -> Result<()> {
+        // Stop the current read loop and wait for it to exit.
+        let old_state = {
+            let mut state = self.read_loop_state.lock().await;
+            state.take()
+        };
+        if let Some(s) = old_state {
+            s.pause.cancel();
+            let _ = s.handle.await;
+        }
+
+        // Discard any pending exchanges from the old session.
+        self.pending_exchanges.lock().unwrap().clear();
+        self.unacked.lock().await.clear();
+
+        // Install the new session.
+        *self.session_holder.lock().unwrap() = Arc::new(new_session);
+        let new_session_arc = self.session_holder.lock().unwrap().clone();
+
+        // Spawn a fresh read loop on the same transport connection.
+        let new_pause = self.cancel.child_token();
+        let new_received_counters = Arc::new(std::sync::Mutex::new(ReceivedCounters::new(MAX_CACHED_COUNTERS)));
+        let handle = tokio::spawn(connection_read_loop(
+            self.transport_conn.clone(),
+            new_session_arc,
+            self.pending_exchanges.clone(),
+            self.unacked.clone(),
+            new_received_counters,
+            self.event_tx.clone(),
+            new_pause.clone(),
+        ));
+
+        *self.read_loop_state.lock().await = Some(ReadLoopState { pause: new_pause, handle });
+        Ok(())
+    }
+
     async fn send_internal(&self, exchange_id: u16, data: &[u8]) -> Result<()> {
-        let encoded = self.session.encode_message(data)?;
+        let session = self.session_holder.lock().unwrap().clone();
+        let encoded = session.encode_message(data)?;
         self.track_sent(&encoded, Some(exchange_id)).await;
         if let Err(e) = self.transport_conn.send(&encoded).await {
             log::debug!("error sending message on exchange {}: {:?}", exchange_id, e);
@@ -143,55 +165,44 @@ impl ActiveConnection {
         }
         Ok(())
     }
-    
-    /// Send request and wait for response on specific exchange.
+
     pub async fn request(&self, exchange_id: u16, data: &[u8]) -> Result<Message> {
         let (tx, rx) = oneshot::channel();
-
-        // Register for response
         {
             let mut pending = self.pending_exchanges.lock().unwrap();
             pending.insert(exchange_id, tx);
         }
 
-        // Encode, send and track for retransmit
         if let Err(e) = self.send_internal(exchange_id, data).await {
-            // Sending failed - clean up pending
-            log::debug!("error sending request on exchange {}: {:?}; cleanp up retransmit/exchange maps", exchange_id, e);
+            log::debug!("error sending request on exchange {}: {:?}; cleanup retransmit/exchange maps", exchange_id, e);
             let mut pending = self.pending_exchanges.lock().unwrap();
             pending.remove(&exchange_id);
             return Err(e);
         }
 
-        // Wait for response
         rx.await.context("channel closed while waiting for response")
     }
 
-
-    /// Send without registering for response (fire-and-forget with retransmit).
     pub async fn send(&self, data: &[u8]) -> Result<()> {
-        let encoded = self.session.encode_message(data)?;
+        let session = self.session_holder.lock().unwrap().clone();
+        let encoded = session.encode_message(data)?;
         self.track_sent(&encoded, None).await;
         self.transport_conn.send(&encoded).await?;
         Ok(())
     }
 
-    /// Receive next event. Returns None when connection is closed.
     pub async fn recv_event(&self) -> Option<Message> {
         let mut rx = self.event_rx.lock().await;
         rx.recv().await
     }
 
-    /// Try receive event without blocking.
     pub fn try_recv_event(&self) -> Option<Message> {
-        // Note: This requires trying to lock, so it may not always succeed
         match self.event_rx.try_lock() {
             Ok(mut rx) => rx.try_recv().ok(),
             Err(_) => None,
         }
     }
 
-    /// Track sent message for retransmit with optional exchange_id for result signaling.
     async fn track_sent(&self, encoded: &[u8], exchange_id: Option<u16>) {
         if self.transport_conn.is_reliable() {
             return;
@@ -212,6 +223,7 @@ impl ActiveConnection {
 
 impl Drop for ActiveConnection {
     fn drop(&mut self) {
+        // Cancels the parent token which also cancels any active child (read loop pause) token.
         self.cancel.cancel();
     }
 }
@@ -246,7 +258,6 @@ async fn connection_read_loop(
                         }
                     }
                     Err(_) => {
-                        // Timeout - check for retransmit
                         if !transport_conn.is_reliable() {
                             check_retransmit(&transport_conn, &unacked, &pending_exchanges).await;
                         }
@@ -266,22 +277,19 @@ async fn process_incoming(
     received_counters: &Arc<std::sync::Mutex<ReceivedCounters>>,
     event_tx: &mpsc::Sender<Message>,
 ) -> Result<()> {
-    // 1. Decode via session (decrypt if keys set)
     log::trace!("received raw data: {:x?}", data);
     let decoded_data = session.decode_message(data);
     let decoded_data = match decoded_data {
         Ok(d) => d,
         Err(e) => {
-            log::debug!("failed to decode incoming message: {}", e.to_string());
+            log::debug!("failed to decode incoming message: {}", e);
             return Ok(());
         }
     };
 
-    // 2. Parse Message
     let message = Message::decode(&decoded_data)?;
     log::trace!("received message {:?}", message);
 
-    // 3. Handle ACK flag -> remove from unacked
     if message.protocol_header.exchange_flags & ProtocolMessageHeader::FLAG_ACK != 0 {
         let mut unacked_lock = unacked.lock().await;
         unacked_lock.remove(&message.protocol_header.ack_counter);
@@ -291,14 +299,12 @@ async fn process_incoming(
         );
     }
 
-    // 4. Duplicate check
     let is_new = {
         let mut received = received_counters.lock().unwrap();
         received.insert(message.message_header.message_counter)
     };
 
     if !is_new {
-        // Send ACK for duplicate (lost ACK may be reason for duplicate)
         send_ack(session, transport_conn, &message).await?;
         log::trace!(
             "dropping duplicate message exchange:{} counter:{}",
@@ -308,14 +314,10 @@ async fn process_incoming(
         return Ok(());
     }
 
-    // 5. Send ACK for new messages
     if message.protocol_header.exchange_flags & ProtocolMessageHeader::FLAG_RELIABILITY != 0 {
-        // Only send ACK for messages that do have the reliability flag set
         send_ack(session, transport_conn, &message).await?;
     }
-    //send_ack(session, transport_conn, &message).await?;
 
-    // 6. Skip standalone ACK messages
     if message.protocol_header.protocol_id
         == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
         && message.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_ACK
@@ -328,7 +330,6 @@ async fn process_incoming(
         return Ok(());
     }
 
-    // 7. Route by exchange ID
     let exchange_id = message.protocol_header.exchange_id;
     let sender = {
         let mut pending = pending_exchanges.lock().unwrap();
@@ -337,11 +338,9 @@ async fn process_incoming(
 
     match sender {
         Some(tx) => {
-            // Response to a pending request
             let _ = tx.send(message);
         }
         None => {
-            // Unsolicited event
             let _ = event_tx.send(message).await;
         }
     }
@@ -385,7 +384,6 @@ async fn check_retransmit(
 
             if age >= MAX_RETRANSMIT_AGE {
                 log::debug!("giving up on counter {} after {:?}", counter, age);
-                // Signal failure to waiting request by removing sender (closes channel)
                 if let Some(exch) = msg.exchange_id {
                     pending_exchanges.lock().unwrap().remove(&exch);
                 }
@@ -393,17 +391,13 @@ async fn check_retransmit(
             } else if since_last_send >= RETRANSMIT_THRESHOLD {
                 log::trace!("retransmit counter = {} exchange = {}", counter, msg.exchange_id.unwrap_or(0));
                 to_retransmit.push(msg.data.clone());
-                //if let Err(e) = transport_conn.send(&msg.data).await {
-                //    log::debug!("retransmit failed: {:?}", e);
-                //}
-                msg.last_sent = Instant::now();  // Reset for next retransmit
+                msg.last_sent = Instant::now();
             }
         }
         for counter in to_remove {
             unacked_lock.remove(&counter);
         }
     }
-    // Send outside of lock
     for data in to_retransmit {
         if let Err(e) = transport_conn.send(&data).await {
             log::debug!("retransmit failed: {:?}", e);

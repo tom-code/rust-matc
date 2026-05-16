@@ -2,6 +2,22 @@
 // into per-connection mpsc channels. Each Connection is a logical association
 // identified solely by the peer's socket address string.
 
+/// Returned by [`Connection::receive`] when the underlying mpsc channel has been
+/// closed (e.g. because the same remote address was re-registered via
+/// [`Transport::create_connection`]). Callers can detect this via
+/// `anyhow::Error::downcast_ref::<ConnectionClosed>()` and bail immediately
+/// instead of spinning on retransmit.
+#[derive(Debug)]
+pub struct ConnectionClosed;
+
+impl std::fmt::Display for ConnectionClosed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "connection closed")
+    }
+}
+
+impl std::error::Error for ConnectionClosed {}
+
 use anyhow::{Context, Result};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{net::UdpSocket, sync::Mutex};
@@ -51,12 +67,19 @@ impl Transport {
     ) -> Result<()> {
         loop {
             let mut buf = vec![0u8; 1024];
-            let (n, addr) = {
+            let recv_result = {
                 tokio::select! {
                     recv_resp = socket.recv_from(&mut buf) => recv_resp,
                     _ = stop_receive_token.cancelled() => break
                 }
-            }?;
+            };
+            let (n, addr) = match recv_result {
+                Ok(r) => r,
+                Err(e) => {
+                    log::debug!("transport recv error (ignored): {:?}", e);
+                    continue;
+                }
+            };
             buf.resize(n, 0);
             let self_strong = self_weak
                 .upgrade()
@@ -141,11 +164,18 @@ impl Connection {
         Ok(())
     }
     /// Receive the next datagram for this connection (with timeout).
+    ///
+    /// Returns `Err(ConnectionClosed)` (detectable via `downcast_ref`) when the
+    /// channel is permanently closed, distinct from a normal receive timeout.
     pub async fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
         let mut ch = self.receiver.lock().await;
         let rec_future = ch.recv();
         let with_timeout = tokio::time::timeout(timeout, rec_future);
-        with_timeout.await?.context("eof")
+        match with_timeout.await {
+            Err(_elapsed) => Err(anyhow::anyhow!("receive timeout")),
+            Ok(None) => Err(anyhow::Error::new(ConnectionClosed)),
+            Ok(Some(v)) => Ok(v),
+        }
     }
 }
 

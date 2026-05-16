@@ -302,11 +302,12 @@ impl From<u16> for SecureChannelProtocolCode {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct StatusReportInfo {
     general_code: u16,
     protocol_id: u32,
     protocol_code: u16,
+    protocol_data: Vec<u8>,
 }
 impl std::fmt::Display for StatusReportInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -339,14 +340,32 @@ impl StatusReportInfo {
         let general_code = cursor.read_u16::<LittleEndian>()?;
         let protocol_id = cursor.read_u32::<LittleEndian>()?;
         let protocol_code = cursor.read_u16::<LittleEndian>()?;
+        let mut protocol_data = Vec::new();
+        cursor.read_to_end(&mut protocol_data).ok();
         Ok(Self {
             general_code,
             protocol_id,
             protocol_code,
+            protocol_data,
         })
     }
     pub fn is_ok(&self) -> bool {
         self.general_code == 0 && self.protocol_id == 0 && self.protocol_code == 0
+    }
+    pub fn is_busy(&self) -> bool {
+        self.general_code == SecureChannelGeneralCode::Busy as u16
+            && self.protocol_id == ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL as u32
+            && self.protocol_code == SecureChannelProtocolCode::Busy as u16
+    }
+    /// Returns the Minimum Wait Time (ms) from the protocol-specific data of a SC BUSY response.
+    /// Per Matter spec this is u32 LE; some stacks emit u16 -- both are accepted.
+    pub fn minimum_wait_time_ms(&self) -> Option<u32> {
+        if !self.is_busy() { return None; }
+        match self.protocol_data.len() {
+            n if n >= 4 => Some(u32::from_le_bytes(self.protocol_data[..4].try_into().ok()?)),
+            2 => Some(u16::from_le_bytes(self.protocol_data[..2].try_into().ok()?) as u32),
+            _ => None,
+        }
     }
 }
 

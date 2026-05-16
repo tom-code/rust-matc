@@ -188,22 +188,45 @@ impl DeviceManager {
         self.connect_with_rediscovery(node_id, &address).await
     }
 
-    /// Try auth_sigma at the given address; on failure, re-discover via mDNS and retry once.
+    /// Connect with BUSY retry and one round of mDNS rediscovery on non-BUSY failure.
+    /// BUSY handling is delegated to Controller::auth_sigma_with_busy_retry so that
+    /// in-place reauth uses identical retry semantics.
     async fn connect_with_rediscovery(&self, node_id: u64, address: &str) -> Result<controller::Connection> {
-        let conn = self.transport.create_connection(address).await;
-        match self.controller.auth_sigma(&conn, node_id, self.config.controller_id).await {
-            Ok(c) => Ok(c),
+        let mut current_address = address.to_string();
+        // Create connection once and reuse across retries; only replace if address changes.
+        let mut conn = self.transport.create_connection(&current_address).await;
+
+        match self.controller.auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id).await {
+            Ok(ses) => Ok(controller::Connection::from_parts(conn, ses)),
             Err(e) => {
-                log::info!("Connection to {} failed ({}), attempting operational rediscovery...", address, e);
-                let new_address = self.discover_device(node_id, Duration::from_secs(10)).await
-                    .context(format!("rediscovery for node {} after connect failure", node_id))?;
-                let conn = self.transport.create_connection(&new_address).await;
-                self.controller
-                    .auth_sigma(&conn, node_id, self.config.controller_id)
+                // Try operational mDNS rediscovery once, then one more attempt.
+                log::info!(
+                    "Connection to {} failed ({}), attempting operational rediscovery...",
+                    current_address, e
+                );
+                let new_address = self
+                    .discover_device(node_id, Duration::from_secs(10))
                     .await
-                    .context(format!("connection still failed after rediscovery at {}", new_address))
+                    .context(format!("rediscovery for node {} after connect failure", node_id))?;
+                current_address = new_address;
+                conn = self.transport.create_connection(&current_address).await;
+                let ses = self
+                    .controller
+                    .auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id)
+                    .await
+                    .context(format!(
+                        "connection still failed after rediscovery at {}", current_address
+                    ))?;
+                Ok(controller::Connection::from_parts(conn, ses))
             }
         }
+    }
+
+    /// Re-run CASE on an existing controller::Connection without tearing down the
+    /// transport channel. Delegates to Connection::reauth which pauses the read loop,
+    /// calls auth_sigma_with_busy_retry, swaps the session, and restarts the loop.
+    pub async fn reauth(&self, conn: &controller::Connection, node_id: u64) -> Result<()> {
+        conn.reauth(&self.controller, node_id, self.config.controller_id).await
     }
 
     /// Commission a device using a manual pairing code.

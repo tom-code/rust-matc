@@ -99,7 +99,10 @@ impl<'b> RetrContext<'b> {
             let resp = self.connection.receive(RECEIVE_TIMEOUT).await;
             let resp = match resp {
                 Ok(v) => v,
-                Err(_) => {
+                Err(e) => {
+                    if e.downcast_ref::<crate::transport::ConnectionClosed>().is_some() {
+                        return Err(e);
+                    }
                     if let Some(r) = self.to_resend() {
                         self.connection.send(&r).await?;
                     }
