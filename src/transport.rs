@@ -19,8 +19,47 @@ impl std::fmt::Display for ConnectionClosed {
 impl std::error::Error for ConnectionClosed {}
 
 use anyhow::{Context, Result};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{net::UdpSocket, sync::Mutex};
+
+/// Normalize a peer address string so that its address family matches the
+/// local socket. This canonical form is used both as the connection map key
+/// and as the destination for `send_to`, so inbound and outbound paths agree
+/// without per-packet conversion.
+///
+/// * V6 socket + V4 peer  -> V4-mapped V6 (`[::ffff:a.b.c.d]:port`), needed
+///   because the kernel rejects cross-family `sendto` on AF_INET6.
+/// * V4 socket + V4-mapped V6 peer -> plain V4.
+/// * Other combinations are returned unchanged (real V6 on a V4 socket will
+///   fail at `send_to`, which is the correct behavior).
+fn normalize_remote_for_socket(socket: &UdpSocket, remote: &str) -> String {
+    let Ok(parsed) = remote.parse::<SocketAddr>() else {
+        return remote.to_owned();
+    };
+    let Ok(local) = socket.local_addr() else {
+        return parsed.to_string();
+    };
+    let normalized = match (local.is_ipv6(), parsed) {
+        (true, SocketAddr::V4(v4)) => {
+            let mapped = v4.ip().to_ipv6_mapped();
+            SocketAddr::new(IpAddr::V6(mapped), v4.port())
+        }
+        (false, SocketAddr::V6(v6)) => {
+            if let Some(v4) = v6.ip().to_ipv4_mapped() {
+                SocketAddr::new(IpAddr::V4(v4), v6.port())
+            } else {
+                parsed
+            }
+        }
+        _ => parsed,
+    };
+    normalized.to_string()
+}
 
 /// Transport-agnostic connection: send and receive raw Matter messages.
 ///
@@ -143,12 +182,13 @@ impl Transport {
 
     /// Create (or replace) a logical connection entry for the given remote address.
     pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<dyn ConnectionTrait> {
+        let remote = normalize_remote_for_socket(&self.socket, remote);
         let mut clock = self.connections.lock().await;
         let (sender, receiver) = tokio::sync::mpsc::channel(32);
         clock.insert(remote.to_owned(), ConnectionInfo { sender });
         Arc::new(Connection {
             transport: self.clone(),
-            remote_address: remote.to_owned(),
+            remote_address: remote,
             receiver: Mutex::new(receiver),
         })
     }
