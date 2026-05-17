@@ -68,7 +68,7 @@ use std::time::Duration;
 
 use tokio::sync::mpsc::UnboundedReceiver;
 
-use crate::{certmanager, controller, discover, fabric::Fabric, mdns2, onboarding, transport};
+use crate::{certmanager, controller, discover::{self, MatterDeviceInfo}, fabric::Fabric, mdns2, onboarding, transport};
 
 pub struct DeviceManager {
     base_path: String,
@@ -409,6 +409,41 @@ impl DeviceManager {
 
         self.update_device_address(node_id, &address)?;
         Ok(address)
+    }
+
+    pub async fn discover_commissionable_devices(&self, timeout: Duration) -> Result<Vec<(String, MatterDeviceInfo)>> {
+        let mut receiver = self.mdns_receiver.lock().await;
+        self.mdns.active_lookup("_matterc._udp.local", 0xff).await;
+
+        let mut devices = Vec::new();
+        let start = std::time::Instant::now();
+        while start.elapsed() < timeout {
+            let remaining = timeout.checked_sub(start.elapsed()).unwrap_or_default();
+            let event = tokio::time::timeout(remaining, receiver.recv())
+                .await;
+            let event = match event {
+                Ok(e) => e,
+                Err(_) => break, // timeout, stop waiting for more
+            };
+            match event {
+                Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
+                    if svc_name != "_matterc._udp.local." {
+                        continue;
+                    }
+                    let matter_info = match discover::extract_matter_info(&target, &self.mdns).await {
+                        Ok(i) => i,
+                        Err(e) => {
+                            log::debug!("Failed to extract Matter info from {}: {}", target, e);
+                            continue;
+                        }
+                    };
+                    devices.push((target, matter_info));
+                }
+                None => break,
+                _ => {}
+            }
+        }
+        Ok(devices)
     }
 
     /// List all registered devices.

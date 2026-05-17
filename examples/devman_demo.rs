@@ -17,6 +17,9 @@
 ///   # Scan for BLE commissionable devices (requires --features ble):
 ///   cargo run --features ble --example devman_demo -- scan-ble --timeout-secs 5
 ///
+///   # Discover commissionable Matter devices via mDNS:
+///   cargo run --example devman_demo -- -d ./matter-data discover-commissionable --timeout-secs 5
+///
 ///   # List registered devices:
 ///   cargo run --example devman_demo -- -d ./matter-data list
 ///
@@ -34,7 +37,6 @@ use matc::{
     devman::{DeviceManager, ManagerConfig},
     tlv,
 };
-#[cfg(feature = "ble")]
 use std::time::Duration;
 #[cfg(feature = "ble")]
 use matc::{ble, NetworkCreds};
@@ -109,6 +111,12 @@ enum Commands {
     #[cfg(feature = "ble")]
     ScanBle {
         /// Scan duration in seconds
+        #[clap(long, default_value_t = 5)]
+        timeout_secs: u64,
+    },
+    /// Discover commissionable Matter devices via mDNS
+    DiscoverCommissionable {
+        /// Discovery window in seconds
         #[clap(long, default_value_t = 5)]
         timeout_secs: u64,
     },
@@ -350,6 +358,20 @@ async fn main() -> Result<()> {
                              d.discriminator, d.vendor_id, d.product_id,
                              if d.cm_flag { "y" } else { "n" },
                              rssi, name, d.address);
+                }
+            }
+        }
+        Commands::DiscoverCommissionable { timeout_secs } => {
+            let dm = DeviceManager::load(data_dir).await?;
+            println!("Discovering commissionable devices for {}s...", timeout_secs);
+            let devices = dm.discover_commissionable_devices(Duration::from_secs(timeout_secs)).await?;
+            if devices.is_empty() {
+                println!("No commissionable devices found.");
+            } else {
+                println!("{:<20} {:<6} {:<15} IPs", "Name", "Disc", "Device");
+                println!("{}", "-".repeat(70));
+                for (instance, info) in devices {
+                    println!("{:<20} {:<6} {:<15} {:?}", info.name.unwrap_or_default(), info.discriminator.unwrap_or_default(), instance, info.ips);
                 }
             }
         }
