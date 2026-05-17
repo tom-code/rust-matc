@@ -37,28 +37,54 @@ fn base38_val(ch: char) -> Result<u32> {
 
 /// Decode a Base38 string into bytes.
 ///
-/// Matter uses groups of 3 chars for every 2 bytes (little-endian u16), and 2
-/// chars for a trailing single byte.
+/// Per the Matter spec, Base38 encodes input bytes in chunks of 3 bytes → 5
+/// chars (little-endian, char 0 carrying the least-significant base-38 digit).
+/// Trailing groups are: 4 chars → 2 bytes, 2 chars → 1 byte. Any other
+/// trailing length is invalid.
 fn base38_decode(s: &str) -> Result<Vec<u8>> {
+    const CHARS_PER_CHUNK: usize = 5;
+    const BYTES_PER_CHUNK: usize = 3;
+
     let chars: Vec<char> = s.chars().collect();
-    let mut out = Vec::with_capacity(chars.len() * 2 / 3 + 1);
-    let mut i = 0;
-    while i + 2 < chars.len() {
-        let v = base38_val(chars[i])? * 38 * 38
-            + base38_val(chars[i + 1])? * 38
-            + base38_val(chars[i + 2])?;
+    let n = chars.len();
+    let trailing = n % CHARS_PER_CHUNK;
+    let trailing_bytes = match trailing {
+        0 => 0,
+        2 => 1,
+        4 => 2,
+        _ => bail!(
+            "invalid Base38 length {}: trailing chars must be 0, 2, or 4 (mod 5)",
+            n
+        ),
+    };
+
+    let full_chunks = n / CHARS_PER_CHUNK;
+    let mut out = Vec::with_capacity(full_chunks * BYTES_PER_CHUNK + trailing_bytes);
+
+    let decode_group = |chars_slice: &[char]| -> Result<u32> {
+        let mut v: u32 = 0;
+        for c in chars_slice.iter().rev() {
+            v = v * 38 + base38_val(*c)?;
+        }
+        Ok(v)
+    };
+
+    for chunk in 0..full_chunks {
+        let i = chunk * CHARS_PER_CHUNK;
+        let v = decode_group(&chars[i..i + CHARS_PER_CHUNK])?;
         out.push((v & 0xff) as u8);
         out.push(((v >> 8) & 0xff) as u8);
-        i += 3;
+        out.push(((v >> 16) & 0xff) as u8);
     }
-    if i + 1 < chars.len() {
-        let v = base38_val(chars[i])? * 38 + base38_val(chars[i + 1])?;
-        out.push((v & 0xff) as u8);
-        i += 2;
+
+    if trailing > 0 {
+        let i = full_chunks * CHARS_PER_CHUNK;
+        let v = decode_group(&chars[i..i + trailing])?;
+        for b in 0..trailing_bytes {
+            out.push(((v >> (b * 8)) & 0xff) as u8);
+        }
     }
-    if i < chars.len() {
-        bail!("unexpected Base38 input length");
-    }
+
     Ok(out)
 }
 
@@ -68,11 +94,11 @@ fn base38_decode(s: &str) -> Result<Vec<u8>> {
 /// * bits  0- 2 : version (3 bits)
 /// * bits  3-18 : vendor ID (16 bits)
 /// * bits 19-34 : product ID (16 bits)
-/// * bits 35-36 : custom flow (2 bits)
-/// * bits 37-43 : discovery capabilities (7 bits, we use low 3)
-/// * bits 44-55 : discriminator (12 bits)
-/// * bits 56-82 : passcode (27 bits)
-/// * bits 83-87 : padding (5 bits, must be zero)
+/// * bits 35-36 : commissioning flow (2 bits)
+/// * bits 37-44 : discovery capabilities (8 bits)
+/// * bits 45-56 : discriminator (12 bits)
+/// * bits 57-83 : passcode (27 bits)
+/// * bits 84-87 : padding (4 bits, must be zero)
 pub fn decode_qr_payload(qr: &str) -> Result<OnboardingInfo> {
     let payload = qr.trim().strip_prefix("MT:").unwrap_or(qr.trim());
     let bytes = base38_decode(payload).context("base38 decode")?;
@@ -90,9 +116,9 @@ pub fn decode_qr_payload(qr: &str) -> Result<OnboardingInfo> {
     let vendor_id         = ((bits >> 3) & 0xffff) as u16;
     let product_id        = ((bits >> 19) & 0xffff) as u16;
     let _custom_flow      = ((bits >> 35) & 0x3) as u8;
-    let disc_caps         = ((bits >> 37) & 0x7f) as u8;
-    let discriminator     = ((bits >> 44) & 0xfff) as u16;
-    let passcode          = ((bits >> 56) & 0x7ff_ffff) as u32;
+    let disc_caps         = ((bits >> 37) & 0xff) as u8;
+    let discriminator     = ((bits >> 45) & 0xfff) as u16;
+    let passcode          = ((bits >> 57) & 0x7ff_ffff) as u32;
 
     Ok(OnboardingInfo {
         discriminator,
@@ -217,13 +243,28 @@ mod tests {
         println!("Encoded: {}", encoded);
     }
 
+    /// QR from `chip-lighting-app --passcode 123456 --discriminator 100`
+    /// (default vendor 0xFFF1 / product 0x8001).
     #[test]
     pub fn test_qr_decode() {
-        let info = super::decode_qr_payload("MT:00000003E6RM9A201").unwrap();
-        assert_eq!(info.passcode, 20202021, "passcode mismatch");
-        assert_eq!(info.discriminator, 3840, "discriminator mismatch");
-        assert_eq!(info.vendor_id, Some(0));
-        assert_eq!(info.product_id, Some(0));
+        let info = super::decode_qr_payload("MT:-24J04QI14G6Q663000").unwrap();
+        assert_eq!(info.passcode, 123456, "passcode mismatch");
+        assert_eq!(info.discriminator, 100, "discriminator mismatch");
+        assert_eq!(info.vendor_id, Some(0xFFF1));
+        assert_eq!(info.product_id, Some(0x8001));
+        let dc = info.discovery_capabilities.unwrap();
+        assert!(dc.has_on_network());
+    }
+
+    /// Same default vendor/product as `test_qr_decode`, but with
+    /// passcode 123456 and discriminator 4095 (all 12 bits set).
+    #[test]
+    pub fn test_qr_decode2() {
+        let info = super::decode_qr_payload("MT:-24J0SO527LJQ663000").unwrap();
+        assert_eq!(info.passcode, 123456, "passcode mismatch");
+        assert_eq!(info.discriminator, 4095, "discriminator mismatch");
+        assert_eq!(info.vendor_id, Some(0xFFF1));
+        assert_eq!(info.product_id, Some(0x8001));
         let dc = info.discovery_capabilities.unwrap();
         assert!(dc.has_on_network());
     }
