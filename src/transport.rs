@@ -105,7 +105,7 @@ impl Transport {
         self_weak: std::sync::Weak<Transport>,
     ) -> Result<()> {
         loop {
-            let mut buf = vec![0u8; 1024];
+            let mut buf = vec![0u8; 2048];
             let recv_result = {
                 tokio::select! {
                     recv_resp = socket.recv_from(&mut buf) => recv_resp,

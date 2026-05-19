@@ -249,8 +249,13 @@ impl DeviceManager {
         self.mdns.active_lookup("_matterc._udp.local", 0xff).await;
 
         let discovery_timeout = Duration::from_secs(10);
+        let start_time = std::time::Instant::now();
         let (ips, port) = loop {
-            let event = tokio::time::timeout(discovery_timeout, receiver.recv())
+            if start_time.elapsed() > discovery_timeout {
+                anyhow::bail!("timed out waiting for device with discriminator {}", discriminator);
+            }
+            let remaining = discovery_timeout.checked_sub(start_time.elapsed()).unwrap_or_default();
+            let event = tokio::time::timeout(remaining, receiver.recv())
                 .await
                 .map_err(|_| anyhow::anyhow!("timed out waiting for device with discriminator {}", discriminator))?;
             match event {

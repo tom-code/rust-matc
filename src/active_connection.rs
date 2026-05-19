@@ -13,7 +13,7 @@ use crate::{messages::{self, Message, ProtocolMessageHeader}, session::Session, 
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(1);
 const RETRANSMIT_THRESHOLD: Duration = Duration::from_secs(3);
 const MAX_RETRANSMIT_AGE: Duration = Duration::from_secs(10);
-const MAX_CACHED_COUNTERS: usize = 32;
+const MAX_CACHED_COUNTERS: usize = 512;
 
 struct UnackedMessage {
     data: Vec<u8>,
