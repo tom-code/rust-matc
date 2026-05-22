@@ -22,7 +22,10 @@ use anyhow::{Context, Result};
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 use tokio::{net::UdpSocket, sync::Mutex};
@@ -76,6 +79,7 @@ pub trait ConnectionTrait: Send + Sync {
 #[derive(Debug, Clone)]
 struct ConnectionInfo {
     sender: tokio::sync::mpsc::Sender<Vec<u8>>,
+    generation: u64,
 }
 
 /// Shared transport holding:
@@ -86,7 +90,8 @@ struct ConnectionInfo {
 pub struct Transport {
     socket: Arc<UdpSocket>,
     connections: Mutex<HashMap<String, ConnectionInfo>>,
-    remove_channel_sender: tokio::sync::mpsc::UnboundedSender<String>,
+    remove_channel_sender: tokio::sync::mpsc::UnboundedSender<(String, u64)>,
+    next_generation: AtomicU64,
     stop_receive_token: tokio_util::sync::CancellationToken,
 }
 
@@ -96,6 +101,7 @@ pub struct Connection {
     transport: Arc<Transport>,
     remote_address: String,
     receiver: Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>,
+    generation: u64,
 }
 
 impl Transport {
@@ -132,22 +138,27 @@ impl Transport {
     }
 
     async fn read_from_delete_queue_loop(
-        mut remove_channel_receiver: tokio::sync::mpsc::UnboundedReceiver<String>,
+        mut remove_channel_receiver: tokio::sync::mpsc::UnboundedReceiver<(String, u64)>,
         self_weak: std::sync::Weak<Transport>,
     ) -> Result<()> {
         loop {
             let to_remove = remove_channel_receiver.recv().await;
             match to_remove {
-                Some(to_remove) => {
-                    if to_remove.is_empty() {
-                        // Empty string used as sentinel to terminate this task.
-                        break;
-                    }
+                Some((addr, _gen)) if addr.is_empty() => {
+                    // Empty address is the shutdown sentinel.
+                    break;
+                }
+                Some((addr, gen)) => {
                     let self_strong = self_weak
                         .upgrade()
                         .context("weak to self is gone - just stop")?;
                     let mut cons = self_strong.connections.lock().await;
-                    _ = cons.remove(&to_remove);
+                    // Only remove if the entry still belongs to this Connection.
+                    // A concurrent create_connection for the same address inserts a
+                    // newer generation, so the stale remove becomes a no-op.
+                    if cons.get(&addr).map(|c| c.generation) == Some(gen) {
+                        cons.remove(&addr);
+                    }
                 }
                 None => break, // Sender dropped => shutdown
             }
@@ -166,6 +177,7 @@ impl Transport {
             socket: Arc::new(socket),
             connections: Mutex::new(HashMap::new()),
             remove_channel_sender,
+            next_generation: AtomicU64::new(1),
             stop_receive_token,
         });
         let self_weak = Arc::downgrade(&o.clone());
@@ -184,12 +196,14 @@ impl Transport {
     pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<dyn ConnectionTrait> {
         let remote = normalize_remote_for_socket(&self.socket, remote);
         let mut clock = self.connections.lock().await;
+        let generation = self.next_generation.fetch_add(1, Ordering::Relaxed);
         let (sender, receiver) = tokio::sync::mpsc::channel(32);
-        clock.insert(remote.to_owned(), ConnectionInfo { sender });
+        clock.insert(remote.to_owned(), ConnectionInfo { sender, generation });
         Arc::new(Connection {
             transport: self.clone(),
             remote_address: remote,
             receiver: Mutex::new(receiver),
+            generation,
         })
     }
 }
@@ -221,7 +235,7 @@ impl Connection {
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        _ = self.remove_channel_sender.send("".to_owned());
+        _ = self.remove_channel_sender.send(("".to_owned(), 0));
         self.stop_receive_token.cancel();
     }
 }
@@ -241,6 +255,7 @@ impl Drop for Connection {
         _ = self
             .transport
             .remove_channel_sender
-            .send(self.remote_address.clone());
+            .send((self.remote_address.clone(), self.generation));
     }
 }
+
