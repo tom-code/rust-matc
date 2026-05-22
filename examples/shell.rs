@@ -49,7 +49,7 @@ const COMMANDS: &[&str] = &[
     "connect", "connect-all", "disconnect",
     "on", "off", "toggle", "level", "hue",
     "read", "read-all", "clusters", "parts", "invoke",
-    "subscribe", "subscribe-onoff", "unsubscribe", "subscriptions",
+    "subscribe", "subscribe-onoff", "subscribe-all", "unsubscribe", "subscriptions",
     "rename", "remove",
 ];
 
@@ -57,7 +57,7 @@ const COMMANDS: &[&str] = &[
 const DEVICE_COMMANDS: &[&str] = &[
     "on", "off", "toggle", "level", "hue",
     "read", "read-all", "clusters", "parts", "invoke",
-    "subscribe", "subscribe-onoff", "unsubscribe",
+    "subscribe", "subscribe-onoff", "subscribe-all", "unsubscribe",
     "connect", "disconnect", "rename", "remove",
 ];
 
@@ -178,6 +178,8 @@ struct DeviceSubscriptions {
     entries: Arc<Mutex<Vec<SubscriptionEntry>>>,
     /// Background listener task (one per device).
     handle: tokio::task::JoinHandle<()>,
+    /// Set when a wildcard subscribe-all is active. Inner Option = endpoint filter (None = all endpoints).
+    wildcard: Option<Option<u16>>,
 }
 
 struct Shell {
@@ -372,6 +374,7 @@ Matter Interactive Shell — available commands:
     subscribe <device> <endpoint> <cluster> <attr>
                                           Subscribe to any attribute change
     subscribe-onoff <device> [endpoint]   Shorthand: subscribe to OnOff (default ep 1)
+    subscribe-all <device> [endpoint]     Subscribe to all attributes (optionally filtered to one endpoint)
     unsubscribe <device>                  Cancel all subscriptions on a device
     subscriptions                         List all active subscriptions
 
@@ -546,6 +549,9 @@ fn cmd_disconnect(shell: &mut Shell, args: &[String]) -> Result<()> {
         return Ok(());
     }
     let node_id = shell.resolve_node_id(&args[0])?;
+    if let Some(ds) = shell.subscriptions.remove(&node_id) {
+        ds.handle.abort();
+    }
     if shell.connections.remove(&node_id).is_some() {
         println!("Disconnected (node {}).", node_id);
     } else {
@@ -825,6 +831,51 @@ fn decode_attr_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, matc::tl
     out
 }
 
+/// Spawn the background listener task for subscription updates on a device connection.
+fn spawn_listener(
+    conn: Arc<Connection>,
+    device_name: String,
+    entries: Arc<Mutex<Vec<SubscriptionEntry>>>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            let ev = match conn.recv_event().await {
+                Some(e) => e,
+                None => break,
+            };
+            match ev.protocol_header.opcode {
+                matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
+                    for (rep_ep, rep_cl, rep_att, val) in decode_attr_reports(&ev.tlv) {
+                        let lbl = {
+                            let entries = entries.lock().unwrap();
+                            entries.iter()
+                                .find(|e| e.endpoint == rep_ep && e.cluster == rep_cl && e.attr == rep_att)
+                                .map(|e| e.label.clone())
+                                .unwrap_or_else(|| attr_label(rep_cl, rep_att))
+                        };
+                        let json = matc::clusters::codec::decode_attribute_json(rep_cl, rep_att, &val);
+                        println!("[{}] ep{} {} = {}", device_name, rep_ep, lbl, json);
+                    }
+                    let status_flags =
+                        if ev.protocol_header.exchange_flags & matc::messages::ProtocolMessageHeader::FLAG_INITIATOR == 0 {
+                            matc::messages::ProtocolMessageHeader::FLAG_INITIATOR | matc::messages::ProtocolMessageHeader::FLAG_ACK
+                        } else {
+                            matc::messages::ProtocolMessageHeader::FLAG_ACK
+                        };
+                    let _ = conn.im_status_response(ev.protocol_header.exchange_id, status_flags, ev.message_header.message_counter).await;
+                }
+                matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP => {
+                    // periodic heartbeat — ignore
+                }
+                _ => {
+                    log::debug!("[{}] subscription: unhandled opcode 0x{:x}", device_name, ev.protocol_header.opcode);
+                }
+            }
+        }
+        log::debug!("[{}] subscription listener exited", device_name);
+    })
+}
+
 /// Core subscribe logic: subscribe to one attribute, print priming value,
 /// start the background listener if not already running, add entry to list.
 async fn do_subscribe(
@@ -872,42 +923,8 @@ async fn do_subscribe(
     // If first subscription on this device, start the background listener
     if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
         let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
-        let entries_clone = entries.clone();
-        let conn_clone = conn.clone();
-        let device_name = device.to_string();
-        let handle = tokio::spawn(async move {
-            loop {
-                let ev = match conn_clone.recv_event().await {
-                    Some(e) => e,
-                    None => break,
-                };
-                match ev.protocol_header.opcode {
-                    matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
-                        for (rep_ep, rep_cl, rep_att, val) in decode_attr_reports(&ev.tlv) {
-                            let lbl = {
-                                let entries = entries_clone.lock().unwrap();
-                                entries.iter()
-                                    .find(|e| e.endpoint == rep_ep && e.cluster == rep_cl && e.attr == rep_att)
-                                    .map(|e| e.label.clone())
-                                    .unwrap_or_else(|| attr_label(rep_cl, rep_att))
-                            };
-                            let json = matc::clusters::codec::decode_attribute_json(rep_cl, rep_att, &val);
-                            println!("\n[{}] ep{} {} = {}", device_name, rep_ep, lbl, json);
-                        }
-                        // (empty list = keepalive — silent)
-                        let _ = conn_clone.im_status_response(ev.protocol_header.exchange_id, 2, ev.message_header.message_counter).await;
-                    }
-                    matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP => {
-                        // periodic heartbeat — ignore
-                    }
-                    _ => {
-                        log::debug!("[{}] subscription: unhandled opcode 0x{:x}", device_name, ev.protocol_header.opcode);
-                    }
-                }
-            }
-            log::debug!("[{}] subscription listener exited", device_name);
-        });
-        e.insert(DeviceSubscriptions { entries, handle });
+        let handle = spawn_listener(conn, device.to_string(), entries.clone());
+        e.insert(DeviceSubscriptions { entries, handle, wildcard: None });
     }
 
     // Register the new entry
@@ -938,6 +955,56 @@ async fn cmd_subscribe_onoff(shell: &mut Shell, args: &[String]) -> Result<()> {
     let device = args[0].clone();
     let endpoint: u16 = if args.len() > 1 { parse_u16(&args[1])? } else { 1 };
     do_subscribe(shell, &device, endpoint, CLUSTER_ID_ON_OFF, CLUSTER_ON_OFF_ATTR_ID_ONOFF).await
+}
+async fn cmd_subscribe_all(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.is_empty() {
+        println!("usage: subscribe-all <device> [endpoint]");
+        return Ok(());
+    }
+    let device = args[0].clone();
+    let endpoint: Option<u16> = if args.len() > 1 { Some(parse_u16(&args[1])?) } else { None };
+
+    let node_id = shell.resolve_node_id(&device)?;
+    if !shell.connections.contains_key(&node_id) {
+        println!("  connecting to '{}' …", device);
+        let conn = Arc::new(shell.dm.connect(node_id).await?);
+        shell.connections.insert(node_id, conn);
+    }
+    let conn = shell.connections.get(&node_id).unwrap().clone();
+
+    let keep = shell.subscriptions.contains_key(&node_id);
+    let res = conn.im_subscribe_request_attr2(endpoint, None, None, keep).await?;
+
+    if res.protocol_header.opcode != matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
+        println!("unexpected subscribe response opcode 0x{:x}", res.protocol_header.opcode);
+        return Ok(());
+    }
+
+    let priming = decode_attr_reports(&res.tlv);
+    if priming.is_empty() {
+        println!("[{}] wildcard subscribed (no initial values)", device);
+    } else {
+        for (ep, cl, att, val) in &priming {
+            let json = matc::clusters::codec::decode_attribute_json(*cl, *att, val);
+            println!("[{}] ep{} {} = {} (current)", device, ep, attr_label(*cl, *att), json);
+        }
+    }
+
+    conn.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await?;
+
+    if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
+        let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
+        let handle = spawn_listener(conn, device.clone(), entries.clone());
+        e.insert(DeviceSubscriptions { entries, handle, wildcard: Some(endpoint) });
+    } else {
+        shell.subscriptions.get_mut(&node_id).unwrap().wildcard = Some(endpoint);
+    }
+
+    match endpoint {
+        Some(ep) => println!("Subscribed (wildcard ep{}): [{}]. Use 'unsubscribe {}' to stop.", ep, device, device),
+        None     => println!("Subscribed (wildcard all): [{}]. Use 'unsubscribe {}' to stop.", device, device),
+    }
+    Ok(())
 }
 
 async fn cmd_unsubscribe(shell: &mut Shell, args: &[String]) -> Result<()> {
@@ -973,6 +1040,11 @@ fn cmd_subscriptions(shell: &Shell) -> Result<()> {
         for e in entries.iter() {
             println!("  {} (node {}) ep{} {}", name, node_id, e.endpoint, e.label);
         }
+        match ds.wildcard {
+            Some(Some(ep)) => println!("  {} (node {}) ep{} <all attributes>", name, node_id, ep),
+            Some(None)     => println!("  {} (node {}) ep* <all attributes>", name, node_id),
+            None           => {}
+        }
     }
     Ok(())
 }
@@ -988,6 +1060,9 @@ fn cmd_rename(shell: &Shell, args: &[String]) -> Result<()> {
 fn cmd_remove(shell: &mut Shell, args: &[String]) -> Result<()> {
     if args.is_empty() { println!("usage: remove <device>"); return Ok(()); }
     let node_id = shell.resolve_node_id(&args[0])?;
+    if let Some(ds) = shell.subscriptions.remove(&node_id) {
+        ds.handle.abort();
+    }
     shell.connections.remove(&node_id);
     shell.dm.remove_device(node_id)?;
     println!("Removed node {}.", node_id);
@@ -1037,6 +1112,7 @@ async fn dispatch(shell: &mut Shell, tokens: &[String]) -> Result<bool> {
 
         "subscribe" => cmd_subscribe(shell, args).await?,
         "subscribe-onoff" => cmd_subscribe_onoff(shell, args).await?,
+        "subscribe-all" => cmd_subscribe_all(shell, args).await?,
         "unsubscribe" => cmd_unsubscribe(shell, args).await?,
         "subscriptions" => cmd_subscriptions(shell)?,
 

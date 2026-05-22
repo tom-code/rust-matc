@@ -677,7 +677,7 @@ pub fn im_subscribe_request(endpoint: u16, cluster: u32, exchange: u16, event: u
 /// Build a SubscribeRequest for an attribute path (AttributeRequests, tag 3).
 /// `keep_subscriptions`: if true the device keeps existing subscriptions alive;
 /// if false the device cancels all prior subscriptions before creating this one.
-pub fn im_subscribe_request_attr(endpoint: u16, cluster: u32, attr: u32, exchange: u16, keep_subscriptions: bool) -> Result<Vec<u8>> {
+pub fn im_subscribe_request_attr(endpoint: Option<u16>, cluster: Option<u32>, attr: Option<u32>, exchange: u16, keep_subscriptions: bool) -> Result<Vec<u8>> {
     let b = ProtocolMessageHeader {
         exchange_flags: 5,
         opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ,
@@ -695,9 +695,15 @@ pub fn im_subscribe_request_attr(endpoint: u16, cluster: u32, attr: u32, exchang
     tlv.write_array(3)?;            // AttributeRequests
 
     tlv.write_anon_list()?;
-    tlv.write_uint16(2, endpoint)?;
-    tlv.write_uint32(3, cluster)?;
-    tlv.write_uint32(4, attr)?;
+    if let Some(endpoint) = endpoint {
+        tlv.write_uint16(2, endpoint)?;
+    }
+    if let Some(cluster) = cluster {
+        tlv.write_uint32(3, cluster)?;
+    }
+    if let Some(attr) = attr {
+        tlv.write_uint32(4, attr)?;
+    }
 
     tlv.write_struct_end()?;        // end AttributePathIB
     tlv.write_struct_end()?;        // end AttributeRequests array

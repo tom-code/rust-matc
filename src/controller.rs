@@ -435,6 +435,26 @@ impl Connection {
             "im_subscribe_request_attr exch:{} endpoint:{} cluster:{} attr:{} keep:{}",
             exchange, endpoint, cluster, attr, keep_subscriptions
         );
+        let msg = messages::im_subscribe_request_attr(
+            Some(endpoint),
+            Some(cluster),
+            Some(attr),
+            exchange,
+            keep_subscriptions)?;
+        self.active.request(exchange, &msg).await
+    }
+    pub async fn im_subscribe_request_attr2(
+        &self,
+        endpoint: Option<u16>,
+        cluster: Option<u32>,
+        attr: Option<u32>,
+        keep_subscriptions: bool,
+    ) -> Result<Message> {
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "im_subscribe_request_attr exch:{} endpoint:{:?} cluster:{:?} attr:{:?} keep:{}",
+            exchange, endpoint, cluster, attr, keep_subscriptions
+        );
         let msg = messages::im_subscribe_request_attr(endpoint, cluster, attr, exchange, keep_subscriptions)?;
         self.active.request(exchange, &msg).await
     }
