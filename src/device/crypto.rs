@@ -56,8 +56,7 @@ impl Device {
                 Ok(id) => id,
                 Err(_) => continue,
             };
-            let mut fab = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key);
-            fab.ipk_epoch_key = fi.ipk.clone();
+            let fab = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key, &fi.ipk);
             if sigma::verify_destination_id(
                 initiator_random,
                 received_destination_id,

@@ -85,7 +85,7 @@ impl Device {
         let ca_public_key = fi.ca_public_key()?;
         let fabric_id = fi.fabric_id()?;
         let ca_id = fi.ca_id()?;
-        let fabric = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key);
+        let fabric = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key, &fi.ipk);
 
         let iname = format!(
             "{}-{:016X}",

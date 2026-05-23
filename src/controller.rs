@@ -47,7 +47,12 @@ impl Controller {
         transport: &Arc<transport::Transport>,
         fabric_id: u64,
     ) -> Result<Arc<Self>> {
-        let fabric = fabric::Fabric::new(fabric_id, CA_ID, &certmanager.get_ca_public_key()?);
+        let fabric = fabric::Fabric::new(
+            fabric_id,
+            CA_ID,
+            &certmanager.get_ca_public_key()?,
+            &certmanager.get_ipk_epoch_key(),
+        );
         Ok(Arc::new(Self {
             certmanager: certmanager.clone(),
             transport: transport.clone(),
@@ -199,7 +204,7 @@ impl Controller {
 
         // 5. Rediscover device via operational mDNS
         let ca_pubkey = self.certmanager.get_ca_public_key()?;
-        let fabric_tmp = fabric::Fabric::new(self.fabric.id, 0, &ca_pubkey);
+        let fabric_tmp = fabric::Fabric::new(self.fabric.id, 0, &ca_pubkey, &self.certmanager.get_ipk_epoch_key());
         let compressed = fabric_tmp.compressed().context("compressed fabric ID")?;
         let instance = format!("{}-{:016X}", hex::encode_upper(&compressed), node_id);
         let expected_target = format!("{}._matter._tcp.local.", instance);

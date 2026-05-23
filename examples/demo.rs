@@ -259,7 +259,7 @@ fn discover_cmd(discover: DiscoverCommand, timeout: u64, cert_path: String) {
         DiscoverCommand::Commissioned2 { device_id } => runtime.block_on(async {
             let device_str = if let Some(device_id) = device_id {
                 let cm: Arc<dyn certmanager::CertManager> = certmanager::FileCertManager::load(&cert_path).unwrap();
-                let fabric = matc::fabric::Fabric::new(cm.get_fabric_id(), 1, &cm.get_ca_public_key().unwrap());
+                let fabric = matc::fabric::Fabric::new(cm.get_fabric_id(), 1, &cm.get_ca_public_key().unwrap(), &cm.get_ipk_epoch_key());
                 let c = fabric.compressed().unwrap();
                 Some(format!("{}-{:016X}", hex::encode(c).to_uppercase(), device_id))
             } else {

@@ -10,10 +10,16 @@ pub struct Fabric {
 }
 
 impl Fabric {
-    pub fn new(fabric_id: u64, ca_id: u64, ca_public_key: &[u8]) -> Self {
+    /// Create a new Fabric.
+    ///
+    /// `ipk_epoch_key` is the 16-byte IPK epoch key for this fabric. On the controller side it
+    /// should come from [`certmanager::CertManager::get_ipk_epoch_key`] (generated at bootstrap
+    /// and persisted in `metadata.json`). On the device side it is supplied by the controller
+    /// via AddNOC and stored in `FabricInfo.ipk`.
+    pub fn new(fabric_id: u64, ca_id: u64, ca_public_key: &[u8], ipk_epoch_key: &[u8]) -> Self {
         Self {
             id: fabric_id,
-            ipk_epoch_key: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf],
+            ipk_epoch_key: ipk_epoch_key.to_owned(),
             ca_id,
             ca_public_key: ca_public_key.to_owned(),
         }

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::{cert_x509, util::cryptoutil};
 
@@ -13,32 +14,66 @@ pub trait CertManager: Send + Sync {
     fn get_user_cert(&self, id: u64) -> Result<Vec<u8>>;
     fn get_user_key(&self, id: u64) -> Result<p256::SecretKey>;
     fn get_fabric_id(&self) -> u64;
+    fn get_ipk_epoch_key(&self) -> Vec<u8>;
 }
 
 /// Example implementation of [CertManager] trait.
 /// It stores keys and certificates in PEM files in specified directory.
 pub struct FileCertManager {
     fabric_id: u64,
+    ipk_epoch_key: Vec<u8>,
     path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Metadata {
+    fabric_id: String,
+    ipk_epoch_key: String,
 }
 
 impl FileCertManager {
     pub fn new(fabric_id: u64, path: &str) -> Arc<Self> {
+        let ipk_epoch_key: [u8; 16] = rand::random();
         Arc::new(Self {
             fabric_id,
+            ipk_epoch_key: ipk_epoch_key.to_vec(),
             path: path.to_owned(),
         })
     }
+
+    /// Load an existing CA identity from `path`.
+    ///
+    /// Reads `metadata.json` (fabric_id + ipk_epoch_key) if present.
+    /// Falls back to legacy `metadata.pem` (fabric_id only, hardcoded IPK)
+    /// so identities bootstrapped before this change keep working.
     pub fn load(path: &str) -> Result<Arc<Self>> {
-        let fname = format!("{}/metadata.pem", path);
-        let fabric_str =
-            std::fs::read_to_string(&fname).context(format!("can't read from {}", fname))?;
-        let fabric_id = fabric_str.parse::<u64>()?;
+        let json_path = format!("{}/metadata.json", path);
+        let pem_path = format!("{}/metadata.pem", path);
+
+        let (fabric_id, ipk_epoch_key) = if std::path::Path::new(&json_path).exists() {
+            let s = std::fs::read_to_string(&json_path)
+                .context(format!("can't read from {}", json_path))?;
+            let m: Metadata = serde_json::from_str(&s)
+                .context(format!("invalid JSON in {}", json_path))?;
+            let fid = m.fabric_id.parse::<u64>()
+                .context("invalid fabric_id in metadata.json")?;
+            let ipk = hex::decode(&m.ipk_epoch_key)
+                .context("invalid ipk_epoch_key hex in metadata.json")?;
+            (fid, ipk)
+        } else {
+            let s = std::fs::read_to_string(&pem_path)
+                .context(format!("can't read from {}", pem_path))?;
+            let fid = s.trim().parse::<u64>()?;
+            (fid, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf])
+        };
+
         Ok(Arc::new(Self {
             fabric_id,
+            ipk_epoch_key,
             path: path.to_owned(),
         }))
     }
+
     fn user_key_fname(&self, id: u64) -> String {
         format!("{}/{}-private.pem", self.path, id)
     }
@@ -51,8 +86,8 @@ impl FileCertManager {
     fn ca_cert_fname(&self) -> String {
         format!("{}/ca-cert.pem", self.path)
     }
-    fn metadata_fname(&self) -> String {
-        format!("{}/metadata.pem", self.path)
+    fn metadata_json_fname(&self) -> String {
+        format!("{}/metadata.json", self.path)
     }
 }
 
@@ -75,6 +110,7 @@ const CA_NODE_ID: u64 = 1;
 
 impl FileCertManager {
     /// Initialize CA. Create directory, generate CA key and certificate and store them in specified directory.
+    /// Also writes `metadata.json` with the fabric_id and a randomly generated IPK epoch key.
     /// Directory must not exist before calling this function. If it exists function will fail.
     pub fn bootstrap(&self) -> Result<()> {
         std::fs::create_dir(&self.path)?;
@@ -94,7 +130,14 @@ impl FileCertManager {
             true,
         )?;
         cryptoutil::write_pem("CERTIFICATE", &x509, &self.ca_cert_fname())?;
-        std::fs::write(self.metadata_fname(), format!("{}", self.fabric_id))?;
+        let metadata = Metadata {
+            fabric_id: format!("{}", self.fabric_id),
+            ipk_epoch_key: hex::encode(&self.ipk_epoch_key),
+        };
+        std::fs::write(
+            self.metadata_json_fname(),
+            serde_json::to_string_pretty(&metadata)?,
+        )?;
         Ok(())
     }
 
@@ -144,5 +187,9 @@ impl CertManager for FileCertManager {
 
     fn get_fabric_id(&self) -> u64 {
         self.fabric_id
+    }
+
+    fn get_ipk_epoch_key(&self) -> Vec<u8> {
+        self.ipk_epoch_key.clone()
     }
 }

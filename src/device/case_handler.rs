@@ -52,8 +52,7 @@ impl Device {
             device_node_id
         );
 
-        let mut fabric = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key);
-        fabric.ipk_epoch_key = ipk;
+        let fabric = fabric::Fabric::new(fabric_id, ca_id, &ca_public_key, &ipk);
 
         let sigma2_ctx = sigma::sigma2_respond(
             &fabric,

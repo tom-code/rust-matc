@@ -365,7 +365,7 @@ impl DeviceManager {
     /// Updates the stored address in the registry and returns the new address.
     pub async fn discover_device(&self, node_id: u64, timeout: Duration) -> Result<String> {
         let ca_public_key = self.certmanager.get_ca_public_key()?;
-        let fabric = Fabric::new(self.config.fabric_id, 0, &ca_public_key);
+        let fabric = Fabric::new(self.config.fabric_id, 0, &ca_public_key, &self.certmanager.get_ipk_epoch_key());
         let compressed = fabric.compressed().context("computing compressed fabric ID")?;
         let instance_name = format!("{}-{:016X}", hex::encode_upper(&compressed), node_id);
         let expected_target = format!("{}._matter._tcp.local.", instance_name);

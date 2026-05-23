@@ -342,7 +342,8 @@ mod tests {
         // Setup CA keypair and fabric
         let ca_secret_key = p256::SecretKey::random(&mut rand::thread_rng());
         let ca_public_key = ca_secret_key.public_key().to_sec1_bytes();
-          let fabric = fabric::Fabric::new(FABRIC_ID, CA_NODE_ID, &ca_public_key);
+        let test_ipk = [0u8; 16];
+        let fabric = fabric::Fabric::new(FABRIC_ID, CA_NODE_ID, &ca_public_key, &test_ipk);
 
         // Step 1: Generate sigma1 (initiator)
         let mut ctx = SigmaContext::new(NODE_ID);
