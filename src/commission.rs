@@ -14,7 +14,6 @@ const CMD_OPERATIONAL_CSRREQUEST: u32 = 0x4;
 //const CMD_OPERATIONAL_CERTCHAIN_REQUEST: u32 = 0x2;
 
 const CLUSTER_GENERAL_COMMISSIONING: u32 = 0x30;
-#[cfg(feature = "ble")]
 const CMD_GENERAL_COMMISSIONING_ARMFAILSAFE: u32 = 0;
 //const CMD_GENERAL_COMMISSIONING_SETREGULATORYCONFIG: u32 = 2;
 const CMD_GENERAL_COMMISSIONING_COMMISSIONINGCOMPLETE: u32 = 4;
@@ -287,18 +286,19 @@ pub(crate) async fn commission(
     let mut retrctx = retransmit::RetrContext::new(connection, session);
     let base: u16 = rand::random();
 
-    let csrd = send_csr(&mut retrctx, base).await?;
+    arm_failsafe(&mut retrctx, 60, base).await?;
 
-    push_ca_cert(&mut retrctx, cm, base.wrapping_add(1)).await?;
+    let csrd = send_csr(&mut retrctx, base.wrapping_add(1)).await?;
 
-    push_device_cert(&mut retrctx, cm, csrd, node_id, controller_id, fabric, base.wrapping_add(2)).await?;
+    push_ca_cert(&mut retrctx, cm, base.wrapping_add(2)).await?;
+
+    push_device_cert(&mut retrctx, cm, csrd, node_id, controller_id, fabric, base.wrapping_add(3)).await?;
 
     let ses = commissioning_complete(connection, cm, node_id, controller_id, fabric).await?;
 
     Ok(ses)
 }
 
-#[cfg(feature = "ble")]
 async fn arm_failsafe(
     retrctx: &mut retransmit::RetrContext<'_>,
     timeout_secs: u16,
