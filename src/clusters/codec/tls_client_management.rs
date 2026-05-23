@@ -59,49 +59,49 @@ impl From<StatusCode> for u8 {
 
 #[derive(Debug, serde::Serialize)]
 pub struct TLSEndpoint {
-    pub endpoint_id: Option<u8>,
+    pub endpoint_id: Option<u16>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub hostname: Option<Vec<u8>>,
     pub port: Option<u16>,
-    pub caid: Option<u8>,
-    pub ccdid: Option<u8>,
+    pub caid: Option<u16>,
+    pub ccdid: Option<u16>,
     pub reference_count: Option<u8>,
 }
 
 // Command encoders
 
 /// Encode ProvisionEndpoint command (0x00)
-pub fn encode_provision_endpoint(hostname: Vec<u8>, port: u16, caid: u8, ccdid: Option<u8>, endpoint_id: Option<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_provision_endpoint(hostname: Vec<u8>, port: u16, caid: u16, ccdid: Option<u16>, endpoint_id: Option<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::OctetString(hostname)).into(),
         (1, tlv::TlvItemValueEnc::UInt16(port)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(caid)).into(),
-        (3, tlv::TlvItemValueEnc::UInt8(ccdid.unwrap_or(0))).into(),
-        (4, tlv::TlvItemValueEnc::UInt8(endpoint_id.unwrap_or(0))).into(),
+        (2, tlv::TlvItemValueEnc::UInt16(caid)).into(),
+        (3, tlv::TlvItemValueEnc::UInt16(ccdid.unwrap_or(0))).into(),
+        (4, tlv::TlvItemValueEnc::UInt16(endpoint_id.unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode FindEndpoint command (0x02)
-pub fn encode_find_endpoint(endpoint_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_find_endpoint(endpoint_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(endpoint_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(endpoint_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode RemoveEndpoint command (0x04)
-pub fn encode_remove_endpoint(endpoint_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_endpoint(endpoint_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(endpoint_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(endpoint_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -124,11 +124,11 @@ pub fn decode_provisioned_endpoints(inp: &tlv::TlvItemValue) -> anyhow::Result<V
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(TLSEndpoint {
-                endpoint_id: item.get_int(&[0]).map(|v| v as u8),
+                endpoint_id: item.get_int(&[0]).map(|v| v as u16),
                 hostname: item.get_octet_string_owned(&[1]),
                 port: item.get_int(&[2]).map(|v| v as u16),
-                caid: item.get_int(&[3]).map(|v| v as u8),
-                ccdid: item.get_int(&[4]).map(|v| v as u8),
+                caid: item.get_int(&[3]).map(|v| v as u16),
+                ccdid: item.get_int(&[4]).map(|v| v as u16),
                 reference_count: item.get_int(&[5]).map(|v| v as u8),
             });
         }
@@ -206,15 +206,15 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
         0x00 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "hostname", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "port", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 2, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 3, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
-            crate::clusters::codec::CommandField { tag: 4, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "caid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "ccdid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 4, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
         ]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         _ => None,
     }
@@ -225,17 +225,17 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x00 => {
         let hostname = crate::clusters::codec::json_util::get_octstr(args, "hostname")?;
         let port = crate::clusters::codec::json_util::get_u16(args, "port")?;
-        let caid = crate::clusters::codec::json_util::get_u8(args, "caid")?;
-        let ccdid = crate::clusters::codec::json_util::get_opt_u8(args, "ccdid")?;
-        let endpoint_id = crate::clusters::codec::json_util::get_opt_u8(args, "endpoint_id")?;
+        let caid = crate::clusters::codec::json_util::get_u16(args, "caid")?;
+        let ccdid = crate::clusters::codec::json_util::get_opt_u16(args, "ccdid")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_opt_u16(args, "endpoint_id")?;
         encode_provision_endpoint(hostname, port, caid, ccdid, endpoint_id)
         }
         0x02 => {
-        let endpoint_id = crate::clusters::codec::json_util::get_u8(args, "endpoint_id")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
         encode_find_endpoint(endpoint_id)
         }
         0x04 => {
-        let endpoint_id = crate::clusters::codec::json_util::get_u8(args, "endpoint_id")?;
+        let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
         encode_remove_endpoint(endpoint_id)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -244,7 +244,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 
 #[derive(Debug, serde::Serialize)]
 pub struct ProvisionEndpointResponse {
-    pub endpoint_id: Option<u8>,
+    pub endpoint_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -259,7 +259,7 @@ pub fn decode_provision_endpoint_response(inp: &tlv::TlvItemValue) -> anyhow::Re
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ProvisionEndpointResponse {
-                endpoint_id: item.get_int(&[0]).map(|v| v as u8),
+                endpoint_id: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -276,11 +276,11 @@ pub fn decode_find_endpoint_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
                         if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 0, value: nested_tlv.clone() };
                             Some(TLSEndpoint {
-                endpoint_id: nested_item.get_int(&[0]).map(|v| v as u8),
+                endpoint_id: nested_item.get_int(&[0]).map(|v| v as u16),
                 hostname: nested_item.get_octet_string_owned(&[1]),
                 port: nested_item.get_int(&[2]).map(|v| v as u16),
-                caid: nested_item.get_int(&[3]).map(|v| v as u8),
-                ccdid: nested_item.get_int(&[4]).map(|v| v as u8),
+                caid: nested_item.get_int(&[3]).map(|v| v as u16),
+                ccdid: nested_item.get_int(&[4]).map(|v| v as u16),
                 reference_count: nested_item.get_int(&[5]).map(|v| v as u8),
                             })
                         } else {
@@ -299,19 +299,19 @@ pub fn decode_find_endpoint_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
 // Typed facade (invokes + reads)
 
 /// Invoke `ProvisionEndpoint` command on cluster `TLS Client Management`.
-pub async fn provision_endpoint(conn: &crate::controller::Connection, endpoint: u16, hostname: Vec<u8>, port: u16, caid: u8, ccdid: Option<u8>, endpoint_id: Option<u8>) -> anyhow::Result<ProvisionEndpointResponse> {
+pub async fn provision_endpoint(conn: &crate::controller::Connection, endpoint: u16, hostname: Vec<u8>, port: u16, caid: u16, ccdid: Option<u16>, endpoint_id: Option<u16>) -> anyhow::Result<ProvisionEndpointResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_CMD_ID_PROVISIONENDPOINT, &encode_provision_endpoint(hostname, port, caid, ccdid, endpoint_id)?).await?;
     decode_provision_endpoint_response(&tlv)
 }
 
 /// Invoke `FindEndpoint` command on cluster `TLS Client Management`.
-pub async fn find_endpoint(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u8) -> anyhow::Result<FindEndpointResponse> {
+pub async fn find_endpoint(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u16) -> anyhow::Result<FindEndpointResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_CMD_ID_FINDENDPOINT, &encode_find_endpoint(endpoint_id)?).await?;
     decode_find_endpoint_response(&tlv)
 }
 
 /// Invoke `RemoveEndpoint` command on cluster `TLS Client Management`.
-pub async fn remove_endpoint(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u8) -> anyhow::Result<()> {
+pub async fn remove_endpoint(conn: &crate::controller::Connection, endpoint: u16, endpoint_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CLIENT_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CLIENT_MANAGEMENT_CMD_ID_REMOVEENDPOINT, &encode_remove_endpoint(endpoint_id)?).await?;
     Ok(())
 }

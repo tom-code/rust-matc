@@ -149,6 +149,10 @@ impl From<ProductFinish> for u8 {
 pub struct CapabilityMinima {
     pub case_sessions_per_fabric: Option<u16>,
     pub subscriptions_per_fabric: Option<u16>,
+    pub simultaneous_invocations_supported: Option<u16>,
+    pub simultaneous_writes_supported: Option<u16>,
+    pub read_paths_supported: Option<u16>,
+    pub subscribe_paths_supported: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -352,6 +356,10 @@ pub fn decode_capability_minima(inp: &tlv::TlvItemValue) -> anyhow::Result<Capab
         Ok(CapabilityMinima {
                 case_sessions_per_fabric: item.get_int(&[0]).map(|v| v as u16),
                 subscriptions_per_fabric: item.get_int(&[1]).map(|v| v as u16),
+                simultaneous_invocations_supported: item.get_int(&[2]).map(|v| v as u16),
+                simultaneous_writes_supported: item.get_int(&[3]).map(|v| v as u16),
+                read_paths_supported: item.get_int(&[4]).map(|v| v as u16),
+                subscribe_paths_supported: item.get_int(&[5]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))

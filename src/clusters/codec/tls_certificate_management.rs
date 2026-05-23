@@ -17,14 +17,14 @@ use crate::clusters::helpers::{serialize_opt_bytes_as_hex, serialize_opt_vec_byt
 
 #[derive(Debug, serde::Serialize)]
 pub struct TLSCert {
-    pub caid: Option<u8>,
+    pub caid: Option<u16>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub certificate: Option<Vec<u8>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct TLSClientCertificateDetail {
-    pub ccdid: Option<u8>,
+    pub ccdid: Option<u16>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub client_certificate: Option<Vec<u8>>,
     #[serde(serialize_with = "serialize_opt_vec_bytes_as_hex")]
@@ -34,23 +34,23 @@ pub struct TLSClientCertificateDetail {
 // Command encoders
 
 /// Encode ProvisionRootCertificate command (0x00)
-pub fn encode_provision_root_certificate(certificate: Vec<u8>, caid: Option<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_provision_root_certificate(certificate: Vec<u8>, caid: Option<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::OctetString(certificate)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(caid.unwrap_or(0))).into(),
+        (1, tlv::TlvItemValueEnc::UInt16(caid.unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode FindRootCertificate command (0x02)
-pub fn encode_find_root_certificate(caid: Option<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_find_root_certificate(caid: Option<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(caid.unwrap_or(0))).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(caid.unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -68,34 +68,34 @@ pub fn encode_lookup_root_certificate(fingerprint: Vec<u8>) -> anyhow::Result<Ve
 }
 
 /// Encode RemoveRootCertificate command (0x06)
-pub fn encode_remove_root_certificate(caid: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_root_certificate(caid: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(caid)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(caid)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode ClientCSR command (0x07)
-pub fn encode_client_csr(nonce: Vec<u8>, ccdid: Option<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_client_csr(nonce: Vec<u8>, ccdid: Option<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::OctetString(nonce)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(ccdid.unwrap_or(0))).into(),
+        (1, tlv::TlvItemValueEnc::UInt16(ccdid.unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode ProvisionClientCertificate command (0x09)
-pub fn encode_provision_client_certificate(ccdid: u8, client_certificate: Vec<u8>, intermediate_certificates: Vec<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_provision_client_certificate(ccdid: u16, client_certificate: Vec<u8>, intermediate_certificates: Vec<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(ccdid)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(ccdid)).into(),
         (1, tlv::TlvItemValueEnc::OctetString(client_certificate)).into(),
         (2, tlv::TlvItemValueEnc::StructAnon(intermediate_certificates.into_iter().map(|v| (0, tlv::TlvItemValueEnc::OctetString(v)).into()).collect())).into(),
         ]),
@@ -104,11 +104,11 @@ pub fn encode_provision_client_certificate(ccdid: u8, client_certificate: Vec<u8
 }
 
 /// Encode FindClientCertificate command (0x0A)
-pub fn encode_find_client_certificate(ccdid: Option<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_find_client_certificate(ccdid: Option<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(ccdid.unwrap_or(0))).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(ccdid.unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -126,11 +126,11 @@ pub fn encode_lookup_client_certificate(fingerprint: Vec<u8>) -> anyhow::Result<
 }
 
 /// Encode RemoveClientCertificate command (0x0E)
-pub fn encode_remove_client_certificate(ccdid: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_client_certificate(ccdid: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(ccdid)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(ccdid)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -153,7 +153,7 @@ pub fn decode_provisioned_root_certificates(inp: &tlv::TlvItemValue) -> anyhow::
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(TLSCert {
-                caid: item.get_int(&[0]).map(|v| v as u8),
+                caid: item.get_int(&[0]).map(|v| v as u16),
                 certificate: item.get_octet_string_owned(&[1]),
             });
         }
@@ -176,7 +176,7 @@ pub fn decode_provisioned_client_certificates(inp: &tlv::TlvItemValue) -> anyhow
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(TLSClientCertificateDetail {
-                ccdid: item.get_int(&[0]).map(|v| v as u8),
+                ccdid: item.get_int(&[0]).map(|v| v as u16),
                 client_certificate: item.get_octet_string_owned(&[1]),
                 intermediate_certificates: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[2]) {
@@ -287,34 +287,34 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
     match cmd_id {
         0x00 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "certificate", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 1, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "caid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
         ]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 0, name: "caid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
         ]),
         0x04 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "fingerprint", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
         ]),
         0x06 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "caid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "caid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x07 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "nonce", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 1, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 1, name: "ccdid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
         ]),
         0x09 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "client_certificate", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "intermediate_certificates", kind: crate::clusters::codec::FieldKind::List { entry_type: "octstr" }, optional: false, nullable: false },
         ]),
         0x0A => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
         ]),
         0x0C => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "fingerprint", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
         ]),
         0x0E => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "ccdid", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         _ => None,
     }
@@ -324,11 +324,11 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => {
         let certificate = crate::clusters::codec::json_util::get_octstr(args, "certificate")?;
-        let caid = crate::clusters::codec::json_util::get_opt_u8(args, "caid")?;
+        let caid = crate::clusters::codec::json_util::get_opt_u16(args, "caid")?;
         encode_provision_root_certificate(certificate, caid)
         }
         0x02 => {
-        let caid = crate::clusters::codec::json_util::get_opt_u8(args, "caid")?;
+        let caid = crate::clusters::codec::json_util::get_opt_u16(args, "caid")?;
         encode_find_root_certificate(caid)
         }
         0x04 => {
@@ -336,17 +336,17 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_lookup_root_certificate(fingerprint)
         }
         0x06 => {
-        let caid = crate::clusters::codec::json_util::get_u8(args, "caid")?;
+        let caid = crate::clusters::codec::json_util::get_u16(args, "caid")?;
         encode_remove_root_certificate(caid)
         }
         0x07 => {
         let nonce = crate::clusters::codec::json_util::get_octstr(args, "nonce")?;
-        let ccdid = crate::clusters::codec::json_util::get_opt_u8(args, "ccdid")?;
+        let ccdid = crate::clusters::codec::json_util::get_opt_u16(args, "ccdid")?;
         encode_client_csr(nonce, ccdid)
         }
         0x09 => Err(anyhow::anyhow!("command \"ProvisionClientCertificate\" has complex args: use raw mode")),
         0x0A => {
-        let ccdid = crate::clusters::codec::json_util::get_opt_u8(args, "ccdid")?;
+        let ccdid = crate::clusters::codec::json_util::get_opt_u16(args, "ccdid")?;
         encode_find_client_certificate(ccdid)
         }
         0x0C => {
@@ -354,7 +354,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_lookup_client_certificate(fingerprint)
         }
         0x0E => {
-        let ccdid = crate::clusters::codec::json_util::get_u8(args, "ccdid")?;
+        let ccdid = crate::clusters::codec::json_util::get_u16(args, "ccdid")?;
         encode_remove_client_certificate(ccdid)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -363,7 +363,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 
 #[derive(Debug, serde::Serialize)]
 pub struct ProvisionRootCertificateResponse {
-    pub caid: Option<u8>,
+    pub caid: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -373,12 +373,12 @@ pub struct FindRootCertificateResponse {
 
 #[derive(Debug, serde::Serialize)]
 pub struct LookupRootCertificateResponse {
-    pub caid: Option<u8>,
+    pub caid: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct ClientCSRResponse {
-    pub ccdid: Option<u8>,
+    pub ccdid: Option<u16>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub csr: Option<Vec<u8>>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
@@ -392,7 +392,7 @@ pub struct FindClientCertificateResponse {
 
 #[derive(Debug, serde::Serialize)]
 pub struct LookupClientCertificateResponse {
-    pub ccdid: Option<u8>,
+    pub ccdid: Option<u16>,
 }
 
 // Command response decoders
@@ -402,7 +402,7 @@ pub fn decode_provision_root_certificate_response(inp: &tlv::TlvItemValue) -> an
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ProvisionRootCertificateResponse {
-                caid: item.get_int(&[0]).map(|v| v as u8),
+                caid: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -419,7 +419,7 @@ pub fn decode_find_root_certificate_response(inp: &tlv::TlvItemValue) -> anyhow:
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TLSCert {
-                caid: list_item.get_int(&[0]).map(|v| v as u8),
+                caid: list_item.get_int(&[0]).map(|v| v as u16),
                 certificate: list_item.get_octet_string_owned(&[1]),
                             });
                         }
@@ -439,7 +439,7 @@ pub fn decode_lookup_root_certificate_response(inp: &tlv::TlvItemValue) -> anyho
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(LookupRootCertificateResponse {
-                caid: item.get_int(&[0]).map(|v| v as u8),
+                caid: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -451,7 +451,7 @@ pub fn decode_client_csr_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Cli
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ClientCSRResponse {
-                ccdid: item.get_int(&[0]).map(|v| v as u8),
+                ccdid: item.get_int(&[0]).map(|v| v as u16),
                 csr: item.get_octet_string_owned(&[1]),
                 nonce_signature: item.get_octet_string_owned(&[2]),
         })
@@ -470,7 +470,7 @@ pub fn decode_find_client_certificate_response(inp: &tlv::TlvItemValue) -> anyho
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TLSClientCertificateDetail {
-                ccdid: list_item.get_int(&[0]).map(|v| v as u8),
+                ccdid: list_item.get_int(&[0]).map(|v| v as u16),
                 client_certificate: list_item.get_octet_string_owned(&[1]),
                 intermediate_certificates: {
                     if let Some(tlv::TlvItemValue::List(l)) = list_item.get(&[2]) {
@@ -498,7 +498,7 @@ pub fn decode_lookup_client_certificate_response(inp: &tlv::TlvItemValue) -> any
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(LookupClientCertificateResponse {
-                ccdid: item.get_int(&[0]).map(|v| v as u8),
+                ccdid: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -508,13 +508,13 @@ pub fn decode_lookup_client_certificate_response(inp: &tlv::TlvItemValue) -> any
 // Typed facade (invokes + reads)
 
 /// Invoke `ProvisionRootCertificate` command on cluster `TLS Certificate Management`.
-pub async fn provision_root_certificate(conn: &crate::controller::Connection, endpoint: u16, certificate: Vec<u8>, caid: Option<u8>) -> anyhow::Result<ProvisionRootCertificateResponse> {
+pub async fn provision_root_certificate(conn: &crate::controller::Connection, endpoint: u16, certificate: Vec<u8>, caid: Option<u16>) -> anyhow::Result<ProvisionRootCertificateResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_PROVISIONROOTCERTIFICATE, &encode_provision_root_certificate(certificate, caid)?).await?;
     decode_provision_root_certificate_response(&tlv)
 }
 
 /// Invoke `FindRootCertificate` command on cluster `TLS Certificate Management`.
-pub async fn find_root_certificate(conn: &crate::controller::Connection, endpoint: u16, caid: Option<u8>) -> anyhow::Result<FindRootCertificateResponse> {
+pub async fn find_root_certificate(conn: &crate::controller::Connection, endpoint: u16, caid: Option<u16>) -> anyhow::Result<FindRootCertificateResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_FINDROOTCERTIFICATE, &encode_find_root_certificate(caid)?).await?;
     decode_find_root_certificate_response(&tlv)
 }
@@ -526,25 +526,25 @@ pub async fn lookup_root_certificate(conn: &crate::controller::Connection, endpo
 }
 
 /// Invoke `RemoveRootCertificate` command on cluster `TLS Certificate Management`.
-pub async fn remove_root_certificate(conn: &crate::controller::Connection, endpoint: u16, caid: u8) -> anyhow::Result<()> {
+pub async fn remove_root_certificate(conn: &crate::controller::Connection, endpoint: u16, caid: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_REMOVEROOTCERTIFICATE, &encode_remove_root_certificate(caid)?).await?;
     Ok(())
 }
 
 /// Invoke `ClientCSR` command on cluster `TLS Certificate Management`.
-pub async fn client_csr(conn: &crate::controller::Connection, endpoint: u16, nonce: Vec<u8>, ccdid: Option<u8>) -> anyhow::Result<ClientCSRResponse> {
+pub async fn client_csr(conn: &crate::controller::Connection, endpoint: u16, nonce: Vec<u8>, ccdid: Option<u16>) -> anyhow::Result<ClientCSRResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_CLIENTCSR, &encode_client_csr(nonce, ccdid)?).await?;
     decode_client_csr_response(&tlv)
 }
 
 /// Invoke `ProvisionClientCertificate` command on cluster `TLS Certificate Management`.
-pub async fn provision_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: u8, client_certificate: Vec<u8>, intermediate_certificates: Vec<Vec<u8>>) -> anyhow::Result<()> {
+pub async fn provision_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: u16, client_certificate: Vec<u8>, intermediate_certificates: Vec<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_PROVISIONCLIENTCERTIFICATE, &encode_provision_client_certificate(ccdid, client_certificate, intermediate_certificates)?).await?;
     Ok(())
 }
 
 /// Invoke `FindClientCertificate` command on cluster `TLS Certificate Management`.
-pub async fn find_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: Option<u8>) -> anyhow::Result<FindClientCertificateResponse> {
+pub async fn find_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: Option<u16>) -> anyhow::Result<FindClientCertificateResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_FINDCLIENTCERTIFICATE, &encode_find_client_certificate(ccdid)?).await?;
     decode_find_client_certificate_response(&tlv)
 }
@@ -556,7 +556,7 @@ pub async fn lookup_client_certificate(conn: &crate::controller::Connection, end
 }
 
 /// Invoke `RemoveClientCertificate` command on cluster `TLS Certificate Management`.
-pub async fn remove_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: u8) -> anyhow::Result<()> {
+pub async fn remove_client_certificate(conn: &crate::controller::Connection, endpoint: u16, ccdid: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_TLS_CERTIFICATE_MANAGEMENT, crate::clusters::defs::CLUSTER_TLS_CERTIFICATE_MANAGEMENT_CMD_ID_REMOVECLIENTCERTIFICATE, &encode_remove_client_certificate(ccdid)?).await?;
     Ok(())
 }

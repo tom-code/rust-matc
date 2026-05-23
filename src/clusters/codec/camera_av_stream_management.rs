@@ -187,7 +187,7 @@ impl From<VideoCodec> for u8 {
 #[derive(Debug, serde::Serialize)]
 pub struct AVMetadata {
     pub utc_time: Option<u64>,
-    pub motion_zones_active: Option<Vec<u8>>,
+    pub motion_zones_active: Option<Vec<u16>>,
     pub black_and_white_active: Option<bool>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub user_defined: Option<Vec<u8>>,
@@ -203,7 +203,7 @@ pub struct AudioCapabilities {
 
 #[derive(Debug, serde::Serialize)]
 pub struct AudioStream {
-    pub audio_stream_id: Option<u8>,
+    pub audio_stream_id: Option<u16>,
     pub stream_usage: Option<u8>,
     pub audio_codec: Option<AudioCodec>,
     pub channel_count: Option<u8>,
@@ -231,7 +231,7 @@ pub struct SnapshotCapabilities {
 
 #[derive(Debug, serde::Serialize)]
 pub struct SnapshotStream {
-    pub snapshot_stream_id: Option<u8>,
+    pub snapshot_stream_id: Option<u16>,
     pub image_codec: Option<ImageCodec>,
     pub frame_rate: Option<u16>,
     pub min_resolution: Option<VideoResolution>,
@@ -260,7 +260,7 @@ pub struct VideoSensorParams {
 
 #[derive(Debug, serde::Serialize)]
 pub struct VideoStream {
-    pub video_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
     pub stream_usage: Option<u8>,
     pub video_codec: Option<VideoCodec>,
     pub min_frame_rate: Option<u16>,
@@ -294,11 +294,11 @@ pub fn encode_audio_stream_allocate(stream_usage: u8, audio_codec: AudioCodec, c
 }
 
 /// Encode AudioStreamDeallocate command (0x02)
-pub fn encode_audio_stream_deallocate(audio_stream_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_audio_stream_deallocate(audio_stream_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(audio_stream_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(audio_stream_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -349,9 +349,9 @@ pub fn encode_video_stream_allocate(params: VideoStreamAllocateParams) -> anyhow
 }
 
 /// Encode VideoStreamModify command (0x05)
-pub fn encode_video_stream_modify(video_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_video_stream_modify(video_stream_id: u16, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<Vec<u8>> {
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
-    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into());
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(video_stream_id)).into());
     if let Some(x) = watermark_enabled { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
     if let Some(x) = osd_enabled { tlv_fields.push((2, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
@@ -362,11 +362,11 @@ pub fn encode_video_stream_modify(video_stream_id: u8, watermark_enabled: Option
 }
 
 /// Encode VideoStreamDeallocate command (0x06)
-pub fn encode_video_stream_deallocate(video_stream_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_video_stream_deallocate(video_stream_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(video_stream_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -398,9 +398,9 @@ pub fn encode_snapshot_stream_allocate(image_codec: ImageCodec, max_frame_rate: 
 }
 
 /// Encode SnapshotStreamModify command (0x09)
-pub fn encode_snapshot_stream_modify(snapshot_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_snapshot_stream_modify(snapshot_stream_id: u16, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<Vec<u8>> {
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
-    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(snapshot_stream_id)).into());
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(snapshot_stream_id)).into());
     if let Some(x) = watermark_enabled { tlv_fields.push((1, tlv::TlvItemValueEnc::Bool(x)).into()); }
     if let Some(x) = osd_enabled { tlv_fields.push((2, tlv::TlvItemValueEnc::Bool(x)).into()); }
     let tlv = tlv::TlvItemEnc {
@@ -411,11 +411,11 @@ pub fn encode_snapshot_stream_modify(snapshot_stream_id: u8, watermark_enabled: 
 }
 
 /// Encode SnapshotStreamDeallocate command (0x0A)
-pub fn encode_snapshot_stream_deallocate(snapshot_stream_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_snapshot_stream_deallocate(snapshot_stream_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(snapshot_stream_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(snapshot_stream_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -433,7 +433,7 @@ pub fn encode_set_stream_priorities(stream_priorities: Vec<u8>) -> anyhow::Resul
 }
 
 /// Encode CaptureSnapshot command (0x0C)
-pub fn encode_capture_snapshot(snapshot_stream_id: Option<u8>, requested_resolution: VideoResolution) -> anyhow::Result<Vec<u8>> {
+pub fn encode_capture_snapshot(snapshot_stream_id: Option<u16>, requested_resolution: VideoResolution) -> anyhow::Result<Vec<u8>> {
             // Encode struct VideoResolutionStruct
             let mut requested_resolution_fields = Vec::new();
             if let Some(x) = requested_resolution.width { requested_resolution_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
@@ -441,7 +441,7 @@ pub fn encode_capture_snapshot(snapshot_stream_id: Option<u8>, requested_resolut
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(snapshot_stream_id.unwrap_or(0))).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(snapshot_stream_id.unwrap_or(0))).into(),
         (1, tlv::TlvItemValueEnc::StructInvisible(requested_resolution_fields)).into(),
         ]),
     };
@@ -705,7 +705,7 @@ pub fn decode_allocated_video_streams(inp: &tlv::TlvItemValue) -> anyhow::Result
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(VideoStream {
-                video_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                video_stream_id: item.get_int(&[0]).map(|v| v as u16),
                 stream_usage: item.get_int(&[1]).map(|v| v as u8),
                 video_codec: item.get_int(&[2]).and_then(|v| VideoCodec::from_u8(v as u8)),
                 min_frame_rate: item.get_int(&[3]).map(|v| v as u16),
@@ -758,7 +758,7 @@ pub fn decode_allocated_audio_streams(inp: &tlv::TlvItemValue) -> anyhow::Result
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(AudioStream {
-                audio_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                audio_stream_id: item.get_int(&[0]).map(|v| v as u16),
                 stream_usage: item.get_int(&[1]).map(|v| v as u8),
                 audio_codec: item.get_int(&[2]).and_then(|v| AudioCodec::from_u8(v as u8)),
                 channel_count: item.get_int(&[3]).map(|v| v as u8),
@@ -778,7 +778,7 @@ pub fn decode_allocated_snapshot_streams(inp: &tlv::TlvItemValue) -> anyhow::Res
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(SnapshotStream {
-                snapshot_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                snapshot_stream_id: item.get_int(&[0]).map(|v| v as u16),
                 image_codec: item.get_int(&[1]).and_then(|v| ImageCodec::from_u8(v as u8)),
                 frame_rate: item.get_int(&[2]).map(|v| v as u16),
                 min_resolution: {
@@ -1397,7 +1397,7 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 5, name: "bit_depth", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x03 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
@@ -1413,12 +1413,12 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 10, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
         ]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "watermark_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
         ]),
         0x06 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x07 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "image_codec", kind: crate::clusters::codec::FieldKind::Enum { name: "ImageCodec", variants: &[(0, "Jpeg"), (1, "Heic")] }, optional: false, nullable: false },
@@ -1430,18 +1430,18 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 6, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
         ]),
         0x09 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "watermark_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "osd_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: true, nullable: false },
         ]),
         0x0A => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x0B => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "stream_priorities", kind: crate::clusters::codec::FieldKind::List { entry_type: "StreamUsageEnum" }, optional: false, nullable: false },
         ]),
         0x0C => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 0, name: "snapshot_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 1, name: "requested_resolution", kind: crate::clusters::codec::FieldKind::Struct { name: "VideoResolutionStruct" }, optional: false, nullable: false },
         ]),
         _ => None,
@@ -1463,29 +1463,29 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_audio_stream_allocate(stream_usage, audio_codec, channel_count, sample_rate, bit_rate, bit_depth)
         }
         0x02 => {
-        let audio_stream_id = crate::clusters::codec::json_util::get_u8(args, "audio_stream_id")?;
+        let audio_stream_id = crate::clusters::codec::json_util::get_u16(args, "audio_stream_id")?;
         encode_audio_stream_deallocate(audio_stream_id)
         }
         0x03 => Err(anyhow::anyhow!("command \"VideoStreamAllocate\" has complex args: use raw mode")),
         0x05 => {
-        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        let video_stream_id = crate::clusters::codec::json_util::get_u16(args, "video_stream_id")?;
         let watermark_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "watermark_enabled")?;
         let osd_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "osd_enabled")?;
         encode_video_stream_modify(video_stream_id, watermark_enabled, osd_enabled)
         }
         0x06 => {
-        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        let video_stream_id = crate::clusters::codec::json_util::get_u16(args, "video_stream_id")?;
         encode_video_stream_deallocate(video_stream_id)
         }
         0x07 => Err(anyhow::anyhow!("command \"SnapshotStreamAllocate\" has complex args: use raw mode")),
         0x09 => {
-        let snapshot_stream_id = crate::clusters::codec::json_util::get_u8(args, "snapshot_stream_id")?;
+        let snapshot_stream_id = crate::clusters::codec::json_util::get_u16(args, "snapshot_stream_id")?;
         let watermark_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "watermark_enabled")?;
         let osd_enabled = crate::clusters::codec::json_util::get_opt_bool(args, "osd_enabled")?;
         encode_snapshot_stream_modify(snapshot_stream_id, watermark_enabled, osd_enabled)
         }
         0x0A => {
-        let snapshot_stream_id = crate::clusters::codec::json_util::get_u8(args, "snapshot_stream_id")?;
+        let snapshot_stream_id = crate::clusters::codec::json_util::get_u16(args, "snapshot_stream_id")?;
         encode_snapshot_stream_deallocate(snapshot_stream_id)
         }
         0x0B => Err(anyhow::anyhow!("command \"SetStreamPriorities\" has complex args: use raw mode")),
@@ -1496,17 +1496,17 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 
 #[derive(Debug, serde::Serialize)]
 pub struct AudioStreamAllocateResponse {
-    pub audio_stream_id: Option<u8>,
+    pub audio_stream_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct VideoStreamAllocateResponse {
-    pub video_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct SnapshotStreamAllocateResponse {
-    pub snapshot_stream_id: Option<u8>,
+    pub snapshot_stream_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -1524,7 +1524,7 @@ pub fn decode_audio_stream_allocate_response(inp: &tlv::TlvItemValue) -> anyhow:
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(AudioStreamAllocateResponse {
-                audio_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                audio_stream_id: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -1536,7 +1536,7 @@ pub fn decode_video_stream_allocate_response(inp: &tlv::TlvItemValue) -> anyhow:
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(VideoStreamAllocateResponse {
-                video_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                video_stream_id: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -1548,7 +1548,7 @@ pub fn decode_snapshot_stream_allocate_response(inp: &tlv::TlvItemValue) -> anyh
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(SnapshotStreamAllocateResponse {
-                snapshot_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                snapshot_stream_id: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -1592,7 +1592,7 @@ pub async fn audio_stream_allocate(conn: &crate::controller::Connection, endpoin
 }
 
 /// Invoke `AudioStreamDeallocate` command on cluster `Camera AV Stream Management`.
-pub async fn audio_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, audio_stream_id: u8) -> anyhow::Result<()> {
+pub async fn audio_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, audio_stream_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_AUDIOSTREAMDEALLOCATE, &encode_audio_stream_deallocate(audio_stream_id)?).await?;
     Ok(())
 }
@@ -1604,13 +1604,13 @@ pub async fn video_stream_allocate(conn: &crate::controller::Connection, endpoin
 }
 
 /// Invoke `VideoStreamModify` command on cluster `Camera AV Stream Management`.
-pub async fn video_stream_modify(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<()> {
+pub async fn video_stream_modify(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u16, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_VIDEOSTREAMMODIFY, &encode_video_stream_modify(video_stream_id, watermark_enabled, osd_enabled)?).await?;
     Ok(())
 }
 
 /// Invoke `VideoStreamDeallocate` command on cluster `Camera AV Stream Management`.
-pub async fn video_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8) -> anyhow::Result<()> {
+pub async fn video_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_VIDEOSTREAMDEALLOCATE, &encode_video_stream_deallocate(video_stream_id)?).await?;
     Ok(())
 }
@@ -1622,13 +1622,13 @@ pub async fn snapshot_stream_allocate(conn: &crate::controller::Connection, endp
 }
 
 /// Invoke `SnapshotStreamModify` command on cluster `Camera AV Stream Management`.
-pub async fn snapshot_stream_modify(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u8, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<()> {
+pub async fn snapshot_stream_modify(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u16, watermark_enabled: Option<bool>, osd_enabled: Option<bool>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SNAPSHOTSTREAMMODIFY, &encode_snapshot_stream_modify(snapshot_stream_id, watermark_enabled, osd_enabled)?).await?;
     Ok(())
 }
 
 /// Invoke `SnapshotStreamDeallocate` command on cluster `Camera AV Stream Management`.
-pub async fn snapshot_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u8) -> anyhow::Result<()> {
+pub async fn snapshot_stream_deallocate(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_SNAPSHOTSTREAMDEALLOCATE, &encode_snapshot_stream_deallocate(snapshot_stream_id)?).await?;
     Ok(())
 }
@@ -1640,7 +1640,7 @@ pub async fn set_stream_priorities(conn: &crate::controller::Connection, endpoin
 }
 
 /// Invoke `CaptureSnapshot` command on cluster `Camera AV Stream Management`.
-pub async fn capture_snapshot(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: Option<u8>, requested_resolution: VideoResolution) -> anyhow::Result<CaptureSnapshotResponse> {
+pub async fn capture_snapshot(conn: &crate::controller::Connection, endpoint: u16, snapshot_stream_id: Option<u16>, requested_resolution: VideoResolution) -> anyhow::Result<CaptureSnapshotResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_STREAM_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_STREAM_MANAGEMENT_CMD_ID_CAPTURESNAPSHOT, &encode_capture_snapshot(snapshot_stream_id, requested_resolution)?).await?;
     decode_capture_snapshot_response(&tlv)
 }

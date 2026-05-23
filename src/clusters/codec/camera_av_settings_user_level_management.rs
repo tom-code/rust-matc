@@ -47,7 +47,7 @@ impl From<PhysicalMovement> for u8 {
 
 #[derive(Debug, serde::Serialize)]
 pub struct DPTZ {
-    pub video_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -127,20 +127,20 @@ pub fn encode_mptz_remove_preset(preset_id: u8) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode DPTZSetViewport command (0x05)
-pub fn encode_dptz_set_viewport(video_stream_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_dptz_set_viewport(video_stream_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(video_stream_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode DPTZRelativeMove command (0x06)
-pub fn encode_dptz_relative_move(video_stream_id: u8, delta_x: Option<i16>, delta_y: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_dptz_relative_move(video_stream_id: u16, delta_x: Option<i16>, delta_y: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<Vec<u8>> {
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
-    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(video_stream_id)).into());
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(video_stream_id)).into());
     if let Some(x) = delta_x { tlv_fields.push((1, tlv::TlvItemValueEnc::Int16(x)).into()); }
     if let Some(x) = delta_y { tlv_fields.push((2, tlv::TlvItemValueEnc::Int16(x)).into()); }
     if let Some(x) = zoom_delta { tlv_fields.push((3, tlv::TlvItemValueEnc::Int8(x)).into()); }
@@ -213,7 +213,7 @@ pub fn decode_dptz_streams(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<DPTZ>>
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(DPTZ {
-                video_stream_id: item.get_int(&[0]).map(|v| v as u8),
+                video_stream_id: item.get_int(&[0]).map(|v| v as u16),
             });
         }
     }
@@ -426,10 +426,10 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 0, name: "preset_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x06 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "delta_x", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "delta_y", kind: crate::clusters::codec::FieldKind::I16, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 3, name: "zoom_delta", kind: crate::clusters::codec::FieldKind::I8, optional: true, nullable: false },
@@ -466,11 +466,11 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_mptz_remove_preset(preset_id)
         }
         0x05 => {
-        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        let video_stream_id = crate::clusters::codec::json_util::get_u16(args, "video_stream_id")?;
         encode_dptz_set_viewport(video_stream_id)
         }
         0x06 => {
-        let video_stream_id = crate::clusters::codec::json_util::get_u8(args, "video_stream_id")?;
+        let video_stream_id = crate::clusters::codec::json_util::get_u16(args, "video_stream_id")?;
         let delta_x = crate::clusters::codec::json_util::get_opt_i16(args, "delta_x")?;
         let delta_y = crate::clusters::codec::json_util::get_opt_i16(args, "delta_y")?;
         let zoom_delta = crate::clusters::codec::json_util::get_opt_i8(args, "zoom_delta")?;
@@ -513,13 +513,13 @@ pub async fn mptz_remove_preset(conn: &crate::controller::Connection, endpoint: 
 }
 
 /// Invoke `DPTZSetViewport` command on cluster `Camera AV Settings User Level Management`.
-pub async fn dptz_set_viewport(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8) -> anyhow::Result<()> {
+pub async fn dptz_set_viewport(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_DPTZSETVIEWPORT, &encode_dptz_set_viewport(video_stream_id)?).await?;
     Ok(())
 }
 
 /// Invoke `DPTZRelativeMove` command on cluster `Camera AV Settings User Level Management`.
-pub async fn dptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u8, delta_x: Option<i16>, delta_y: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<()> {
+pub async fn dptz_relative_move(conn: &crate::controller::Connection, endpoint: u16, video_stream_id: u16, delta_x: Option<i16>, delta_y: Option<i16>, zoom_delta: Option<i8>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT, crate::clusters::defs::CLUSTER_CAMERA_AV_SETTINGS_USER_LEVEL_MANAGEMENT_CMD_ID_DPTZRELATIVEMOVE, &encode_dptz_relative_move(video_stream_id, delta_x, delta_y, zoom_delta)?).await?;
     Ok(())
 }

@@ -273,7 +273,7 @@ impl From<TriggerActivationReason> for u8 {
 #[derive(Debug, serde::Serialize)]
 pub struct AudioStream {
     pub audio_stream_name: Option<String>,
-    pub audio_stream_id: Option<u8>,
+    pub audio_stream_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -304,7 +304,7 @@ pub struct SupportedFormat {
 
 #[derive(Debug, serde::Serialize)]
 pub struct TransportConfiguration {
-    pub connection_id: Option<u8>,
+    pub connection_id: Option<u16>,
     pub transport_status: Option<TransportStatus>,
     pub transport_options: Option<TransportOptions>,
 }
@@ -320,9 +320,9 @@ pub struct TransportMotionTriggerTimeControl {
 #[derive(Debug, serde::Serialize)]
 pub struct TransportOptions {
     pub stream_usage: Option<u8>,
-    pub video_stream_id: Option<u8>,
-    pub audio_stream_id: Option<u8>,
-    pub tls_endpoint_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
+    pub audio_stream_id: Option<u16>,
+    pub tls_endpoint_id: Option<u16>,
     pub url: Option<String>,
     pub trigger_options: Option<TransportTriggerOptions>,
     pub ingest_method: Option<IngestMethods>,
@@ -343,14 +343,14 @@ pub struct TransportTriggerOptions {
 
 #[derive(Debug, serde::Serialize)]
 pub struct TransportZoneOptions {
-    pub zone: Option<u8>,
+    pub zone: Option<u16>,
     pub sensitivity: Option<u8>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct VideoStream {
     pub video_stream_name: Option<String>,
-    pub video_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
 }
 
 // Command encoders
@@ -360,9 +360,9 @@ pub fn encode_allocate_push_transport(transport_options: TransportOptions) -> an
             // Encode struct TransportOptionsStruct
             let mut transport_options_fields = Vec::new();
             if let Some(x) = transport_options.stream_usage { transport_options_fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
-            // TODO: encoding for field video_stream_id (VideoStreamID) not implemented
-            // TODO: encoding for field audio_stream_id (AudioStreamID) not implemented
-            // TODO: encoding for field tls_endpoint_id (TLSEndpointID) not implemented
+            if let Some(x) = transport_options.video_stream_id { transport_options_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+            if let Some(x) = transport_options.audio_stream_id { transport_options_fields.push((2, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+            if let Some(x) = transport_options.tls_endpoint_id { transport_options_fields.push((3, tlv::TlvItemValueEnc::UInt16(x)).into()); }
             if let Some(x) = transport_options.url { transport_options_fields.push((4, tlv::TlvItemValueEnc::String(x.clone())).into()); }
             if let Some(inner) = transport_options.trigger_options {
                 let mut trigger_options_nested_fields = Vec::new();
@@ -370,7 +370,7 @@ pub fn encode_allocate_push_transport(transport_options: TransportOptions) -> an
                 if let Some(listv) = inner.motion_zones {
                     let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                         let mut nested_fields = Vec::new();
-                            // TODO: encoding for field zone (ZoneID) not implemented
+                            if let Some(x) = inner.zone { nested_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                             if let Some(x) = inner.sensitivity { nested_fields.push((1, tlv::TlvItemValueEnc::UInt8(x)).into()); }
                         (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                     }).collect();
@@ -411,7 +411,7 @@ pub fn encode_allocate_push_transport(transport_options: TransportOptions) -> an
                 let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                     let mut nested_fields = Vec::new();
                         if let Some(x) = inner.video_stream_name { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                        // TODO: encoding for field video_stream_id (VideoStreamID) not implemented
+                        if let Some(x) = inner.video_stream_id { nested_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                 }).collect();
                 transport_options_fields.push((9, tlv::TlvItemValueEnc::Array(inner_vec)).into());
@@ -420,7 +420,7 @@ pub fn encode_allocate_push_transport(transport_options: TransportOptions) -> an
                 let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                     let mut nested_fields = Vec::new();
                         if let Some(x) = inner.audio_stream_name { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                        // TODO: encoding for field audio_stream_id (AudioStreamID) not implemented
+                        if let Some(x) = inner.audio_stream_id { nested_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                 }).collect();
                 transport_options_fields.push((10, tlv::TlvItemValueEnc::Array(inner_vec)).into());
@@ -435,24 +435,24 @@ pub fn encode_allocate_push_transport(transport_options: TransportOptions) -> an
 }
 
 /// Encode DeallocatePushTransport command (0x02)
-pub fn encode_deallocate_push_transport(connection_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_deallocate_push_transport(connection_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(connection_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(connection_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode ModifyPushTransport command (0x03)
-pub fn encode_modify_push_transport(connection_id: u8, transport_options: TransportOptions) -> anyhow::Result<Vec<u8>> {
+pub fn encode_modify_push_transport(connection_id: u16, transport_options: TransportOptions) -> anyhow::Result<Vec<u8>> {
             // Encode struct TransportOptionsStruct
             let mut transport_options_fields = Vec::new();
             if let Some(x) = transport_options.stream_usage { transport_options_fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
-            // TODO: encoding for field video_stream_id (VideoStreamID) not implemented
-            // TODO: encoding for field audio_stream_id (AudioStreamID) not implemented
-            // TODO: encoding for field tls_endpoint_id (TLSEndpointID) not implemented
+            if let Some(x) = transport_options.video_stream_id { transport_options_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+            if let Some(x) = transport_options.audio_stream_id { transport_options_fields.push((2, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+            if let Some(x) = transport_options.tls_endpoint_id { transport_options_fields.push((3, tlv::TlvItemValueEnc::UInt16(x)).into()); }
             if let Some(x) = transport_options.url { transport_options_fields.push((4, tlv::TlvItemValueEnc::String(x.clone())).into()); }
             if let Some(inner) = transport_options.trigger_options {
                 let mut trigger_options_nested_fields = Vec::new();
@@ -460,7 +460,7 @@ pub fn encode_modify_push_transport(connection_id: u8, transport_options: Transp
                 if let Some(listv) = inner.motion_zones {
                     let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                         let mut nested_fields = Vec::new();
-                            // TODO: encoding for field zone (ZoneID) not implemented
+                            if let Some(x) = inner.zone { nested_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                             if let Some(x) = inner.sensitivity { nested_fields.push((1, tlv::TlvItemValueEnc::UInt8(x)).into()); }
                         (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                     }).collect();
@@ -501,7 +501,7 @@ pub fn encode_modify_push_transport(connection_id: u8, transport_options: Transp
                 let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                     let mut nested_fields = Vec::new();
                         if let Some(x) = inner.video_stream_name { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                        // TODO: encoding for field video_stream_id (VideoStreamID) not implemented
+                        if let Some(x) = inner.video_stream_id { nested_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                 }).collect();
                 transport_options_fields.push((9, tlv::TlvItemValueEnc::Array(inner_vec)).into());
@@ -510,7 +510,7 @@ pub fn encode_modify_push_transport(connection_id: u8, transport_options: Transp
                 let inner_vec: Vec<_> = listv.into_iter().map(|inner| {
                     let mut nested_fields = Vec::new();
                         if let Some(x) = inner.audio_stream_name { nested_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
-                        // TODO: encoding for field audio_stream_id (AudioStreamID) not implemented
+                        if let Some(x) = inner.audio_stream_id { nested_fields.push((1, tlv::TlvItemValueEnc::UInt16(x)).into()); }
                     (0, tlv::TlvItemValueEnc::StructAnon(nested_fields)).into()
                 }).collect();
                 transport_options_fields.push((10, tlv::TlvItemValueEnc::Array(inner_vec)).into());
@@ -518,7 +518,7 @@ pub fn encode_modify_push_transport(connection_id: u8, transport_options: Transp
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(connection_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(connection_id)).into(),
         (1, tlv::TlvItemValueEnc::StructInvisible(transport_options_fields)).into(),
         ]),
     };
@@ -526,11 +526,11 @@ pub fn encode_modify_push_transport(connection_id: u8, transport_options: Transp
 }
 
 /// Encode SetTransportStatus command (0x04)
-pub fn encode_set_transport_status(connection_id: Option<u8>, transport_status: TransportStatus) -> anyhow::Result<Vec<u8>> {
+pub fn encode_set_transport_status(connection_id: Option<u16>, transport_status: TransportStatus) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(connection_id.unwrap_or(0))).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(connection_id.unwrap_or(0))).into(),
         (1, tlv::TlvItemValueEnc::UInt8(transport_status.to_u8())).into(),
         ]),
     };
@@ -538,9 +538,9 @@ pub fn encode_set_transport_status(connection_id: Option<u8>, transport_status: 
 }
 
 /// Encode ManuallyTriggerTransport command (0x05)
-pub fn encode_manually_trigger_transport(connection_id: u8, activation_reason: TriggerActivationReason, time_control: Option<TransportMotionTriggerTimeControl>, user_defined: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_manually_trigger_transport(connection_id: u16, activation_reason: TriggerActivationReason, time_control: Option<TransportMotionTriggerTimeControl>, user_defined: Option<Vec<u8>>) -> anyhow::Result<Vec<u8>> {
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
-    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(connection_id)).into());
+    tlv_fields.push((0, tlv::TlvItemValueEnc::UInt16(connection_id)).into());
     tlv_fields.push((1, tlv::TlvItemValueEnc::UInt8(activation_reason.to_u8())).into());
     if let Some(time_control) = time_control {
         // Encode struct TransportMotionTriggerTimeControlStruct
@@ -560,11 +560,11 @@ pub fn encode_manually_trigger_transport(connection_id: u8, activation_reason: T
 }
 
 /// Encode FindTransport command (0x06)
-pub fn encode_find_transport(connection_id: Option<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_find_transport(connection_id: Option<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(connection_id.unwrap_or(0))).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(connection_id.unwrap_or(0))).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -592,7 +592,7 @@ pub fn decode_current_connections(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(TransportConfiguration {
-                connection_id: item.get_int(&[0]).map(|v| v as u8),
+                connection_id: item.get_int(&[0]).map(|v| v as u16),
                 transport_status: item.get_int(&[1]).and_then(|v| TransportStatus::from_u8(v as u8)),
                 transport_options: {
                     if let Some(nested_tlv) = item.get(&[2]) {
@@ -600,9 +600,9 @@ pub fn decode_current_connections(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec
                             let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
                             Some(TransportOptions {
                 stream_usage: nested_item.get_int(&[0]).map(|v| v as u8),
-                video_stream_id: nested_item.get_int(&[1]).map(|v| v as u8),
-                audio_stream_id: nested_item.get_int(&[2]).map(|v| v as u8),
-                tls_endpoint_id: nested_item.get_int(&[3]).map(|v| v as u8),
+                video_stream_id: nested_item.get_int(&[1]).map(|v| v as u16),
+                audio_stream_id: nested_item.get_int(&[2]).map(|v| v as u16),
+                tls_endpoint_id: nested_item.get_int(&[3]).map(|v| v as u16),
                 url: nested_item.get_string_owned(&[4]),
                 trigger_options: {
                     if let Some(nested_tlv) = nested_item.get(&[5]) {
@@ -615,7 +615,7 @@ pub fn decode_current_connections(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TransportZoneOptions {
-                zone: list_item.get_int(&[0]).map(|v| v as u8),
+                zone: list_item.get_int(&[0]).map(|v| v as u16),
                 sensitivity: list_item.get_int(&[1]).map(|v| v as u8),
                             });
                         }
@@ -694,7 +694,7 @@ pub fn decode_current_connections(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec
                         for list_item in l {
                             items.push(VideoStream {
                 video_stream_name: list_item.get_string_owned(&[0]),
-                video_stream_id: list_item.get_int(&[1]).map(|v| v as u8),
+                video_stream_id: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -708,7 +708,7 @@ pub fn decode_current_connections(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec
                         for list_item in l {
                             items.push(AudioStream {
                 audio_stream_name: list_item.get_string_owned(&[0]),
-                audio_stream_id: list_item.get_int(&[1]).map(|v| v as u8),
+                audio_stream_id: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -807,24 +807,24 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 0, name: "transport_options", kind: crate::clusters::codec::FieldKind::Struct { name: "TransportOptionsStruct" }, optional: false, nullable: false },
         ]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x03 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "transport_options", kind: crate::clusters::codec::FieldKind::Struct { name: "TransportOptionsStruct" }, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 1, name: "transport_status", kind: crate::clusters::codec::FieldKind::Enum { name: "TransportStatus", variants: &[(0, "Active"), (1, "Inactive")] }, optional: false, nullable: false },
         ]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "activation_reason", kind: crate::clusters::codec::FieldKind::Enum { name: "TriggerActivationReason", variants: &[(0, "Userinitiated"), (1, "Automation"), (2, "Emergency"), (3, "Doorbellpressed")] }, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "time_control", kind: crate::clusters::codec::FieldKind::Struct { name: "TransportMotionTriggerTimeControlStruct" }, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 3, name: "user_defined", kind: crate::clusters::codec::FieldKind::OctetString, optional: true, nullable: false },
         ]),
         0x06 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 0, name: "connection_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
         ]),
         _ => None,
     }
@@ -834,12 +834,12 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => Err(anyhow::anyhow!("command \"AllocatePushTransport\" has complex args: use raw mode")),
         0x02 => {
-        let connection_id = crate::clusters::codec::json_util::get_u8(args, "connection_id")?;
+        let connection_id = crate::clusters::codec::json_util::get_u16(args, "connection_id")?;
         encode_deallocate_push_transport(connection_id)
         }
         0x03 => Err(anyhow::anyhow!("command \"ModifyPushTransport\" has complex args: use raw mode")),
         0x04 => {
-        let connection_id = crate::clusters::codec::json_util::get_opt_u8(args, "connection_id")?;
+        let connection_id = crate::clusters::codec::json_util::get_opt_u16(args, "connection_id")?;
         let transport_status = {
             let n = crate::clusters::codec::json_util::get_u64(args, "transport_status")?;
             TransportStatus::from_u8(n as u8).ok_or_else(|| anyhow::anyhow!("invalid TransportStatus: {}", n))?
@@ -848,7 +848,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         }
         0x05 => Err(anyhow::anyhow!("command \"ManuallyTriggerTransport\" has complex args: use raw mode")),
         0x06 => {
-        let connection_id = crate::clusters::codec::json_util::get_opt_u8(args, "connection_id")?;
+        let connection_id = crate::clusters::codec::json_util::get_opt_u16(args, "connection_id")?;
         encode_find_transport(connection_id)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -877,7 +877,7 @@ pub fn decode_allocate_push_transport_response(inp: &tlv::TlvItemValue) -> anyho
                         if let tlv::TlvItemValue::List(_) = nested_tlv {
                             let nested_item = tlv::TlvItem { tag: 0, value: nested_tlv.clone() };
                             Some(TransportConfiguration {
-                connection_id: nested_item.get_int(&[0]).map(|v| v as u8),
+                connection_id: nested_item.get_int(&[0]).map(|v| v as u16),
                 transport_status: nested_item.get_int(&[1]).and_then(|v| TransportStatus::from_u8(v as u8)),
                 transport_options: {
                     if let Some(nested_tlv) = nested_item.get(&[2]) {
@@ -885,9 +885,9 @@ pub fn decode_allocate_push_transport_response(inp: &tlv::TlvItemValue) -> anyho
                             let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
                             Some(TransportOptions {
                 stream_usage: nested_item.get_int(&[0]).map(|v| v as u8),
-                video_stream_id: nested_item.get_int(&[1]).map(|v| v as u8),
-                audio_stream_id: nested_item.get_int(&[2]).map(|v| v as u8),
-                tls_endpoint_id: nested_item.get_int(&[3]).map(|v| v as u8),
+                video_stream_id: nested_item.get_int(&[1]).map(|v| v as u16),
+                audio_stream_id: nested_item.get_int(&[2]).map(|v| v as u16),
+                tls_endpoint_id: nested_item.get_int(&[3]).map(|v| v as u16),
                 url: nested_item.get_string_owned(&[4]),
                 trigger_options: {
                     if let Some(nested_tlv) = nested_item.get(&[5]) {
@@ -900,7 +900,7 @@ pub fn decode_allocate_push_transport_response(inp: &tlv::TlvItemValue) -> anyho
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TransportZoneOptions {
-                zone: list_item.get_int(&[0]).map(|v| v as u8),
+                zone: list_item.get_int(&[0]).map(|v| v as u16),
                 sensitivity: list_item.get_int(&[1]).map(|v| v as u8),
                             });
                         }
@@ -979,7 +979,7 @@ pub fn decode_allocate_push_transport_response(inp: &tlv::TlvItemValue) -> anyho
                         for list_item in l {
                             items.push(VideoStream {
                 video_stream_name: list_item.get_string_owned(&[0]),
-                video_stream_id: list_item.get_int(&[1]).map(|v| v as u8),
+                video_stream_id: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -993,7 +993,7 @@ pub fn decode_allocate_push_transport_response(inp: &tlv::TlvItemValue) -> anyho
                         for list_item in l {
                             items.push(AudioStream {
                 audio_stream_name: list_item.get_string_owned(&[0]),
-                audio_stream_id: list_item.get_int(&[1]).map(|v| v as u8),
+                audio_stream_id: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -1033,7 +1033,7 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TransportConfiguration {
-                connection_id: list_item.get_int(&[0]).map(|v| v as u8),
+                connection_id: list_item.get_int(&[0]).map(|v| v as u16),
                 transport_status: list_item.get_int(&[1]).and_then(|v| TransportStatus::from_u8(v as u8)),
                 transport_options: {
                     if let Some(nested_tlv) = list_item.get(&[2]) {
@@ -1041,9 +1041,9 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                             let nested_item = tlv::TlvItem { tag: 2, value: nested_tlv.clone() };
                             Some(TransportOptions {
                 stream_usage: nested_item.get_int(&[0]).map(|v| v as u8),
-                video_stream_id: nested_item.get_int(&[1]).map(|v| v as u8),
-                audio_stream_id: nested_item.get_int(&[2]).map(|v| v as u8),
-                tls_endpoint_id: nested_item.get_int(&[3]).map(|v| v as u8),
+                video_stream_id: nested_item.get_int(&[1]).map(|v| v as u16),
+                audio_stream_id: nested_item.get_int(&[2]).map(|v| v as u16),
+                tls_endpoint_id: nested_item.get_int(&[3]).map(|v| v as u16),
                 url: nested_item.get_string_owned(&[4]),
                 trigger_options: {
                     if let Some(nested_tlv) = nested_item.get(&[5]) {
@@ -1056,7 +1056,7 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                         let mut items = Vec::new();
                         for list_item in l {
                             items.push(TransportZoneOptions {
-                zone: list_item.get_int(&[0]).map(|v| v as u8),
+                zone: list_item.get_int(&[0]).map(|v| v as u16),
                 sensitivity: list_item.get_int(&[1]).map(|v| v as u8),
                             });
                         }
@@ -1135,7 +1135,7 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                         for list_item in l {
                             items.push(VideoStream {
                 video_stream_name: list_item.get_string_owned(&[0]),
-                video_stream_id: list_item.get_int(&[1]).map(|v| v as u8),
+                video_stream_id: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -1149,7 +1149,7 @@ pub fn decode_find_transport_response(inp: &tlv::TlvItemValue) -> anyhow::Result
                         for list_item in l {
                             items.push(AudioStream {
                 audio_stream_name: list_item.get_string_owned(&[0]),
-                audio_stream_id: list_item.get_int(&[1]).map(|v| v as u8),
+                audio_stream_id: list_item.get_int(&[1]).map(|v| v as u16),
                             });
                         }
                         Some(items)
@@ -1187,31 +1187,31 @@ pub async fn allocate_push_transport(conn: &crate::controller::Connection, endpo
 }
 
 /// Invoke `DeallocatePushTransport` command on cluster `Push AV Stream Transport`.
-pub async fn deallocate_push_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8) -> anyhow::Result<()> {
+pub async fn deallocate_push_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_DEALLOCATEPUSHTRANSPORT, &encode_deallocate_push_transport(connection_id)?).await?;
     Ok(())
 }
 
 /// Invoke `ModifyPushTransport` command on cluster `Push AV Stream Transport`.
-pub async fn modify_push_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8, transport_options: TransportOptions) -> anyhow::Result<()> {
+pub async fn modify_push_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u16, transport_options: TransportOptions) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_MODIFYPUSHTRANSPORT, &encode_modify_push_transport(connection_id, transport_options)?).await?;
     Ok(())
 }
 
 /// Invoke `SetTransportStatus` command on cluster `Push AV Stream Transport`.
-pub async fn set_transport_status(conn: &crate::controller::Connection, endpoint: u16, connection_id: Option<u8>, transport_status: TransportStatus) -> anyhow::Result<()> {
+pub async fn set_transport_status(conn: &crate::controller::Connection, endpoint: u16, connection_id: Option<u16>, transport_status: TransportStatus) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_SETTRANSPORTSTATUS, &encode_set_transport_status(connection_id, transport_status)?).await?;
     Ok(())
 }
 
 /// Invoke `ManuallyTriggerTransport` command on cluster `Push AV Stream Transport`.
-pub async fn manually_trigger_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u8, activation_reason: TriggerActivationReason, time_control: Option<TransportMotionTriggerTimeControl>, user_defined: Option<Vec<u8>>) -> anyhow::Result<()> {
+pub async fn manually_trigger_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: u16, activation_reason: TriggerActivationReason, time_control: Option<TransportMotionTriggerTimeControl>, user_defined: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_MANUALLYTRIGGERTRANSPORT, &encode_manually_trigger_transport(connection_id, activation_reason, time_control, user_defined)?).await?;
     Ok(())
 }
 
 /// Invoke `FindTransport` command on cluster `Push AV Stream Transport`.
-pub async fn find_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: Option<u8>) -> anyhow::Result<FindTransportResponse> {
+pub async fn find_transport(conn: &crate::controller::Connection, endpoint: u16, connection_id: Option<u16>) -> anyhow::Result<FindTransportResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_PUSH_AV_STREAM_TRANSPORT, crate::clusters::defs::CLUSTER_PUSH_AV_STREAM_TRANSPORT_CMD_ID_FINDTRANSPORT, &encode_find_transport(connection_id)?).await?;
     decode_find_transport_response(&tlv)
 }
@@ -1230,18 +1230,16 @@ pub async fn read_current_connections(conn: &crate::controller::Connection, endp
 
 #[derive(Debug, serde::Serialize)]
 pub struct PushTransportBeginEvent {
-    pub connection_id: Option<u8>,
+    pub connection_id: Option<u16>,
     pub trigger_type: Option<TransportTriggerType>,
     pub activation_reason: Option<TriggerActivationReason>,
     pub container_type: Option<ContainerFormat>,
     pub cmaf_session_number: Option<u64>,
-    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
-    pub vendor_specific_context: Option<Vec<u8>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct PushTransportEndEvent {
-    pub connection_id: Option<u8>,
+    pub connection_id: Option<u16>,
     pub container_type: Option<ContainerFormat>,
     pub cmaf_session_number: Option<u64>,
 }
@@ -1253,12 +1251,11 @@ pub fn decode_push_transport_begin_event(inp: &tlv::TlvItemValue) -> anyhow::Res
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(PushTransportBeginEvent {
-                                connection_id: item.get_int(&[0]).map(|v| v as u8),
+                                connection_id: item.get_int(&[0]).map(|v| v as u16),
                                 trigger_type: item.get_int(&[1]).and_then(|v| TransportTriggerType::from_u8(v as u8)),
                                 activation_reason: item.get_int(&[2]).and_then(|v| TriggerActivationReason::from_u8(v as u8)),
                                 container_type: item.get_int(&[3]).and_then(|v| ContainerFormat::from_u8(v as u8)),
                                 cmaf_session_number: item.get_int(&[4]),
-                                vendor_specific_context: item.get_octet_string_owned(&[5]),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -1270,7 +1267,7 @@ pub fn decode_push_transport_end_event(inp: &tlv::TlvItemValue) -> anyhow::Resul
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(PushTransportEndEvent {
-                                connection_id: item.get_int(&[0]).map(|v| v as u8),
+                                connection_id: item.get_int(&[0]).map(|v| v as u16),
                                 container_type: item.get_int(&[1]).and_then(|v| ContainerFormat::from_u8(v as u8)),
                                 cmaf_session_number: item.get_int(&[2]),
         })

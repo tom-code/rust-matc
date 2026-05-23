@@ -20,6 +20,17 @@ pub struct ChimeSound {
 
 // Command encoders
 
+/// Encode PlayChimeSound command (0x00)
+pub fn encode_play_chime_sound(chime_id: Option<u8>) -> anyhow::Result<Vec<u8>> {
+    let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
+    if let Some(x) = chime_id { tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+    let tlv = tlv::TlvItemEnc {
+        tag: 0,
+        value: tlv::TlvItemValueEnc::StructInvisible(tlv_fields),
+    };
+    Ok(tlv.encode()?)
+}
+
 // Attribute decoders
 
 /// Decode InstalledChimeSounds attribute (0x0000)
@@ -124,14 +135,19 @@ pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
 
 pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
     match cmd_id {
-        0x00 => Some(vec![]),
+        0x00 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "chime_id", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+        ]),
         _ => None,
     }
 }
 
-pub fn encode_command_json(cmd_id: u32, _args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
+pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cmd_id {
-        0x00 => Ok(vec![]),
+        0x00 => {
+        let chime_id = crate::clusters::codec::json_util::get_opt_u8(args, "chime_id")?;
+        encode_play_chime_sound(chime_id)
+        }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
     }
 }
@@ -139,8 +155,8 @@ pub fn encode_command_json(cmd_id: u32, _args: &serde_json::Value) -> anyhow::Re
 // Typed facade (invokes + reads)
 
 /// Invoke `PlayChimeSound` command on cluster `Chime`.
-pub async fn play_chime_sound(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<()> {
-    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_CMD_ID_PLAYCHIMESOUND, &[]).await?;
+pub async fn play_chime_sound(conn: &crate::controller::Connection, endpoint: u16, chime_id: Option<u8>) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_CMD_ID_PLAYCHIMESOUND, &encode_play_chime_sound(chime_id)?).await?;
     Ok(())
 }
 
@@ -160,5 +176,24 @@ pub async fn read_selected_chime(conn: &crate::controller::Connection, endpoint:
 pub async fn read_enabled(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_CHIME, crate::clusters::defs::CLUSTER_CHIME_ATTR_ID_ENABLED).await?;
     decode_enabled(&tlv)
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ChimeStartedPlayingEvent {
+    pub chime_id: Option<u8>,
+}
+
+// Event decoders
+
+/// Decode ChimeStartedPlaying event (0x00, priority: info)
+pub fn decode_chime_started_playing_event(inp: &tlv::TlvItemValue) -> anyhow::Result<ChimeStartedPlayingEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(ChimeStartedPlayingEvent {
+                                chime_id: item.get_int(&[0]).map(|v| v as u8),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
 }
 

@@ -546,19 +546,6 @@ pub mod presettypefeatures {
     pub const SUPPORTS_NAMES: u8 = 0x02;
 }
 
-/// ProgrammingOperationMode bitmap type
-pub type ProgrammingOperationMode = u8;
-
-/// Constants for ProgrammingOperationMode
-pub mod programmingoperationmode {
-    /// Schedule programming mode. This enables any programmed weekly schedule configurations.
-    pub const SCHEDULE_ACTIVE: u8 = 0x01;
-    /// Auto/recovery mode
-    pub const AUTO_RECOVERY: u8 = 0x02;
-    /// Economy/EnergyStar mode
-    pub const ECONOMY: u8 = 0x04;
-}
-
 /// RelayState bitmap type
 pub type RelayState = u8;
 
@@ -642,6 +629,29 @@ pub mod scheduletypefeatures {
     pub const SUPPORTS_OFF: u8 = 0x08;
 }
 
+/// ThermostatSuggestionNotFollowingReason bitmap type
+pub type ThermostatSuggestionNotFollowingReason = u8;
+
+/// Constants for ThermostatSuggestionNotFollowingReason
+pub mod thermostatsuggestionnotfollowingreason {
+    /// Thermostat is responding to a Demand Response event
+    pub const DEMAND_RESPONSE_EVENT: u8 = 0x01;
+    /// Thermostat has an ongoing setpoint hold
+    pub const ONGOING_HOLD: u8 = 0x02;
+    /// Thermostat is following a schedule
+    pub const SCHEDULE: u8 = 0x04;
+    /// Thermostat is following the occupancy signal
+    pub const OCCUPANCY: u8 = 0x08;
+    /// Thermostat is set to Vacation mode
+    pub const VACATION_MODE: u8 = 0x10;
+    /// Thermostat is following a Time Of Use based cost savings plan
+    pub const TIME_OF_USE_COST_SAVINGS: u8 = 0x20;
+    /// Thermostat is precooling or preheating based on an energy forecast signal
+    pub const PRE_COOLING_OR_PRE_HEATING: u8 = 0x40;
+    /// Thermostat has conflicting suggestions and is unable to choose one
+    pub const CONFLICTING_SUGGESTIONS: u8 = 0x80;
+}
+
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
@@ -693,6 +703,15 @@ pub struct ScheduleType {
 }
 
 #[derive(Debug, serde::Serialize)]
+pub struct ThermostatSuggestion {
+    pub unique_id: Option<u8>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
+    pub preset_handle: Option<Vec<u8>>,
+    pub effective_time: Option<u64>,
+    pub expiration_time: Option<u64>,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct WeeklyScheduleTransition {
     pub transition_time: Option<u16>,
     pub heat_setpoint: Option<i16>,
@@ -730,6 +749,30 @@ pub fn encode_set_active_preset_request(preset_handle: Option<Vec<u8>>) -> anyho
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::OctetString(preset_handle.unwrap_or(vec![]))).into(),
+        ]),
+    };
+    Ok(tlv.encode()?)
+}
+
+/// Encode AddThermostatSuggestion command (0x07)
+pub fn encode_add_thermostat_suggestion(preset_handle: Vec<u8>, effective_time: Option<u64>, expiration_in_minutes: u16) -> anyhow::Result<Vec<u8>> {
+    let tlv = tlv::TlvItemEnc {
+        tag: 0,
+        value: tlv::TlvItemValueEnc::StructInvisible(vec![
+        (0, tlv::TlvItemValueEnc::OctetString(preset_handle)).into(),
+        (1, tlv::TlvItemValueEnc::UInt64(effective_time.unwrap_or(0))).into(),
+        (2, tlv::TlvItemValueEnc::UInt16(expiration_in_minutes)).into(),
+        ]),
+    };
+    Ok(tlv.encode()?)
+}
+
+/// Encode RemoveThermostatSuggestion command (0x08)
+pub fn encode_remove_thermostat_suggestion(unique_id: u8) -> anyhow::Result<Vec<u8>> {
+    let tlv = tlv::TlvItemEnc {
+        tag: 0,
+        value: tlv::TlvItemValueEnc::StructInvisible(vec![
+        (0, tlv::TlvItemValueEnc::UInt8(unique_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -828,11 +871,11 @@ pub fn decode_hvac_system_type_configuration(inp: &tlv::TlvItemValue) -> anyhow:
 }
 
 /// Decode LocalTemperatureCalibration attribute (0x0010)
-pub fn decode_local_temperature_calibration(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_local_temperature_calibration(inp: &tlv::TlvItemValue) -> anyhow::Result<i8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as i8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Int8"))
     }
 }
 
@@ -909,11 +952,11 @@ pub fn decode_max_cool_setpoint_limit(inp: &tlv::TlvItemValue) -> anyhow::Result
 }
 
 /// Decode MinSetpointDeadBand attribute (0x0019)
-pub fn decode_min_setpoint_dead_band(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+pub fn decode_min_setpoint_dead_band(inp: &tlv::TlvItemValue) -> anyhow::Result<i8> {
     if let tlv::TlvItemValue::Int(v) = inp {
-        Ok(*v as u8)
+        Ok(*v as i8)
     } else {
-        Err(anyhow::anyhow!("Expected UInt8"))
+        Err(anyhow::anyhow!("Expected Int8"))
     }
 }
 
@@ -972,11 +1015,11 @@ pub fn decode_temperature_setpoint_hold_duration(inp: &tlv::TlvItemValue) -> any
 }
 
 /// Decode ThermostatProgrammingOperationMode attribute (0x0025)
-pub fn decode_thermostat_programming_operation_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<ProgrammingOperationMode> {
+pub fn decode_thermostat_programming_operation_mode(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(*v as u8)
     } else {
-        Err(anyhow::anyhow!("Expected Integer"))
+        Err(anyhow::anyhow!("Expected UInt8"))
     }
 }
 
@@ -1292,6 +1335,60 @@ pub fn decode_schedules(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Schedule>
 pub fn decode_setpoint_hold_expiry_timestamp(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<u64>> {
     if let tlv::TlvItemValue::Int(v) = inp {
         Ok(Some(*v))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Decode MaxThermostatSuggestions attribute (0x0053)
+pub fn decode_max_thermostat_suggestions(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
+    if let tlv::TlvItemValue::Int(v) = inp {
+        Ok(*v as u8)
+    } else {
+        Err(anyhow::anyhow!("Expected UInt8"))
+    }
+}
+
+/// Decode ThermostatSuggestions attribute (0x0054)
+pub fn decode_thermostat_suggestions(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<ThermostatSuggestion>> {
+    let mut res = Vec::new();
+    if let tlv::TlvItemValue::List(v) = inp {
+        for item in v {
+            res.push(ThermostatSuggestion {
+                unique_id: item.get_int(&[0]).map(|v| v as u8),
+                preset_handle: item.get_octet_string_owned(&[1]),
+                effective_time: item.get_int(&[2]),
+                expiration_time: item.get_int(&[3]),
+            });
+        }
+    }
+    Ok(res)
+}
+
+/// Decode CurrentThermostatSuggestion attribute (0x0055)
+pub fn decode_current_thermostat_suggestion(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<ThermostatSuggestion>> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(Some(ThermostatSuggestion {
+                unique_id: item.get_int(&[0]).map(|v| v as u8),
+                preset_handle: item.get_octet_string_owned(&[1]),
+                effective_time: item.get_int(&[2]),
+                expiration_time: item.get_int(&[3]),
+        }))
+    //} else if let tlv::TlvItemValue::Null = inp {
+    //    // Null value for nullable struct
+    //    Ok(None)
+    } else {
+    Ok(None)
+    //    Err(anyhow::anyhow!("Expected struct fields or null"))
+    }
+}
+
+/// Decode ThermostatSuggestionNotFollowingReason attribute (0x0056)
+pub fn decode_thermostat_suggestion_not_following_reason(inp: &tlv::TlvItemValue) -> anyhow::Result<Option<ThermostatSuggestionNotFollowingReason>> {
+    if let tlv::TlvItemValue::Int(v) = inp {
+        Ok(Some(*v as u8))
     } else {
         Ok(None)
     }
@@ -1658,6 +1755,30 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x0053 => {
+            match decode_max_thermostat_suggestions(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x0054 => {
+            match decode_thermostat_suggestions(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x0055 => {
+            match decode_current_thermostat_suggestion(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x0056 => {
+            match decode_thermostat_suggestion_not_following_reason(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -1725,6 +1846,10 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x0050, "Presets"),
         (0x0051, "Schedules"),
         (0x0052, "SetpointHoldExpiryTimestamp"),
+        (0x0053, "MaxThermostatSuggestions"),
+        (0x0054, "ThermostatSuggestions"),
+        (0x0055, "CurrentThermostatSuggestion"),
+        (0x0056, "ThermostatSuggestionNotFollowingReason"),
     ]
 }
 
@@ -1735,6 +1860,8 @@ pub fn get_command_list() -> Vec<(u32, &'static str)> {
         (0x00, "SetpointRaiseLower"),
         (0x05, "SetActiveScheduleRequest"),
         (0x06, "SetActivePresetRequest"),
+        (0x07, "AddThermostatSuggestion"),
+        (0x08, "RemoveThermostatSuggestion"),
     ]
 }
 
@@ -1743,6 +1870,8 @@ pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
         0x00 => Some("SetpointRaiseLower"),
         0x05 => Some("SetActiveScheduleRequest"),
         0x06 => Some("SetActivePresetRequest"),
+        0x07 => Some("AddThermostatSuggestion"),
+        0x08 => Some("RemoveThermostatSuggestion"),
         _ => None,
     }
 }
@@ -1758,6 +1887,14 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
         ]),
         0x06 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "preset_handle", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: true },
+        ]),
+        0x07 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "preset_handle", kind: crate::clusters::codec::FieldKind::OctetString, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "effective_time", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "expiration_in_minutes", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
+        ]),
+        0x08 => Some(vec![
+            crate::clusters::codec::CommandField { tag: 0, name: "unique_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         _ => None,
     }
@@ -1781,7 +1918,36 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         let preset_handle = crate::clusters::codec::json_util::get_opt_octstr(args, "preset_handle")?;
         encode_set_active_preset_request(preset_handle)
         }
+        0x07 => {
+        let preset_handle = crate::clusters::codec::json_util::get_octstr(args, "preset_handle")?;
+        let effective_time = crate::clusters::codec::json_util::get_opt_u64(args, "effective_time")?;
+        let expiration_in_minutes = crate::clusters::codec::json_util::get_u16(args, "expiration_in_minutes")?;
+        encode_add_thermostat_suggestion(preset_handle, effective_time, expiration_in_minutes)
+        }
+        0x08 => {
+        let unique_id = crate::clusters::codec::json_util::get_u8(args, "unique_id")?;
+        encode_remove_thermostat_suggestion(unique_id)
+        }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct AddThermostatSuggestionResponse {
+    pub unique_id: Option<u8>,
+}
+
+// Command response decoders
+
+/// Decode AddThermostatSuggestionResponse command response (02)
+pub fn decode_add_thermostat_suggestion_response(inp: &tlv::TlvItemValue) -> anyhow::Result<AddThermostatSuggestionResponse> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(AddThermostatSuggestionResponse {
+                unique_id: item.get_int(&[0]).map(|v| v as u8),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
     }
 }
 
@@ -1802,6 +1968,18 @@ pub async fn set_active_schedule_request(conn: &crate::controller::Connection, e
 /// Invoke `SetActivePresetRequest` command on cluster `Thermostat`.
 pub async fn set_active_preset_request(conn: &crate::controller::Connection, endpoint: u16, preset_handle: Option<Vec<u8>>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_CMD_ID_SETACTIVEPRESETREQUEST, &encode_set_active_preset_request(preset_handle)?).await?;
+    Ok(())
+}
+
+/// Invoke `AddThermostatSuggestion` command on cluster `Thermostat`.
+pub async fn add_thermostat_suggestion(conn: &crate::controller::Connection, endpoint: u16, preset_handle: Vec<u8>, effective_time: Option<u64>, expiration_in_minutes: u16) -> anyhow::Result<AddThermostatSuggestionResponse> {
+    let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_CMD_ID_ADDTHERMOSTATSUGGESTION, &encode_add_thermostat_suggestion(preset_handle, effective_time, expiration_in_minutes)?).await?;
+    decode_add_thermostat_suggestion_response(&tlv)
+}
+
+/// Invoke `RemoveThermostatSuggestion` command on cluster `Thermostat`.
+pub async fn remove_thermostat_suggestion(conn: &crate::controller::Connection, endpoint: u16, unique_id: u8) -> anyhow::Result<()> {
+    conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_CMD_ID_REMOVETHERMOSTATSUGGESTION, &encode_remove_thermostat_suggestion(unique_id)?).await?;
     Ok(())
 }
 
@@ -1866,7 +2044,7 @@ pub async fn read_hvac_system_type_configuration(conn: &crate::controller::Conne
 }
 
 /// Read `LocalTemperatureCalibration` attribute from cluster `Thermostat`.
-pub async fn read_local_temperature_calibration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+pub async fn read_local_temperature_calibration(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i8> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_LOCALTEMPERATURECALIBRATION).await?;
     decode_local_temperature_calibration(&tlv)
 }
@@ -1920,7 +2098,7 @@ pub async fn read_max_cool_setpoint_limit(conn: &crate::controller::Connection, 
 }
 
 /// Read `MinSetpointDeadBand` attribute from cluster `Thermostat`.
-pub async fn read_min_setpoint_dead_band(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+pub async fn read_min_setpoint_dead_band(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<i8> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MINSETPOINTDEADBAND).await?;
     decode_min_setpoint_dead_band(&tlv)
 }
@@ -1962,7 +2140,7 @@ pub async fn read_temperature_setpoint_hold_duration(conn: &crate::controller::C
 }
 
 /// Read `ThermostatProgrammingOperationMode` attribute from cluster `Thermostat`.
-pub async fn read_thermostat_programming_operation_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<ProgrammingOperationMode> {
+pub async fn read_thermostat_programming_operation_mode(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_THERMOSTATPROGRAMMINGOPERATIONMODE).await?;
     decode_thermostat_programming_operation_mode(&tlv)
 }
@@ -2145,5 +2323,189 @@ pub async fn read_schedules(conn: &crate::controller::Connection, endpoint: u16)
 pub async fn read_setpoint_hold_expiry_timestamp(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<u64>> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_SETPOINTHOLDEXPIRYTIMESTAMP).await?;
     decode_setpoint_hold_expiry_timestamp(&tlv)
+}
+
+/// Read `MaxThermostatSuggestions` attribute from cluster `Thermostat`.
+pub async fn read_max_thermostat_suggestions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_MAXTHERMOSTATSUGGESTIONS).await?;
+    decode_max_thermostat_suggestions(&tlv)
+}
+
+/// Read `ThermostatSuggestions` attribute from cluster `Thermostat`.
+pub async fn read_thermostat_suggestions(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<ThermostatSuggestion>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_THERMOSTATSUGGESTIONS).await?;
+    decode_thermostat_suggestions(&tlv)
+}
+
+/// Read `CurrentThermostatSuggestion` attribute from cluster `Thermostat`.
+pub async fn read_current_thermostat_suggestion(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ThermostatSuggestion>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_CURRENTTHERMOSTATSUGGESTION).await?;
+    decode_current_thermostat_suggestion(&tlv)
+}
+
+/// Read `ThermostatSuggestionNotFollowingReason` attribute from cluster `Thermostat`.
+pub async fn read_thermostat_suggestion_not_following_reason(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Option<ThermostatSuggestionNotFollowingReason>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_THERMOSTAT, crate::clusters::defs::CLUSTER_THERMOSTAT_ATTR_ID_THERMOSTATSUGGESTIONNOTFOLLOWINGREASON).await?;
+    decode_thermostat_suggestion_not_following_reason(&tlv)
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SystemModeChangeEvent {
+    pub previous_system_mode: Option<SystemMode>,
+    pub current_system_mode: Option<SystemMode>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct LocalTemperatureChangeEvent {
+    pub current_local_temperature: Option<i16>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct OccupancyChangeEvent {
+    pub previous_occupancy: Option<Occupancy>,
+    pub current_occupancy: Option<Occupancy>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SetpointChangeEvent {
+    pub system_mode: Option<SystemMode>,
+    pub occupancy: Option<Occupancy>,
+    pub previous_setpoint: Option<i16>,
+    pub current_setpoint: Option<i16>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RunningStateChangeEvent {
+    pub previous_running_state: Option<RelayState>,
+    pub current_running_state: Option<RelayState>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RunningModeChangeEvent {
+    pub previous_running_mode: Option<ThermostatRunningMode>,
+    pub current_running_mode: Option<ThermostatRunningMode>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ActiveScheduleChangeEvent {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
+    pub previous_schedule_handle: Option<Vec<u8>>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
+    pub current_schedule_handle: Option<Vec<u8>>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ActivePresetChangeEvent {
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
+    pub previous_preset_handle: Option<Vec<u8>>,
+    #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
+    pub current_preset_handle: Option<Vec<u8>>,
+}
+
+// Event decoders
+
+/// Decode SystemModeChange event (0x00, priority: info)
+pub fn decode_system_mode_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<SystemModeChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(SystemModeChangeEvent {
+                                previous_system_mode: item.get_int(&[0]).and_then(|v| SystemMode::from_u8(v as u8)),
+                                current_system_mode: item.get_int(&[1]).and_then(|v| SystemMode::from_u8(v as u8)),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode LocalTemperatureChange event (0x01, priority: info)
+pub fn decode_local_temperature_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<LocalTemperatureChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(LocalTemperatureChangeEvent {
+                                current_local_temperature: item.get_int(&[0]).map(|v| v as i16),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode OccupancyChange event (0x02, priority: info)
+pub fn decode_occupancy_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<OccupancyChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(OccupancyChangeEvent {
+                                previous_occupancy: item.get_int(&[0]).map(|v| v as u8),
+                                current_occupancy: item.get_int(&[1]).map(|v| v as u8),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode SetpointChange event (0x03, priority: info)
+pub fn decode_setpoint_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<SetpointChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(SetpointChangeEvent {
+                                system_mode: item.get_int(&[0]).and_then(|v| SystemMode::from_u8(v as u8)),
+                                occupancy: item.get_int(&[1]).map(|v| v as u8),
+                                previous_setpoint: item.get_int(&[2]).map(|v| v as i16),
+                                current_setpoint: item.get_int(&[3]).map(|v| v as i16),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode RunningStateChange event (0x04, priority: info)
+pub fn decode_running_state_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<RunningStateChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(RunningStateChangeEvent {
+                                previous_running_state: item.get_int(&[0]).map(|v| v as u8),
+                                current_running_state: item.get_int(&[1]).map(|v| v as u8),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode RunningModeChange event (0x05, priority: info)
+pub fn decode_running_mode_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<RunningModeChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(RunningModeChangeEvent {
+                                previous_running_mode: item.get_int(&[0]).and_then(|v| ThermostatRunningMode::from_u8(v as u8)),
+                                current_running_mode: item.get_int(&[1]).and_then(|v| ThermostatRunningMode::from_u8(v as u8)),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode ActiveScheduleChange event (0x06, priority: info)
+pub fn decode_active_schedule_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<ActiveScheduleChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(ActiveScheduleChangeEvent {
+                                previous_schedule_handle: item.get_octet_string_owned(&[0]),
+                                current_schedule_handle: item.get_octet_string_owned(&[1]),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode ActivePresetChange event (0x07, priority: info)
+pub fn decode_active_preset_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<ActivePresetChangeEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(ActivePresetChangeEvent {
+                                previous_preset_handle: item.get_octet_string_owned(&[0]),
+                                current_preset_handle: item.get_octet_string_owned(&[1]),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
 }
 

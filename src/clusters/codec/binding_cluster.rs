@@ -15,7 +15,7 @@ use serde_json;
 #[derive(Debug, serde::Serialize)]
 pub struct Target {
     pub node: Option<u64>,
-    pub group: Option<u8>,
+    pub group: Option<u16>,
     pub endpoint: Option<u16>,
     pub cluster: Option<u32>,
 }
@@ -29,7 +29,7 @@ pub fn decode_binding(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Target>> {
         for item in v {
             res.push(Target {
                 node: item.get_int(&[1]),
-                group: item.get_int(&[2]).map(|v| v as u8),
+                group: item.get_int(&[2]).map(|v| v as u16),
                 endpoint: item.get_int(&[3]).map(|v| v as u16),
                 cluster: item.get_int(&[4]).map(|v| v as u32),
             });

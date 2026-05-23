@@ -182,7 +182,7 @@ pub struct TwoDCartesianZone {
 
 #[derive(Debug, serde::Serialize)]
 pub struct ZoneInformation {
-    pub zone_id: Option<u8>,
+    pub zone_id: Option<u16>,
     pub zone_type: Option<ZoneType>,
     pub zone_source: Option<ZoneSource>,
     pub two_d_cartesian_zone: Option<TwoDCartesianZone>,
@@ -190,7 +190,7 @@ pub struct ZoneInformation {
 
 #[derive(Debug, serde::Serialize)]
 pub struct ZoneTriggerControl {
-    pub zone_id: Option<u8>,
+    pub zone_id: Option<u16>,
     pub initial_duration: Option<u32>,
     pub augmentation_duration: Option<u32>,
     pub max_duration: Option<u32>,
@@ -226,7 +226,7 @@ pub fn encode_create_two_d_cartesian_zone(zone: TwoDCartesianZone) -> anyhow::Re
 }
 
 /// Encode UpdateTwoDCartesianZone command (0x02)
-pub fn encode_update_two_d_cartesian_zone(zone_id: u8, zone: TwoDCartesianZone) -> anyhow::Result<Vec<u8>> {
+pub fn encode_update_two_d_cartesian_zone(zone_id: u16, zone: TwoDCartesianZone) -> anyhow::Result<Vec<u8>> {
             // Encode struct TwoDCartesianZoneStruct
             let mut zone_fields = Vec::new();
             if let Some(x) = zone.name { zone_fields.push((0, tlv::TlvItemValueEnc::String(x.clone())).into()); }
@@ -244,7 +244,7 @@ pub fn encode_update_two_d_cartesian_zone(zone_id: u8, zone: TwoDCartesianZone) 
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(zone_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(zone_id)).into(),
         (1, tlv::TlvItemValueEnc::StructInvisible(zone_fields)).into(),
         ]),
     };
@@ -252,11 +252,11 @@ pub fn encode_update_two_d_cartesian_zone(zone_id: u8, zone: TwoDCartesianZone) 
 }
 
 /// Encode RemoveZone command (0x03)
-pub fn encode_remove_zone(zone_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_zone(zone_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(zone_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(zone_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -266,7 +266,7 @@ pub fn encode_remove_zone(zone_id: u8) -> anyhow::Result<Vec<u8>> {
 pub fn encode_create_or_update_trigger(trigger: ZoneTriggerControl) -> anyhow::Result<Vec<u8>> {
             // Encode struct ZoneTriggerControlStruct
             let mut trigger_fields = Vec::new();
-            // TODO: encoding for field zone_id (ZoneID) not implemented
+            if let Some(x) = trigger.zone_id { trigger_fields.push((0, tlv::TlvItemValueEnc::UInt16(x)).into()); }
             if let Some(x) = trigger.initial_duration { trigger_fields.push((1, tlv::TlvItemValueEnc::UInt32(x)).into()); }
             if let Some(x) = trigger.augmentation_duration { trigger_fields.push((2, tlv::TlvItemValueEnc::UInt32(x)).into()); }
             if let Some(x) = trigger.max_duration { trigger_fields.push((3, tlv::TlvItemValueEnc::UInt32(x)).into()); }
@@ -282,11 +282,11 @@ pub fn encode_create_or_update_trigger(trigger: ZoneTriggerControl) -> anyhow::R
 }
 
 /// Encode RemoveTrigger command (0x05)
-pub fn encode_remove_trigger(zone_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_trigger(zone_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(zone_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(zone_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -318,7 +318,7 @@ pub fn decode_zones(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<ZoneInformati
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(ZoneInformation {
-                zone_id: item.get_int(&[0]).map(|v| v as u8),
+                zone_id: item.get_int(&[0]).map(|v| v as u16),
                 zone_type: item.get_int(&[1]).and_then(|v| ZoneType::from_u8(v as u8)),
                 zone_source: item.get_int(&[2]).and_then(|v| ZoneSource::from_u8(v as u8)),
                 two_d_cartesian_zone: {
@@ -363,7 +363,7 @@ pub fn decode_triggers(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<ZoneTrigge
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(ZoneTriggerControl {
-                zone_id: item.get_int(&[0]).map(|v| v as u8),
+                zone_id: item.get_int(&[0]).map(|v| v as u16),
                 initial_duration: item.get_int(&[1]).map(|v| v as u32),
                 augmentation_duration: item.get_int(&[2]).map(|v| v as u32),
                 max_duration: item.get_int(&[3]).map(|v| v as u32),
@@ -517,17 +517,17 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 0, name: "zone", kind: crate::clusters::codec::FieldKind::Struct { name: "TwoDCartesianZoneStruct" }, optional: false, nullable: false },
         ]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "zone", kind: crate::clusters::codec::FieldKind::Struct { name: "TwoDCartesianZoneStruct" }, optional: false, nullable: false },
         ]),
         0x03 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "trigger", kind: crate::clusters::codec::FieldKind::Struct { name: "ZoneTriggerControlStruct" }, optional: false, nullable: false },
         ]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "zone_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         _ => None,
     }
@@ -538,12 +538,12 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x00 => Err(anyhow::anyhow!("command \"CreateTwoDCartesianZone\" has complex args: use raw mode")),
         0x02 => Err(anyhow::anyhow!("command \"UpdateTwoDCartesianZone\" has complex args: use raw mode")),
         0x03 => {
-        let zone_id = crate::clusters::codec::json_util::get_u8(args, "zone_id")?;
+        let zone_id = crate::clusters::codec::json_util::get_u16(args, "zone_id")?;
         encode_remove_zone(zone_id)
         }
         0x04 => Err(anyhow::anyhow!("command \"CreateOrUpdateTrigger\" has complex args: use raw mode")),
         0x05 => {
-        let zone_id = crate::clusters::codec::json_util::get_u8(args, "zone_id")?;
+        let zone_id = crate::clusters::codec::json_util::get_u16(args, "zone_id")?;
         encode_remove_trigger(zone_id)
         }
         _ => Err(anyhow::anyhow!("unknown command ID: 0x{:02X}", cmd_id)),
@@ -552,7 +552,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 
 #[derive(Debug, serde::Serialize)]
 pub struct CreateTwoDCartesianZoneResponse {
-    pub zone_id: Option<u8>,
+    pub zone_id: Option<u16>,
 }
 
 // Command response decoders
@@ -562,7 +562,7 @@ pub fn decode_create_two_d_cartesian_zone_response(inp: &tlv::TlvItemValue) -> a
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(CreateTwoDCartesianZoneResponse {
-                zone_id: item.get_int(&[0]).map(|v| v as u8),
+                zone_id: item.get_int(&[0]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -578,13 +578,13 @@ pub async fn create_two_d_cartesian_zone(conn: &crate::controller::Connection, e
 }
 
 /// Invoke `UpdateTwoDCartesianZone` command on cluster `Zone Management`.
-pub async fn update_two_d_cartesian_zone(conn: &crate::controller::Connection, endpoint: u16, zone_id: u8, zone: TwoDCartesianZone) -> anyhow::Result<()> {
+pub async fn update_two_d_cartesian_zone(conn: &crate::controller::Connection, endpoint: u16, zone_id: u16, zone: TwoDCartesianZone) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_UPDATETWODCARTESIANZONE, &encode_update_two_d_cartesian_zone(zone_id, zone)?).await?;
     Ok(())
 }
 
 /// Invoke `RemoveZone` command on cluster `Zone Management`.
-pub async fn remove_zone(conn: &crate::controller::Connection, endpoint: u16, zone_id: u8) -> anyhow::Result<()> {
+pub async fn remove_zone(conn: &crate::controller::Connection, endpoint: u16, zone_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_REMOVEZONE, &encode_remove_zone(zone_id)?).await?;
     Ok(())
 }
@@ -596,7 +596,7 @@ pub async fn create_or_update_trigger(conn: &crate::controller::Connection, endp
 }
 
 /// Invoke `RemoveTrigger` command on cluster `Zone Management`.
-pub async fn remove_trigger(conn: &crate::controller::Connection, endpoint: u16, zone_id: u8) -> anyhow::Result<()> {
+pub async fn remove_trigger(conn: &crate::controller::Connection, endpoint: u16, zone_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_ZONE_MANAGEMENT, crate::clusters::defs::CLUSTER_ZONE_MANAGEMENT_CMD_ID_REMOVETRIGGER, &encode_remove_trigger(zone_id)?).await?;
     Ok(())
 }
@@ -645,13 +645,13 @@ pub async fn read_two_d_cartesian_max(conn: &crate::controller::Connection, endp
 
 #[derive(Debug, serde::Serialize)]
 pub struct ZoneTriggeredEvent {
-    pub zone: Option<u8>,
+    pub zone: Option<u16>,
     pub reason: Option<ZoneEventTriggeredReason>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct ZoneStoppedEvent {
-    pub zone: Option<u8>,
+    pub zone: Option<u16>,
     pub reason: Option<ZoneEventStoppedReason>,
 }
 
@@ -662,7 +662,7 @@ pub fn decode_zone_triggered_event(inp: &tlv::TlvItemValue) -> anyhow::Result<Zo
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ZoneTriggeredEvent {
-                                zone: item.get_int(&[0]).map(|v| v as u8),
+                                zone: item.get_int(&[0]).map(|v| v as u16),
                                 reason: item.get_int(&[1]).and_then(|v| ZoneEventTriggeredReason::from_u8(v as u8)),
         })
     } else {
@@ -675,7 +675,7 @@ pub fn decode_zone_stopped_event(inp: &tlv::TlvItemValue) -> anyhow::Result<Zone
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ZoneStoppedEvent {
-                                zone: item.get_int(&[0]).map(|v| v as u8),
+                                zone: item.get_int(&[0]).map(|v| v as u16),
                                 reason: item.get_int(&[1]).and_then(|v| ZoneEventStoppedReason::from_u8(v as u8)),
         })
     } else {

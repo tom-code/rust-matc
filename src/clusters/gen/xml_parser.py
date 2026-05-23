@@ -262,6 +262,19 @@ class ClusterParser:
 
         return enums
 
+    def parse_typedefs(self) -> Dict[str, str]:
+        """Parse <number> typedef elements from dataTypes and return name -> base_type mapping."""
+        typedefs = {}
+        data_types_elem = self.root.find('dataTypes')
+        if data_types_elem is None:
+            return typedefs
+        for num_elem in data_types_elem.findall('number'):
+            name = num_elem.get('name')
+            base = num_elem.get('type')
+            if name and base:
+                typedefs[name] = base
+        return typedefs
+
     def parse_bitmaps(self) -> Dict[str, MatterBitmap]:
         """Parse all bitmap definitions from the XML."""
         bitmaps = {}

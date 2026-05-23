@@ -10,7 +10,7 @@ import os
 import sys
 import glob
 import re
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .naming import convert_to_snake_case, upper_ident
 from .xml_parser import ClusterParser
@@ -132,7 +132,16 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {{
     return function
 
 
-def generate_rust_code(xml_file: str) -> str:
+def _resolve_field_typedefs(fields, typedefs: Dict[str, str]) -> None:
+    """Resolve typedef names in MatterField objects to their base types in-place."""
+    for field in fields:
+        if field.field_type in typedefs:
+            field.field_type = typedefs[field.field_type]
+        if field.entry_type and field.entry_type in typedefs:
+            field.entry_type = typedefs[field.entry_type]
+
+
+def generate_rust_code(xml_file: str, typedefs: Optional[Dict[str, str]] = None) -> str:
     """Generate Rust code for the given XML cluster file."""
     parser = ClusterParser(xml_file)
     commands = parser.parse_commands()
@@ -142,6 +151,19 @@ def generate_rust_code(xml_file: str) -> str:
     structs = parser.parse_structs()
     enums = parser.parse_enums()
     bitmaps = parser.parse_bitmaps()
+
+    # Resolve <number> typedefs to base types so existing helpers handle them correctly
+    if typedefs:
+        for cmd in commands:
+            _resolve_field_typedefs(cmd.fields, typedefs)
+        for resp in response_commands:
+            _resolve_field_typedefs(resp.fields, typedefs)
+        for evt in events:
+            _resolve_field_typedefs(evt.fields, typedefs)
+        for struct in structs.values():
+            _resolve_field_typedefs(struct.fields, typedefs)
+        for attr in attributes:
+            _resolve_field_typedefs([attr._field], typedefs)
 
     # Detect name collisions between enums, structs, and bitmaps
     # If an enum/bitmap has the same name as a struct, rename by NOT removing the "Enum"/"Bitmap" suffix
@@ -579,6 +601,7 @@ _SCALAR_FIELD_KIND = {
     'subject-id':   'U64',
     'SubjectID':    'U64',
     'attribute-id': 'U32',
+    'group-id':     'U16',
     'enum8':        'U8',
     'enum16':       'U16',
     'bitmap8':      'U8',
@@ -686,6 +709,7 @@ _JSON_EXTRACT = {
     'subject-id':   ('get_u64',  ''),
     'SubjectID':    ('get_u64',  ''),
     'attribute-id': ('get_u32',  ''),
+    'group-id':     ('get_u16',  ''),
     'enum8':        ('get_u8',   ''),
     'enum16':       ('get_u16',  ''),
     'bitmap8':      ('get_u8',   ''),
@@ -1267,6 +1291,19 @@ def process_xml_files(xml_dir: str, output_dir: str) -> None:
 
     print(f"Found {len(xml_files)} XML files in {xml_dir}")
 
+    # Build global typedef registry from all XML files (first pass)
+    # so cross-cluster <number> typedefs are available during code generation.
+    global_typedefs: Dict[str, str] = {}
+    for xml_file in sorted(xml_files):
+        try:
+            local = ClusterParser(xml_file).parse_typedefs()
+            for name, base in local.items():
+                # Resolve transitive aliases (typedef of typedef)
+                resolved = global_typedefs.get(base, base)
+                global_typedefs[name] = resolved
+        except Exception:
+            pass  # Parsing failures are reported in the main loop below
+
     processed_count = 0
     failed_count = 0
     generated_rust_files = []
@@ -1309,7 +1346,7 @@ def process_xml_files(xml_dir: str, output_dir: str) -> None:
                 'xml_filename': xml_filename
             })
 
-            rust_code = generate_rust_code(xml_file)
+            rust_code = generate_rust_code(xml_file, global_typedefs)
 
             with open(output_file, 'w') as f:
                 f.write(rust_code)

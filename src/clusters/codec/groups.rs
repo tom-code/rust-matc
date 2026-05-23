@@ -24,11 +24,11 @@ pub mod namesupport {
 // Command encoders
 
 /// Encode AddGroup command (0x00)
-pub fn encode_add_group(group_id: u8, group_name: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_group(group_id: u16, group_name: String) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::String(group_name)).into(),
         ]),
     };
@@ -36,44 +36,44 @@ pub fn encode_add_group(group_id: u8, group_name: String) -> anyhow::Result<Vec<
 }
 
 /// Encode ViewGroup command (0x01)
-pub fn encode_view_group(group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_view_group(group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode GetGroupMembership command (0x02)
-pub fn encode_get_group_membership(group_list: Vec<u8>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_get_group_membership(group_list: Vec<u16>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::StructAnon(group_list.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into(),
+        (0, tlv::TlvItemValueEnc::StructAnon(group_list.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode RemoveGroup command (0x03)
-pub fn encode_remove_group(group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_group(group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode AddGroupIfIdentifying command (0x05)
-pub fn encode_add_group_if_identifying(group_id: u8, group_name: String) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_group_if_identifying(group_id: u16, group_name: String) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::String(group_name)).into(),
         ]),
     };
@@ -158,21 +158,21 @@ pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
 pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
     match cmd_id {
         0x00 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "group_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
         ]),
         0x01 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x02 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "group_list", kind: crate::clusters::codec::FieldKind::List { entry_type: "group-id" }, optional: false, nullable: false },
         ]),
         0x03 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "group_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
         ]),
         _ => None,
@@ -182,22 +182,22 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
 pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Result<Vec<u8>> {
     match cmd_id {
         0x00 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let group_name = crate::clusters::codec::json_util::get_string(args, "group_name")?;
         encode_add_group(group_id, group_name)
         }
         0x01 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_view_group(group_id)
         }
         0x02 => Err(anyhow::anyhow!("command \"GetGroupMembership\" has complex args: use raw mode")),
         0x03 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_remove_group(group_id)
         }
         0x04 => Ok(vec![]),
         0x05 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let group_name = crate::clusters::codec::json_util::get_string(args, "group_name")?;
         encode_add_group_if_identifying(group_id, group_name)
         }
@@ -208,26 +208,26 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 #[derive(Debug, serde::Serialize)]
 pub struct AddGroupResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct ViewGroupResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub group_name: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct GetGroupMembershipResponse {
     pub capacity: Option<u8>,
-    pub group_list: Option<Vec<u8>>,
+    pub group_list: Option<Vec<u16>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct RemoveGroupResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
 }
 
 // Command response decoders
@@ -238,7 +238,7 @@ pub fn decode_add_group_response(inp: &tlv::TlvItemValue) -> anyhow::Result<AddG
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(AddGroupResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -251,7 +251,7 @@ pub fn decode_view_group_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Vie
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ViewGroupResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 group_name: item.get_string_owned(&[2]),
         })
     } else {
@@ -267,7 +267,7 @@ pub fn decode_get_group_membership_response(inp: &tlv::TlvItemValue) -> anyhow::
                 capacity: item.get_int(&[0]).map(|v| v as u8),
                 group_list: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[1]) {
-                        let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
+                        let items: Vec<u16> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u16) } else { None } }).collect();
                         Some(items)
                     } else {
                         None
@@ -285,7 +285,7 @@ pub fn decode_remove_group_response(inp: &tlv::TlvItemValue) -> anyhow::Result<R
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(RemoveGroupResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -295,25 +295,25 @@ pub fn decode_remove_group_response(inp: &tlv::TlvItemValue) -> anyhow::Result<R
 // Typed facade (invokes + reads)
 
 /// Invoke `AddGroup` command on cluster `Groups`.
-pub async fn add_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, group_name: String) -> anyhow::Result<AddGroupResponse> {
+pub async fn add_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, group_name: String) -> anyhow::Result<AddGroupResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_ADDGROUP, &encode_add_group(group_id, group_name)?).await?;
     decode_add_group_response(&tlv)
 }
 
 /// Invoke `ViewGroup` command on cluster `Groups`.
-pub async fn view_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<ViewGroupResponse> {
+pub async fn view_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u16) -> anyhow::Result<ViewGroupResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_VIEWGROUP, &encode_view_group(group_id)?).await?;
     decode_view_group_response(&tlv)
 }
 
 /// Invoke `GetGroupMembership` command on cluster `Groups`.
-pub async fn get_group_membership(conn: &crate::controller::Connection, endpoint: u16, group_list: Vec<u8>) -> anyhow::Result<GetGroupMembershipResponse> {
+pub async fn get_group_membership(conn: &crate::controller::Connection, endpoint: u16, group_list: Vec<u16>) -> anyhow::Result<GetGroupMembershipResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_GETGROUPMEMBERSHIP, &encode_get_group_membership(group_list)?).await?;
     decode_get_group_membership_response(&tlv)
 }
 
 /// Invoke `RemoveGroup` command on cluster `Groups`.
-pub async fn remove_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<RemoveGroupResponse> {
+pub async fn remove_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u16) -> anyhow::Result<RemoveGroupResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_REMOVEGROUP, &encode_remove_group(group_id)?).await?;
     decode_remove_group_response(&tlv)
 }
@@ -325,7 +325,7 @@ pub async fn remove_all_groups(conn: &crate::controller::Connection, endpoint: u
 }
 
 /// Invoke `AddGroupIfIdentifying` command on cluster `Groups`.
-pub async fn add_group_if_identifying(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, group_name: String) -> anyhow::Result<()> {
+pub async fn add_group_if_identifying(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, group_name: String) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_GROUPS, crate::clusters::defs::CLUSTER_GROUPS_CMD_ID_ADDGROUPIFIDENTIFYING, &encode_add_group_if_identifying(group_id, group_name)?).await?;
     Ok(())
 }

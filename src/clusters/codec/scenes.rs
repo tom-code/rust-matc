@@ -46,7 +46,7 @@ pub struct ExtensionFieldSet {
 pub struct SceneInfo {
     pub scene_count: Option<u8>,
     pub current_scene: Option<u8>,
-    pub current_group: Option<u8>,
+    pub current_group: Option<u16>,
     pub scene_valid: Option<bool>,
     pub remaining_capacity: Option<u8>,
 }
@@ -54,11 +54,11 @@ pub struct SceneInfo {
 // Command encoders
 
 /// Encode AddScene command (0x00)
-pub fn encode_add_scene(group_id: u8, scene_id: u8, transition_time: u32, scene_name: String, extension_field_set_structs: Vec<ExtensionFieldSet>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_scene(group_id: u16, scene_id: u8, transition_time: u32, scene_name: String, extension_field_set_structs: Vec<ExtensionFieldSet>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt8(scene_id)).into(),
         (2, tlv::TlvItemValueEnc::UInt32(transition_time)).into(),
         (3, tlv::TlvItemValueEnc::String(scene_name)).into(),
@@ -89,11 +89,11 @@ pub fn encode_add_scene(group_id: u8, scene_id: u8, transition_time: u32, scene_
 }
 
 /// Encode ViewScene command (0x01)
-pub fn encode_view_scene(group_id: u8, scene_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_view_scene(group_id: u16, scene_id: u8) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt8(scene_id)).into(),
         ]),
     };
@@ -101,11 +101,11 @@ pub fn encode_view_scene(group_id: u8, scene_id: u8) -> anyhow::Result<Vec<u8>> 
 }
 
 /// Encode RemoveScene command (0x02)
-pub fn encode_remove_scene(group_id: u8, scene_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_scene(group_id: u16, scene_id: u8) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt8(scene_id)).into(),
         ]),
     };
@@ -113,22 +113,22 @@ pub fn encode_remove_scene(group_id: u8, scene_id: u8) -> anyhow::Result<Vec<u8>
 }
 
 /// Encode RemoveAllScenes command (0x03)
-pub fn encode_remove_all_scenes(group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_all_scenes(group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode StoreScene command (0x04)
-pub fn encode_store_scene(group_id: u8, scene_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_store_scene(group_id: u16, scene_id: u8) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt8(scene_id)).into(),
         ]),
     };
@@ -136,11 +136,11 @@ pub fn encode_store_scene(group_id: u8, scene_id: u8) -> anyhow::Result<Vec<u8>>
 }
 
 /// Encode RecallScene command (0x05)
-pub fn encode_recall_scene(group_id: u8, scene_id: u8, transition_time: Option<u32>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_recall_scene(group_id: u16, scene_id: u8, transition_time: Option<u32>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt8(scene_id)).into(),
         (2, tlv::TlvItemValueEnc::UInt32(transition_time.unwrap_or(0))).into(),
         ]),
@@ -149,25 +149,25 @@ pub fn encode_recall_scene(group_id: u8, scene_id: u8, transition_time: Option<u
 }
 
 /// Encode GetSceneMembership command (0x06)
-pub fn encode_get_scene_membership(group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_get_scene_membership(group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode CopyScene command (0x40)
-pub fn encode_copy_scene(mode: CopyMode, group_identifier_from: u8, scene_identifier_from: u8, group_identifier_to: u8, scene_identifier_to: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_copy_scene(mode: CopyMode, group_identifier_from: u16, scene_identifier_from: u8, group_identifier_to: u16, scene_identifier_to: u8) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt8(mode)).into(),
-        (1, tlv::TlvItemValueEnc::UInt8(group_identifier_from)).into(),
+        (1, tlv::TlvItemValueEnc::UInt16(group_identifier_from)).into(),
         (2, tlv::TlvItemValueEnc::UInt8(scene_identifier_from)).into(),
-        (3, tlv::TlvItemValueEnc::UInt8(group_identifier_to)).into(),
+        (3, tlv::TlvItemValueEnc::UInt16(group_identifier_to)).into(),
         (4, tlv::TlvItemValueEnc::UInt8(scene_identifier_to)).into(),
         ]),
     };
@@ -202,7 +202,7 @@ pub fn decode_fabric_scene_info(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<S
             res.push(SceneInfo {
                 scene_count: item.get_int(&[0]).map(|v| v as u8),
                 current_scene: item.get_int(&[1]).map(|v| v as u8),
-                current_group: item.get_int(&[2]).map(|v| v as u8),
+                current_group: item.get_int(&[2]).map(|v| v as u16),
                 scene_valid: item.get_bool(&[3]),
                 remaining_capacity: item.get_int(&[4]).map(|v| v as u8),
             });
@@ -296,40 +296,40 @@ pub fn get_command_name(cmd_id: u32) -> Option<&'static str> {
 pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::CommandField>> {
     match cmd_id {
         0x00 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 3, name: "scene_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 4, name: "extension_field_set_structs", kind: crate::clusters::codec::FieldKind::List { entry_type: "ExtensionFieldSetStruct" }, optional: false, nullable: false },
         ]),
         0x01 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         0x02 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         0x03 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "scene_id", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "transition_time", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
         ]),
         0x06 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x40 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "mode", kind: crate::clusters::codec::FieldKind::Bitmap { name: "CopyMode", bits: &[(1, "COPY_ALL_SCENES")] }, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 1, name: "group_identifier_from", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 1, name: "group_identifier_from", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "scene_identifier_from", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 3, name: "group_identifier_to", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "group_identifier_to", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 4, name: "scene_identifier_to", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
         ]),
         _ => None,
@@ -340,39 +340,39 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
     match cmd_id {
         0x00 => Err(anyhow::anyhow!("command \"AddScene\" has complex args: use raw mode")),
         0x01 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
         encode_view_scene(group_id, scene_id)
         }
         0x02 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
         encode_remove_scene(group_id, scene_id)
         }
         0x03 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_remove_all_scenes(group_id)
         }
         0x04 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
         encode_store_scene(group_id, scene_id)
         }
         0x05 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let scene_id = crate::clusters::codec::json_util::get_u8(args, "scene_id")?;
         let transition_time = crate::clusters::codec::json_util::get_opt_u32(args, "transition_time")?;
         encode_recall_scene(group_id, scene_id, transition_time)
         }
         0x06 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_get_scene_membership(group_id)
         }
         0x40 => {
         let mode = crate::clusters::codec::json_util::get_u8(args, "mode")?;
-        let group_identifier_from = crate::clusters::codec::json_util::get_u8(args, "group_identifier_from")?;
+        let group_identifier_from = crate::clusters::codec::json_util::get_u16(args, "group_identifier_from")?;
         let scene_identifier_from = crate::clusters::codec::json_util::get_u8(args, "scene_identifier_from")?;
-        let group_identifier_to = crate::clusters::codec::json_util::get_u8(args, "group_identifier_to")?;
+        let group_identifier_to = crate::clusters::codec::json_util::get_u16(args, "group_identifier_to")?;
         let scene_identifier_to = crate::clusters::codec::json_util::get_u8(args, "scene_identifier_to")?;
         encode_copy_scene(mode, group_identifier_from, scene_identifier_from, group_identifier_to, scene_identifier_to)
         }
@@ -383,14 +383,14 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 #[derive(Debug, serde::Serialize)]
 pub struct AddSceneResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub scene_id: Option<u8>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct ViewSceneResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub scene_id: Option<u8>,
     pub transition_time: Option<u32>,
     pub scene_name: Option<String>,
@@ -400,20 +400,20 @@ pub struct ViewSceneResponse {
 #[derive(Debug, serde::Serialize)]
 pub struct RemoveSceneResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub scene_id: Option<u8>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct RemoveAllScenesResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct StoreSceneResponse {
     pub status: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub scene_id: Option<u8>,
 }
 
@@ -421,14 +421,14 @@ pub struct StoreSceneResponse {
 pub struct GetSceneMembershipResponse {
     pub status: Option<u8>,
     pub capacity: Option<u8>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub scene_list: Option<Vec<u8>>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct CopySceneResponse {
     pub status: Option<u8>,
-    pub group_identifier_from: Option<u8>,
+    pub group_identifier_from: Option<u16>,
     pub scene_identifier_from: Option<u8>,
 }
 
@@ -440,7 +440,7 @@ pub fn decode_add_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<AddS
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(AddSceneResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 scene_id: item.get_int(&[2]).map(|v| v as u8),
         })
     } else {
@@ -454,7 +454,7 @@ pub fn decode_view_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Vie
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ViewSceneResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 scene_id: item.get_int(&[2]).map(|v| v as u8),
                 transition_time: item.get_int(&[3]).map(|v| v as u32),
                 scene_name: item.get_string_owned(&[4]),
@@ -504,7 +504,7 @@ pub fn decode_remove_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<R
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(RemoveSceneResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 scene_id: item.get_int(&[2]).map(|v| v as u8),
         })
     } else {
@@ -518,7 +518,7 @@ pub fn decode_remove_all_scenes_response(inp: &tlv::TlvItemValue) -> anyhow::Res
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(RemoveAllScenesResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -531,7 +531,7 @@ pub fn decode_store_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<St
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(StoreSceneResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 scene_id: item.get_int(&[2]).map(|v| v as u8),
         })
     } else {
@@ -546,7 +546,7 @@ pub fn decode_get_scene_membership_response(inp: &tlv::TlvItemValue) -> anyhow::
         Ok(GetSceneMembershipResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
                 capacity: item.get_int(&[1]).map(|v| v as u8),
-                group_id: item.get_int(&[2]).map(|v| v as u8),
+                group_id: item.get_int(&[2]).map(|v| v as u16),
                 scene_list: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[3]) {
                         let items: Vec<u8> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u8) } else { None } }).collect();
@@ -567,7 +567,7 @@ pub fn decode_copy_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Cop
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(CopySceneResponse {
                 status: item.get_int(&[0]).map(|v| v as u8),
-                group_identifier_from: item.get_int(&[1]).map(|v| v as u8),
+                group_identifier_from: item.get_int(&[1]).map(|v| v as u16),
                 scene_identifier_from: item.get_int(&[2]).map(|v| v as u8),
         })
     } else {
@@ -578,49 +578,49 @@ pub fn decode_copy_scene_response(inp: &tlv::TlvItemValue) -> anyhow::Result<Cop
 // Typed facade (invokes + reads)
 
 /// Invoke `AddScene` command on cluster `Scenes Management`.
-pub async fn add_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8, transition_time: u32, scene_name: String, extension_field_set_structs: Vec<ExtensionFieldSet>) -> anyhow::Result<AddSceneResponse> {
+pub async fn add_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, scene_id: u8, transition_time: u32, scene_name: String, extension_field_set_structs: Vec<ExtensionFieldSet>) -> anyhow::Result<AddSceneResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_ADDSCENE, &encode_add_scene(group_id, scene_id, transition_time, scene_name, extension_field_set_structs)?).await?;
     decode_add_scene_response(&tlv)
 }
 
 /// Invoke `ViewScene` command on cluster `Scenes Management`.
-pub async fn view_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8) -> anyhow::Result<ViewSceneResponse> {
+pub async fn view_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, scene_id: u8) -> anyhow::Result<ViewSceneResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_VIEWSCENE, &encode_view_scene(group_id, scene_id)?).await?;
     decode_view_scene_response(&tlv)
 }
 
 /// Invoke `RemoveScene` command on cluster `Scenes Management`.
-pub async fn remove_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8) -> anyhow::Result<RemoveSceneResponse> {
+pub async fn remove_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, scene_id: u8) -> anyhow::Result<RemoveSceneResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_REMOVESCENE, &encode_remove_scene(group_id, scene_id)?).await?;
     decode_remove_scene_response(&tlv)
 }
 
 /// Invoke `RemoveAllScenes` command on cluster `Scenes Management`.
-pub async fn remove_all_scenes(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<RemoveAllScenesResponse> {
+pub async fn remove_all_scenes(conn: &crate::controller::Connection, endpoint: u16, group_id: u16) -> anyhow::Result<RemoveAllScenesResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_REMOVEALLSCENES, &encode_remove_all_scenes(group_id)?).await?;
     decode_remove_all_scenes_response(&tlv)
 }
 
 /// Invoke `StoreScene` command on cluster `Scenes Management`.
-pub async fn store_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8) -> anyhow::Result<StoreSceneResponse> {
+pub async fn store_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, scene_id: u8) -> anyhow::Result<StoreSceneResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_STORESCENE, &encode_store_scene(group_id, scene_id)?).await?;
     decode_store_scene_response(&tlv)
 }
 
 /// Invoke `RecallScene` command on cluster `Scenes Management`.
-pub async fn recall_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, scene_id: u8, transition_time: Option<u32>) -> anyhow::Result<()> {
+pub async fn recall_scene(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, scene_id: u8, transition_time: Option<u32>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_RECALLSCENE, &encode_recall_scene(group_id, scene_id, transition_time)?).await?;
     Ok(())
 }
 
 /// Invoke `GetSceneMembership` command on cluster `Scenes Management`.
-pub async fn get_scene_membership(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<GetSceneMembershipResponse> {
+pub async fn get_scene_membership(conn: &crate::controller::Connection, endpoint: u16, group_id: u16) -> anyhow::Result<GetSceneMembershipResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_GETSCENEMEMBERSHIP, &encode_get_scene_membership(group_id)?).await?;
     decode_get_scene_membership_response(&tlv)
 }
 
 /// Invoke `CopyScene` command on cluster `Scenes Management`.
-pub async fn copy_scene(conn: &crate::controller::Connection, endpoint: u16, mode: CopyMode, group_identifier_from: u8, scene_identifier_from: u8, group_identifier_to: u8, scene_identifier_to: u8) -> anyhow::Result<CopySceneResponse> {
+pub async fn copy_scene(conn: &crate::controller::Connection, endpoint: u16, mode: CopyMode, group_identifier_from: u16, scene_identifier_from: u8, group_identifier_to: u16, scene_identifier_to: u8) -> anyhow::Result<CopySceneResponse> {
     let tlv = conn.invoke_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SCENES_MANAGEMENT, crate::clusters::defs::CLUSTER_SCENES_MANAGEMENT_CMD_ID_COPYSCENE, &encode_copy_scene(mode, group_identifier_from, scene_identifier_from, group_identifier_to, scene_identifier_to)?).await?;
     decode_copy_scene_response(&tlv)
 }

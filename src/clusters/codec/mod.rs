@@ -56,6 +56,7 @@ pub mod fixed_label_cluster;
 pub mod flow_measurement;
 pub mod general_commissioning_cluster;
 pub mod group_key_management_cluster;
+pub mod groupcast;
 pub mod groups;
 pub mod icd_management;
 pub mod identify;
@@ -89,6 +90,7 @@ pub mod mode_rvc_run;
 pub mod mode_select;
 pub mod mode_water_heater;
 pub mod network_commissioning_cluster;
+pub mod network_identity_management;
 pub mod occupancy_sensing;
 pub mod on_off;
 pub mod operational_credential_cluster;
@@ -111,10 +113,12 @@ pub mod smoke_co_alarm;
 pub mod soil_measurement;
 pub mod switch;
 pub mod target_navigator;
+pub mod temperature_alarm;
 pub mod temperature_control;
 pub mod temperature_measurement;
 pub mod thermostat;
 pub mod thermostat_user_interface_configuration;
+pub mod thread_border_router_diagnostics;
 pub mod thread_border_router_management;
 pub mod thread_network_directory;
 pub mod time_sync;
@@ -194,6 +198,8 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x005F => microwave_oven_control::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0060 => operational_state::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0062 => scenes::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0064 => temperature_alarm::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0065 => groupcast::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0080 => boolean_state_configuration::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0081 => valve_configuration_control::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0090 => electrical_power_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -225,9 +231,11 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
         0x0404 => flow_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0406 => occupancy_sensing::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0430 => soil_measurement::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0450 => network_identity_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0451 => wifi_network_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0452 => thread_border_router_management::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0453 => thread_network_directory::decode_attribute_json(cluster_id, attribute_id, tlv_value),
+        0x0454 => thread_border_router_diagnostics::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0503 => wake_on_lan::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0504 => channel::decode_attribute_json(cluster_id, attribute_id, tlv_value),
         0x0505 => target_navigator::decode_attribute_json(cluster_id, attribute_id, tlv_value),
@@ -319,6 +327,8 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x005F => microwave_oven_control::get_attribute_list(),
         0x0060 => operational_state::get_attribute_list(),
         0x0062 => scenes::get_attribute_list(),
+        0x0064 => temperature_alarm::get_attribute_list(),
+        0x0065 => groupcast::get_attribute_list(),
         0x0080 => boolean_state_configuration::get_attribute_list(),
         0x0081 => valve_configuration_control::get_attribute_list(),
         0x0090 => electrical_power_measurement::get_attribute_list(),
@@ -350,9 +360,11 @@ pub fn get_attribute_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0404 => flow_measurement::get_attribute_list(),
         0x0406 => occupancy_sensing::get_attribute_list(),
         0x0430 => soil_measurement::get_attribute_list(),
+        0x0450 => network_identity_management::get_attribute_list(),
         0x0451 => wifi_network_management::get_attribute_list(),
         0x0452 => thread_border_router_management::get_attribute_list(),
         0x0453 => thread_network_directory::get_attribute_list(),
+        0x0454 => thread_border_router_diagnostics::get_attribute_list(),
         0x0503 => wake_on_lan::get_attribute_list(),
         0x0504 => channel::get_attribute_list(),
         0x0505 => target_navigator::get_attribute_list(),
@@ -419,6 +431,8 @@ pub fn get_command_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0060 => operational_state::get_command_list(),
         0x0061 => operational_state_rvc::get_command_list(),
         0x0062 => scenes::get_command_list(),
+        0x0064 => temperature_alarm::get_command_list(),
+        0x0065 => groupcast::get_command_list(),
         0x0080 => boolean_state_configuration::get_command_list(),
         0x0081 => valve_configuration_control::get_command_list(),
         0x0094 => water_heater_management::get_command_list(),
@@ -434,6 +448,7 @@ pub fn get_command_list(cluster_id: u32) -> Vec<(u32, &'static str)> {
         0x0201 => thermostat::get_command_list(),
         0x0202 => fan_control::get_command_list(),
         0x0300 => color_control::get_command_list(),
+        0x0450 => network_identity_management::get_command_list(),
         0x0451 => wifi_network_management::get_command_list(),
         0x0452 => thread_border_router_management::get_command_list(),
         0x0453 => thread_network_directory::get_command_list(),
@@ -501,6 +516,8 @@ pub fn get_command_name(cluster_id: u32, cmd_id: u32) -> Option<&'static str> {
         0x0060 => operational_state::get_command_name(cmd_id),
         0x0061 => operational_state_rvc::get_command_name(cmd_id),
         0x0062 => scenes::get_command_name(cmd_id),
+        0x0064 => temperature_alarm::get_command_name(cmd_id),
+        0x0065 => groupcast::get_command_name(cmd_id),
         0x0080 => boolean_state_configuration::get_command_name(cmd_id),
         0x0081 => valve_configuration_control::get_command_name(cmd_id),
         0x0094 => water_heater_management::get_command_name(cmd_id),
@@ -516,6 +533,7 @@ pub fn get_command_name(cluster_id: u32, cmd_id: u32) -> Option<&'static str> {
         0x0201 => thermostat::get_command_name(cmd_id),
         0x0202 => fan_control::get_command_name(cmd_id),
         0x0300 => color_control::get_command_name(cmd_id),
+        0x0450 => network_identity_management::get_command_name(cmd_id),
         0x0451 => wifi_network_management::get_command_name(cmd_id),
         0x0452 => thread_border_router_management::get_command_name(cmd_id),
         0x0453 => thread_network_directory::get_command_name(cmd_id),
@@ -583,6 +601,8 @@ pub fn get_command_schema(cluster_id: u32, cmd_id: u32) -> Option<Vec<CommandFie
         0x0060 => operational_state::get_command_schema(cmd_id),
         0x0061 => operational_state_rvc::get_command_schema(cmd_id),
         0x0062 => scenes::get_command_schema(cmd_id),
+        0x0064 => temperature_alarm::get_command_schema(cmd_id),
+        0x0065 => groupcast::get_command_schema(cmd_id),
         0x0080 => boolean_state_configuration::get_command_schema(cmd_id),
         0x0081 => valve_configuration_control::get_command_schema(cmd_id),
         0x0094 => water_heater_management::get_command_schema(cmd_id),
@@ -598,6 +618,7 @@ pub fn get_command_schema(cluster_id: u32, cmd_id: u32) -> Option<Vec<CommandFie
         0x0201 => thermostat::get_command_schema(cmd_id),
         0x0202 => fan_control::get_command_schema(cmd_id),
         0x0300 => color_control::get_command_schema(cmd_id),
+        0x0450 => network_identity_management::get_command_schema(cmd_id),
         0x0451 => wifi_network_management::get_command_schema(cmd_id),
         0x0452 => thread_border_router_management::get_command_schema(cmd_id),
         0x0453 => thread_network_directory::get_command_schema(cmd_id),
@@ -665,6 +686,8 @@ pub fn encode_command_json(cluster_id: u32, cmd_id: u32, args: &serde_json::Valu
         0x0060 => operational_state::encode_command_json(cmd_id, args),
         0x0061 => operational_state_rvc::encode_command_json(cmd_id, args),
         0x0062 => scenes::encode_command_json(cmd_id, args),
+        0x0064 => temperature_alarm::encode_command_json(cmd_id, args),
+        0x0065 => groupcast::encode_command_json(cmd_id, args),
         0x0080 => boolean_state_configuration::encode_command_json(cmd_id, args),
         0x0081 => valve_configuration_control::encode_command_json(cmd_id, args),
         0x0094 => water_heater_management::encode_command_json(cmd_id, args),
@@ -680,6 +703,7 @@ pub fn encode_command_json(cluster_id: u32, cmd_id: u32, args: &serde_json::Valu
         0x0201 => thermostat::encode_command_json(cmd_id, args),
         0x0202 => fan_control::encode_command_json(cmd_id, args),
         0x0300 => color_control::encode_command_json(cmd_id, args),
+        0x0450 => network_identity_management::encode_command_json(cmd_id, args),
         0x0451 => wifi_network_management::encode_command_json(cmd_id, args),
         0x0452 => thread_border_router_management::encode_command_json(cmd_id, args),
         0x0453 => thread_network_directory::encode_command_json(cmd_id, args),

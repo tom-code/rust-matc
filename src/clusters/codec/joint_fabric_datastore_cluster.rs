@@ -221,7 +221,7 @@ pub struct DatastoreAdministratorInformationEntry {
 #[derive(Debug, serde::Serialize)]
 pub struct DatastoreBindingTarget {
     pub node: Option<u64>,
-    pub group: Option<u8>,
+    pub group: Option<u16>,
     pub endpoint: Option<u16>,
     pub cluster: Option<u32>,
 }
@@ -247,7 +247,7 @@ pub struct DatastoreEndpointEntry {
 pub struct DatastoreEndpointGroupIDEntry {
     pub node_id: Option<u64>,
     pub endpoint_id: Option<u16>,
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub status_entry: Option<DatastoreStatusEntry>,
 }
 
@@ -356,11 +356,11 @@ pub fn encode_remove_key_set(group_key_set_id: u16) -> anyhow::Result<Vec<u8>> {
 }
 
 /// Encode AddGroup command (0x03)
-pub fn encode_add_group(group_id: u8, friendly_name: String, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: DatastoreAccessControlEntryPrivilege) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_group(group_id: u16, friendly_name: String, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: DatastoreAccessControlEntryPrivilege) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::String(friendly_name)).into(),
         (2, tlv::TlvItemValueEnc::UInt16(group_key_set_id.unwrap_or(0))).into(),
         (3, tlv::TlvItemValueEnc::UInt16(group_cat.unwrap_or(0))).into(),
@@ -372,11 +372,11 @@ pub fn encode_add_group(group_id: u8, friendly_name: String, group_key_set_id: O
 }
 
 /// Encode UpdateGroup command (0x04)
-pub fn encode_update_group(group_id: u8, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: Option<DatastoreAccessControlEntryPrivilege>) -> anyhow::Result<Vec<u8>> {
+pub fn encode_update_group(group_id: u16, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: Option<DatastoreAccessControlEntryPrivilege>) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         (1, tlv::TlvItemValueEnc::String(friendly_name.unwrap_or("".to_string()))).into(),
         (2, tlv::TlvItemValueEnc::UInt16(group_key_set_id.unwrap_or(0))).into(),
         (3, tlv::TlvItemValueEnc::UInt16(group_cat.unwrap_or(0))).into(),
@@ -388,11 +388,11 @@ pub fn encode_update_group(group_id: u8, friendly_name: Option<String>, group_ke
 }
 
 /// Encode RemoveGroup command (0x05)
-pub fn encode_remove_group(group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_group(group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
-        (0, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (0, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -496,26 +496,26 @@ pub fn encode_update_endpoint_for_node(endpoint_id: u16, node_id: u64, friendly_
 }
 
 /// Encode AddGroupIDToEndpointForNode command (0x0E)
-pub fn encode_add_group_id_to_endpoint_for_node(node_id: u64, endpoint_id: u16, group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_add_group_id_to_endpoint_for_node(node_id: u64, endpoint_id: u16, group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt64(node_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt16(endpoint_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (2, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
 }
 
 /// Encode RemoveGroupIDFromEndpointForNode command (0x0F)
-pub fn encode_remove_group_id_from_endpoint_for_node(node_id: u64, endpoint_id: u16, group_id: u8) -> anyhow::Result<Vec<u8>> {
+pub fn encode_remove_group_id_from_endpoint_for_node(node_id: u64, endpoint_id: u16, group_id: u16) -> anyhow::Result<Vec<u8>> {
     let tlv = tlv::TlvItemEnc {
         tag: 0,
         value: tlv::TlvItemValueEnc::StructInvisible(vec![
         (0, tlv::TlvItemValueEnc::UInt64(node_id)).into(),
         (1, tlv::TlvItemValueEnc::UInt16(endpoint_id)).into(),
-        (2, tlv::TlvItemValueEnc::UInt8(group_id)).into(),
+        (2, tlv::TlvItemValueEnc::UInt16(group_id)).into(),
         ]),
     };
     Ok(tlv.encode()?)
@@ -526,7 +526,7 @@ pub fn encode_add_binding_to_endpoint_for_node(node_id: u64, endpoint_id: u16, b
             // Encode struct DatastoreBindingTargetStruct
             let mut binding_fields = Vec::new();
             if let Some(x) = binding.node { binding_fields.push((1, tlv::TlvItemValueEnc::UInt64(x)).into()); }
-            // TODO: encoding for field group (group-id) not implemented
+            if let Some(x) = binding.group { binding_fields.push((2, tlv::TlvItemValueEnc::UInt16(x)).into()); }
             if let Some(x) = binding.endpoint { binding_fields.push((3, tlv::TlvItemValueEnc::UInt16(x)).into()); }
             if let Some(x) = binding.cluster { binding_fields.push((4, tlv::TlvItemValueEnc::UInt32(x)).into()); }
     let tlv = tlv::TlvItemEnc {
@@ -738,7 +738,7 @@ pub fn decode_endpoint_group_id_list(inp: &tlv::TlvItemValue) -> anyhow::Result<
             res.push(DatastoreEndpointGroupIDEntry {
                 node_id: item.get_int(&[0]),
                 endpoint_id: item.get_int(&[1]).map(|v| v as u16),
-                group_id: item.get_int(&[2]).map(|v| v as u8),
+                group_id: item.get_int(&[2]).map(|v| v as u16),
                 status_entry: {
                     if let Some(nested_tlv) = item.get(&[3]) {
                         if let tlv::TlvItemValue::List(_) = nested_tlv {
@@ -776,7 +776,7 @@ pub fn decode_endpoint_binding_list(inp: &tlv::TlvItemValue) -> anyhow::Result<V
                             let nested_item = tlv::TlvItem { tag: 3, value: nested_tlv.clone() };
                             Some(DatastoreBindingTarget {
                 node: nested_item.get_int(&[1]),
-                group: nested_item.get_int(&[2]).map(|v| v as u8),
+                group: nested_item.get_int(&[2]).map(|v| v as u16),
                 endpoint: nested_item.get_int(&[3]).map(|v| v as u16),
                 cluster: nested_item.get_int(&[4]).map(|v| v as u32),
                             })
@@ -1133,7 +1133,7 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 0, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x03 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 2, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 3, name: "group_cat", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
@@ -1141,7 +1141,7 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (2, "Proxyview"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: false },
         ]),
         0x04 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "friendly_name", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 2, name: "group_key_set_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 3, name: "group_cat", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: true },
@@ -1149,7 +1149,7 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
             crate::clusters::codec::CommandField { tag: 5, name: "group_permission", kind: crate::clusters::codec::FieldKind::Enum { name: "DatastoreAccessControlEntryPrivilege", variants: &[(1, "View"), (2, "Proxyview"), (3, "Operate"), (4, "Manage"), (5, "Administer")] }, optional: false, nullable: true },
         ]),
         0x05 => Some(vec![
-            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 0, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x06 => Some(vec![
             crate::clusters::codec::CommandField { tag: 1, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
@@ -1187,12 +1187,12 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
         0x0E => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 2, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x0F => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 2, name: "group_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
+            crate::clusters::codec::CommandField { tag: 2, name: "group_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
         ]),
         0x10 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "node_id", kind: crate::clusters::codec::FieldKind::U64, optional: false, nullable: false },
@@ -1225,7 +1225,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_remove_key_set(group_key_set_id)
         }
         0x03 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let friendly_name = crate::clusters::codec::json_util::get_string(args, "friendly_name")?;
         let group_key_set_id = crate::clusters::codec::json_util::get_opt_u16(args, "group_key_set_id")?;
         let group_cat = crate::clusters::codec::json_util::get_opt_u16(args, "group_cat")?;
@@ -1237,7 +1237,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_add_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)
         }
         0x04 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         let friendly_name = crate::clusters::codec::json_util::get_opt_string(args, "friendly_name")?;
         let group_key_set_id = crate::clusters::codec::json_util::get_opt_u16(args, "group_key_set_id")?;
         let group_cat = crate::clusters::codec::json_util::get_opt_u16(args, "group_cat")?;
@@ -1247,7 +1247,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         encode_update_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)
         }
         0x05 => {
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_remove_group(group_id)
         }
         0x06 => {
@@ -1294,13 +1294,13 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
         0x0E => {
         let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
         let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_add_group_id_to_endpoint_for_node(node_id, endpoint_id, group_id)
         }
         0x0F => {
         let node_id = crate::clusters::codec::json_util::get_u64(args, "node_id")?;
         let endpoint_id = crate::clusters::codec::json_util::get_u16(args, "endpoint_id")?;
-        let group_id = crate::clusters::codec::json_util::get_u8(args, "group_id")?;
+        let group_id = crate::clusters::codec::json_util::get_u16(args, "group_id")?;
         encode_remove_group_id_from_endpoint_for_node(node_id, endpoint_id, group_id)
         }
         0x10 => Err(anyhow::anyhow!("command \"AddBindingToEndpointForNode\" has complex args: use raw mode")),
@@ -1341,19 +1341,19 @@ pub async fn remove_key_set(conn: &crate::controller::Connection, endpoint: u16,
 }
 
 /// Invoke `AddGroup` command on cluster `Joint Fabric Datastore`.
-pub async fn add_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, friendly_name: String, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: DatastoreAccessControlEntryPrivilege) -> anyhow::Result<()> {
+pub async fn add_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, friendly_name: String, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: DatastoreAccessControlEntryPrivilege) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDGROUP, &encode_add_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)?).await?;
     Ok(())
 }
 
 /// Invoke `UpdateGroup` command on cluster `Joint Fabric Datastore`.
-pub async fn update_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: Option<DatastoreAccessControlEntryPrivilege>) -> anyhow::Result<()> {
+pub async fn update_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u16, friendly_name: Option<String>, group_key_set_id: Option<u16>, group_cat: Option<u16>, group_cat_version: Option<u16>, group_permission: Option<DatastoreAccessControlEntryPrivilege>) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_UPDATEGROUP, &encode_update_group(group_id, friendly_name, group_key_set_id, group_cat, group_cat_version, group_permission)?).await?;
     Ok(())
 }
 
 /// Invoke `RemoveGroup` command on cluster `Joint Fabric Datastore`.
-pub async fn remove_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u8) -> anyhow::Result<()> {
+pub async fn remove_group(conn: &crate::controller::Connection, endpoint: u16, group_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEGROUP, &encode_remove_group(group_id)?).await?;
     Ok(())
 }
@@ -1407,13 +1407,13 @@ pub async fn update_endpoint_for_node(conn: &crate::controller::Connection, endp
 }
 
 /// Invoke `AddGroupIDToEndpointForNode` command on cluster `Joint Fabric Datastore`.
-pub async fn add_group_id_to_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, group_id: u8) -> anyhow::Result<()> {
+pub async fn add_group_id_to_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, group_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_ADDGROUPIDTOENDPOINTFORNODE, &encode_add_group_id_to_endpoint_for_node(node_id, endpoint_id, group_id)?).await?;
     Ok(())
 }
 
 /// Invoke `RemoveGroupIDFromEndpointForNode` command on cluster `Joint Fabric Datastore`.
-pub async fn remove_group_id_from_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, group_id: u8) -> anyhow::Result<()> {
+pub async fn remove_group_id_from_endpoint_for_node(conn: &crate::controller::Connection, endpoint: u16, node_id: u64, endpoint_id: u16, group_id: u16) -> anyhow::Result<()> {
     conn.invoke_request(endpoint, crate::clusters::defs::CLUSTER_ID_JOINT_FABRIC_DATASTORE, crate::clusters::defs::CLUSTER_JOINT_FABRIC_DATASTORE_CMD_ID_REMOVEGROUPIDFROMENDPOINTFORNODE, &encode_remove_group_id_from_endpoint_for_node(node_id, endpoint_id, group_id)?).await?;
     Ok(())
 }

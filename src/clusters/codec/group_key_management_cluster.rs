@@ -81,14 +81,14 @@ impl From<GroupKeySecurityPolicy> for u8 {
 
 #[derive(Debug, serde::Serialize)]
 pub struct GroupInfoMap {
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub endpoints: Option<Vec<u16>>,
     pub group_name: Option<String>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct GroupKeyMap {
-    pub group_id: Option<u8>,
+    pub group_id: Option<u16>,
     pub group_key_set_id: Option<u16>,
 }
 
@@ -106,6 +106,11 @@ pub struct GroupKeySet {
     pub epoch_key2: Option<Vec<u8>>,
     pub epoch_start_time2: Option<u64>,
     pub group_key_multicast_policy: Option<GroupKeyMulticastPolicy>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct GroupcastAdoption {
+    pub groupcast_adopted: Option<bool>,
 }
 
 // Command encoders
@@ -173,7 +178,7 @@ pub fn decode_group_key_map(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<Group
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(GroupKeyMap {
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 group_key_set_id: item.get_int(&[2]).map(|v| v as u16),
             });
         }
@@ -187,7 +192,7 @@ pub fn decode_group_table(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<GroupIn
     if let tlv::TlvItemValue::List(v) = inp {
         for item in v {
             res.push(GroupInfoMap {
-                group_id: item.get_int(&[1]).map(|v| v as u8),
+                group_id: item.get_int(&[1]).map(|v| v as u16),
                 endpoints: {
                     if let Some(tlv::TlvItemValue::List(l)) = item.get(&[2]) {
                         let items: Vec<u16> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v as u16) } else { None } }).collect();
@@ -219,6 +224,19 @@ pub fn decode_max_group_keys_per_fabric(inp: &tlv::TlvItemValue) -> anyhow::Resu
     } else {
         Err(anyhow::anyhow!("Expected UInt16"))
     }
+}
+
+/// Decode GroupcastAdoption attribute (0x0004)
+pub fn decode_groupcast_adoption(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<GroupcastAdoption>> {
+    let mut res = Vec::new();
+    if let tlv::TlvItemValue::List(v) = inp {
+        for item in v {
+            res.push(GroupcastAdoption {
+                groupcast_adopted: item.get_bool(&[0]),
+            });
+        }
+    }
+    Ok(res)
 }
 
 
@@ -264,6 +282,12 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x0004 => {
+            match decode_groupcast_adoption(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -278,6 +302,7 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x0001, "GroupTable"),
         (0x0002, "MaxGroupsPerFabric"),
         (0x0003, "MaxGroupKeysPerFabric"),
+        (0x0004, "GroupcastAdoption"),
     ]
 }
 
@@ -451,5 +476,11 @@ pub async fn read_max_groups_per_fabric(conn: &crate::controller::Connection, en
 pub async fn read_max_group_keys_per_fabric(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u16> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_ATTR_ID_MAXGROUPKEYSPERFABRIC).await?;
     decode_max_group_keys_per_fabric(&tlv)
+}
+
+/// Read `GroupcastAdoption` attribute from cluster `Group Key Management`.
+pub async fn read_groupcast_adoption(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<GroupcastAdoption>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GROUP_KEY_MANAGEMENT, crate::clusters::defs::CLUSTER_GROUP_KEY_MANAGEMENT_ATTR_ID_GROUPCASTADOPTION).await?;
+    decode_groupcast_adoption(&tlv)
 }
 

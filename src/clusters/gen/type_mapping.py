@@ -45,6 +45,7 @@ class MatterType:
         'subject-id':   ('UInt64',      'u64'),
         'SubjectID':    ('UInt64',      'u64'),
         'attribute-id': ('UInt32',      'u32'),
+        'group-id':     ('UInt16',      'u16'),
         # Enum/Bitmap base types (for xml_to_readable.py compatibility)
         'enum8':        ('UInt8',       'u8'),
         'enum16':       ('UInt16',      'u16'),

@@ -17,6 +17,49 @@ use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+pub enum ICACCSRResponseStatusCode {
+    /// No error
+    Ok = 0,
+    /// Could not be completed because another commissioning is in progress
+    Busy = 1,
+    /// Provided PAKE parameters were incorrectly formatted or otherwise invalid
+    Pakeparametererror = 2,
+    /// The Joint Commissioning Method commissioning window is not currently open
+    Windownotopen = 3,
+    /// ICACCSRRequest command has been invoked by a peer against which Fabric Table VID Verification hasn't been executed
+    Vidnotverified = 4,
+    /// OpenJointCommissioningWindow command has been invoked but the AdministratorFabricIndex field has the value of null
+    Invalidadministratorfabricindex = 5,
+}
+
+impl ICACCSRResponseStatusCode {
+    /// Convert from u8 value
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(ICACCSRResponseStatusCode::Ok),
+            1 => Some(ICACCSRResponseStatusCode::Busy),
+            2 => Some(ICACCSRResponseStatusCode::Pakeparametererror),
+            3 => Some(ICACCSRResponseStatusCode::Windownotopen),
+            4 => Some(ICACCSRResponseStatusCode::Vidnotverified),
+            5 => Some(ICACCSRResponseStatusCode::Invalidadministratorfabricindex),
+            _ => None,
+        }
+    }
+
+    /// Convert to u8 value
+    pub fn to_u8(self) -> u8 {
+        self as u8
+    }
+}
+
+impl From<ICACCSRResponseStatusCode> for u8 {
+    fn from(val: ICACCSRResponseStatusCode) -> Self {
+        val as u8
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(u8)]
 pub enum ICACResponseStatus {
     /// No error
     Ok = 0,
@@ -45,46 +88,6 @@ impl ICACResponseStatus {
 
 impl From<ICACResponseStatus> for u8 {
     fn from(val: ICACResponseStatus) -> Self {
-        val as u8
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[repr(u8)]
-pub enum StatusCode {
-    /// Could not be completed because another commissioning is in progress
-    Busy = 2,
-    /// Provided PAKE parameters were incorrectly formatted or otherwise invalid
-    Pakeparametererror = 3,
-    /// No commissioning window was currently open
-    Windownotopen = 4,
-    /// ICACCSRRequest command has been invoked by a peer against which Fabric Table VID Verification hasn't been executed
-    Vidnotverified = 5,
-    /// OpenJointCommissioningWindow command has been invoked but the AdministratorFabricIndex field has the value of null
-    Invalidadministratorfabricindex = 6,
-}
-
-impl StatusCode {
-    /// Convert from u8 value
-    pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            2 => Some(StatusCode::Busy),
-            3 => Some(StatusCode::Pakeparametererror),
-            4 => Some(StatusCode::Windownotopen),
-            5 => Some(StatusCode::Vidnotverified),
-            6 => Some(StatusCode::Invalidadministratorfabricindex),
-            _ => None,
-        }
-    }
-
-    /// Convert to u8 value
-    pub fn to_u8(self) -> u8 {
-        self as u8
-    }
-}
-
-impl From<StatusCode> for u8 {
-    fn from(val: StatusCode) -> Self {
         val as u8
     }
 }
@@ -286,6 +289,7 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 
 #[derive(Debug, serde::Serialize)]
 pub struct ICACCSRResponse {
+    pub status_code: Option<ICACCSRResponseStatusCode>,
     #[serde(serialize_with = "serialize_opt_bytes_as_hex")]
     pub icaccsr: Option<Vec<u8>>,
 }
@@ -307,7 +311,8 @@ pub fn decode_icaccsr_response(inp: &tlv::TlvItemValue) -> anyhow::Result<ICACCS
     if let tlv::TlvItemValue::List(_fields) = inp {
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ICACCSRResponse {
-                icaccsr: item.get_octet_string_owned(&[0]),
+                status_code: item.get_int(&[0]).and_then(|v| ICACCSRResponseStatusCode::from_u8(v as u8)),
+                icaccsr: item.get_octet_string_owned(&[1]),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))

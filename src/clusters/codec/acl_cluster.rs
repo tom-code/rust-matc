@@ -17,6 +17,37 @@ use crate::clusters::helpers::{serialize_opt_bytes_as_hex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
+pub enum AccessControlAuxiliaryType {
+    /// This ACL entry exists because of some system reason and is likely non-revocable
+    System = 0,
+    /// Synthesized via Groupcast Cluster administrator-configured group membership
+    Groupcast = 1,
+}
+
+impl AccessControlAuxiliaryType {
+    /// Convert from u8 value
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(AccessControlAuxiliaryType::System),
+            1 => Some(AccessControlAuxiliaryType::Groupcast),
+            _ => None,
+        }
+    }
+
+    /// Convert to u8 value
+    pub fn to_u8(self) -> u8 {
+        self as u8
+    }
+}
+
+impl From<AccessControlAuxiliaryType> for u8 {
+    fn from(val: AccessControlAuxiliaryType) -> Self {
+        val as u8
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[repr(u8)]
 pub enum AccessControlEntryAuthMode {
     /// Passcode authenticated session
     Pase = 1,
@@ -167,6 +198,7 @@ pub struct AccessControlEntry {
     pub auth_mode: Option<AccessControlEntryAuthMode>,
     pub subjects: Option<Vec<u64>>,
     pub targets: Option<Vec<AccessControlTarget>>,
+    pub auxiliary_type: Option<AccessControlAuxiliaryType>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -262,6 +294,7 @@ pub fn decode_acl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<AccessControlEn
                         None
                     }
                 },
+                auxiliary_type: item.get_int(&[5]).and_then(|v| AccessControlAuxiliaryType::from_u8(v as u8)),
             });
         }
     }
@@ -364,6 +397,44 @@ pub fn decode_arl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<AccessRestricti
     Ok(res)
 }
 
+/// Decode AuxiliaryACL attribute (0x0007)
+pub fn decode_auxiliary_acl(inp: &tlv::TlvItemValue) -> anyhow::Result<Vec<AccessControlEntry>> {
+    let mut res = Vec::new();
+    if let tlv::TlvItemValue::List(v) = inp {
+        for item in v {
+            res.push(AccessControlEntry {
+                privilege: item.get_int(&[1]).and_then(|v| AccessControlEntryPrivilege::from_u8(v as u8)),
+                auth_mode: item.get_int(&[2]).and_then(|v| AccessControlEntryAuthMode::from_u8(v as u8)),
+                subjects: {
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[3]) {
+                        let items: Vec<u64> = l.iter().filter_map(|e| { if let tlv::TlvItemValue::Int(v) = &e.value { Some(*v) } else { None } }).collect();
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                targets: {
+                    if let Some(tlv::TlvItemValue::List(l)) = item.get(&[4]) {
+                        let mut items = Vec::new();
+                        for list_item in l {
+                            items.push(AccessControlTarget {
+                cluster: list_item.get_int(&[0]).map(|v| v as u32),
+                endpoint: list_item.get_int(&[1]).map(|v| v as u16),
+                device_type: list_item.get_int(&[2]).map(|v| v as u32),
+                            });
+                        }
+                        Some(items)
+                    } else {
+                        None
+                    }
+                },
+                auxiliary_type: item.get_int(&[5]).and_then(|v| AccessControlAuxiliaryType::from_u8(v as u8)),
+            });
+        }
+    }
+    Ok(res)
+}
+
 
 // JSON dispatcher function
 
@@ -425,6 +496,12 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x0007 => {
+            match decode_auxiliary_acl(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -442,6 +519,7 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x0004, "AccessControlEntriesPerFabric"),
         (0x0005, "CommissioningARL"),
         (0x0006, "ARL"),
+        (0x0007, "AuxiliaryACL"),
     ]
 }
 
@@ -545,6 +623,12 @@ pub async fn read_arl(conn: &crate::controller::Connection, endpoint: u16) -> an
     decode_arl(&tlv)
 }
 
+/// Read `AuxiliaryACL` attribute from cluster `Access Control`.
+pub async fn read_auxiliary_acl(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<Vec<AccessControlEntry>> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_ACCESS_CONTROL, crate::clusters::defs::CLUSTER_ACCESS_CONTROL_ATTR_ID_AUXILIARYACL).await?;
+    decode_auxiliary_acl(&tlv)
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct AccessControlEntryChangedEvent {
     pub admin_node_id: Option<u64>,
@@ -566,6 +650,11 @@ pub struct FabricRestrictionReviewUpdateEvent {
     pub token: Option<u64>,
     pub instruction: Option<String>,
     pub arl_request_flow_url: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct AuxiliaryAccessUpdatedEvent {
+    pub admin_node_id: Option<u64>,
 }
 
 // Event decoders
@@ -608,6 +697,7 @@ pub fn decode_access_control_entry_changed_event(inp: &tlv::TlvItemValue) -> any
                         None
                     }
                 },
+                auxiliary_type: nested_item.get_int(&[5]).and_then(|v| AccessControlAuxiliaryType::from_u8(v as u8)),
                             })
                         } else {
                             None
@@ -658,6 +748,18 @@ pub fn decode_fabric_restriction_review_update_event(inp: &tlv::TlvItemValue) ->
                                 token: item.get_int(&[0]),
                                 instruction: item.get_string_owned(&[1]),
                                 arl_request_flow_url: item.get_string_owned(&[2]),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
+/// Decode AuxiliaryAccessUpdated event (0x03, priority: info)
+pub fn decode_auxiliary_access_updated_event(inp: &tlv::TlvItemValue) -> anyhow::Result<AuxiliaryAccessUpdatedEvent> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(AuxiliaryAccessUpdatedEvent {
+                                admin_node_id: item.get_int(&[0]),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))

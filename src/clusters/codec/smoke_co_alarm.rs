@@ -135,6 +135,8 @@ pub enum ExpressedState {
     Interconnectsmoke = 7,
     /// Interconnected CO Alarm State
     Interconnectco = 8,
+    /// Hardware is not able to detect Smoke or CO
+    Inoperative = 9,
 }
 
 impl ExpressedState {
@@ -150,6 +152,7 @@ impl ExpressedState {
             6 => Some(ExpressedState::Endofservice),
             7 => Some(ExpressedState::Interconnectsmoke),
             8 => Some(ExpressedState::Interconnectco),
+            9 => Some(ExpressedState::Inoperative),
             _ => None,
         }
     }
@@ -352,6 +355,15 @@ pub fn decode_expiry_date(inp: &tlv::TlvItemValue) -> anyhow::Result<u64> {
     }
 }
 
+/// Decode Unmounted attribute (0x000D)
+pub fn decode_unmounted(inp: &tlv::TlvItemValue) -> anyhow::Result<bool> {
+    if let tlv::TlvItemValue::Bool(v) = inp {
+        Ok(*v)
+    } else {
+        Err(anyhow::anyhow!("Expected Bool"))
+    }
+}
+
 
 // JSON dispatcher function
 
@@ -449,6 +461,12 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x000D => {
+            match decode_unmounted(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -472,6 +490,7 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x000A, "ContaminationState"),
         (0x000B, "SmokeSensitivityLevel"),
         (0x000C, "ExpiryDate"),
+        (0x000D, "Unmounted"),
     ]
 }
 
@@ -588,6 +607,12 @@ pub async fn read_smoke_sensitivity_level(conn: &crate::controller::Connection, 
 pub async fn read_expiry_date(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u64> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_EXPIRYDATE).await?;
     decode_expiry_date(&tlv)
+}
+
+/// Read `Unmounted` attribute from cluster `Smoke CO Alarm`.
+pub async fn read_unmounted(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<bool> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_SMOKE_CO_ALARM, crate::clusters::defs::CLUSTER_SMOKE_CO_ALARM_ATTR_ID_UNMOUNTED).await?;
+    decode_unmounted(&tlv)
 }
 
 #[derive(Debug, serde::Serialize)]

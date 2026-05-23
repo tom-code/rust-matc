@@ -30,13 +30,13 @@ pub struct SFrame {
 pub struct SolicitOfferParams {
     pub stream_usage: u8,
     pub originating_endpoint_id: u16,
-    pub video_stream_id: Option<u8>,
-    pub audio_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
+    pub audio_stream_id: Option<u16>,
     pub ice_transport_policy: Option<String>,
     pub metadata_enabled: bool,
     pub s_frame_config: Option<SFrame>,
-    pub video_streams: Option<Vec<u8>>,
-    pub audio_streams: Option<Vec<u8>>,
+    pub video_streams: Option<Vec<u16>>,
+    pub audio_streams: Option<Vec<u16>>,
 }
 
 /// Encode SolicitOffer command (0x00)
@@ -44,8 +44,8 @@ pub fn encode_solicit_offer(params: SolicitOfferParams) -> anyhow::Result<Vec<u8
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
     tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(params.stream_usage)).into());
     tlv_fields.push((1, tlv::TlvItemValueEnc::UInt16(params.originating_endpoint_id)).into());
-    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(params.video_stream_id.unwrap_or(0))).into());
-    tlv_fields.push((3, tlv::TlvItemValueEnc::UInt8(params.audio_stream_id.unwrap_or(0))).into());
+    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt16(params.video_stream_id.unwrap_or(0))).into());
+    tlv_fields.push((3, tlv::TlvItemValueEnc::UInt16(params.audio_stream_id.unwrap_or(0))).into());
     if let Some(x) = params.ice_transport_policy { tlv_fields.push((5, tlv::TlvItemValueEnc::String(x)).into()); }
     tlv_fields.push((6, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into());
     if let Some(s_frame_config) = params.s_frame_config {
@@ -57,10 +57,10 @@ pub fn encode_solicit_offer(params: SolicitOfferParams) -> anyhow::Result<Vec<u8
         tlv_fields.push((7, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into());
     }
     if let Some(video_streams) = params.video_streams {
-        tlv_fields.push((8, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+        tlv_fields.push((8, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into());
     }
     if let Some(audio_streams) = params.audio_streams {
-        tlv_fields.push((9, tlv::TlvItemValueEnc::StructAnon(audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+        tlv_fields.push((9, tlv::TlvItemValueEnc::StructAnon(audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into());
     }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
@@ -73,15 +73,15 @@ pub fn encode_solicit_offer(params: SolicitOfferParams) -> anyhow::Result<Vec<u8
 pub struct ProvideOfferParams {
     pub web_rtc_session_id: Option<u8>,
     pub sdp: String,
-    pub stream_usage: u8,
-    pub originating_endpoint_id: u16,
-    pub video_stream_id: Option<u8>,
-    pub audio_stream_id: Option<u8>,
+    pub stream_usage: Option<u8>,
+    pub originating_endpoint_id: Option<u16>,
+    pub video_stream_id: Option<u16>,
+    pub audio_stream_id: Option<u16>,
     pub ice_transport_policy: Option<String>,
     pub metadata_enabled: bool,
     pub s_frame_config: Option<SFrame>,
-    pub video_streams: Option<Vec<u8>>,
-    pub audio_streams: Option<Vec<u8>>,
+    pub video_streams: Option<Vec<u16>>,
+    pub audio_streams: Option<Vec<u16>>,
 }
 
 /// Encode ProvideOffer command (0x02)
@@ -89,10 +89,10 @@ pub fn encode_provide_offer(params: ProvideOfferParams) -> anyhow::Result<Vec<u8
     let mut tlv_fields: Vec<tlv::TlvItemEnc> = Vec::new();
     tlv_fields.push((0, tlv::TlvItemValueEnc::UInt8(params.web_rtc_session_id.unwrap_or(0))).into());
     tlv_fields.push((1, tlv::TlvItemValueEnc::String(params.sdp)).into());
-    tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(params.stream_usage)).into());
-    tlv_fields.push((3, tlv::TlvItemValueEnc::UInt16(params.originating_endpoint_id)).into());
-    tlv_fields.push((4, tlv::TlvItemValueEnc::UInt8(params.video_stream_id.unwrap_or(0))).into());
-    tlv_fields.push((5, tlv::TlvItemValueEnc::UInt8(params.audio_stream_id.unwrap_or(0))).into());
+    if let Some(x) = params.stream_usage { tlv_fields.push((2, tlv::TlvItemValueEnc::UInt8(x)).into()); }
+    if let Some(x) = params.originating_endpoint_id { tlv_fields.push((3, tlv::TlvItemValueEnc::UInt16(x)).into()); }
+    tlv_fields.push((4, tlv::TlvItemValueEnc::UInt16(params.video_stream_id.unwrap_or(0))).into());
+    tlv_fields.push((5, tlv::TlvItemValueEnc::UInt16(params.audio_stream_id.unwrap_or(0))).into());
     if let Some(x) = params.ice_transport_policy { tlv_fields.push((7, tlv::TlvItemValueEnc::String(x)).into()); }
     tlv_fields.push((8, tlv::TlvItemValueEnc::Bool(params.metadata_enabled)).into());
     if let Some(s_frame_config) = params.s_frame_config {
@@ -104,10 +104,10 @@ pub fn encode_provide_offer(params: ProvideOfferParams) -> anyhow::Result<Vec<u8
         tlv_fields.push((9, tlv::TlvItemValueEnc::StructInvisible(s_frame_config_fields)).into());
     }
     if let Some(video_streams) = params.video_streams {
-        tlv_fields.push((10, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+        tlv_fields.push((10, tlv::TlvItemValueEnc::StructAnon(video_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into());
     }
     if let Some(audio_streams) = params.audio_streams {
-        tlv_fields.push((11, tlv::TlvItemValueEnc::StructAnon(audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt8(v)).into()).collect())).into());
+        tlv_fields.push((11, tlv::TlvItemValueEnc::StructAnon(audio_streams.into_iter().map(|v| (0, tlv::TlvItemValueEnc::UInt16(v)).into()).collect())).into());
     }
     let tlv = tlv::TlvItemEnc {
         tag: 0,
@@ -233,26 +233,26 @@ pub fn get_command_schema(cmd_id: u32) -> Option<Vec<crate::clusters::codec::Com
         0x00 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 1, name: "originating_endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 2, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
-            crate::clusters::codec::CommandField { tag: 3, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 3, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: true },
             crate::clusters::codec::CommandField { tag: 5, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 6, name: "metadata_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 7, name: "s_frame_config", kind: crate::clusters::codec::FieldKind::Struct { name: "SFrameStruct" }, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 8, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "VideoStreamID" }, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 9, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "AudioStreamID" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 8, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 9, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
         ]),
         0x02 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: true },
             crate::clusters::codec::CommandField { tag: 1, name: "sdp", kind: crate::clusters::codec::FieldKind::String, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 2, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 3, name: "originating_endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: false, nullable: false },
-            crate::clusters::codec::CommandField { tag: 4, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
-            crate::clusters::codec::CommandField { tag: 5, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U32, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 2, name: "stream_usage", kind: crate::clusters::codec::FieldKind::U8, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 3, name: "originating_endpoint_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 4, name: "video_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: true },
+            crate::clusters::codec::CommandField { tag: 5, name: "audio_stream_id", kind: crate::clusters::codec::FieldKind::U16, optional: true, nullable: true },
             crate::clusters::codec::CommandField { tag: 7, name: "ice_transport_policy", kind: crate::clusters::codec::FieldKind::String, optional: true, nullable: false },
             crate::clusters::codec::CommandField { tag: 8, name: "metadata_enabled", kind: crate::clusters::codec::FieldKind::Bool, optional: false, nullable: false },
             crate::clusters::codec::CommandField { tag: 9, name: "s_frame_config", kind: crate::clusters::codec::FieldKind::Struct { name: "SFrameStruct" }, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 10, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "VideoStreamID" }, optional: true, nullable: false },
-            crate::clusters::codec::CommandField { tag: 11, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "AudioStreamID" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 10, name: "video_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
+            crate::clusters::codec::CommandField { tag: 11, name: "audio_streams", kind: crate::clusters::codec::FieldKind::List { entry_type: "uint16" }, optional: true, nullable: false },
         ]),
         0x04 => Some(vec![
             crate::clusters::codec::CommandField { tag: 0, name: "web_rtc_session_id", kind: crate::clusters::codec::FieldKind::U32, optional: false, nullable: false },
@@ -295,15 +295,15 @@ pub fn encode_command_json(cmd_id: u32, args: &serde_json::Value) -> anyhow::Res
 pub struct SolicitOfferResponse {
     pub web_rtc_session_id: Option<u8>,
     pub deferred_offer: Option<bool>,
-    pub video_stream_id: Option<u8>,
-    pub audio_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
+    pub audio_stream_id: Option<u16>,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct ProvideOfferResponse {
     pub web_rtc_session_id: Option<u8>,
-    pub video_stream_id: Option<u8>,
-    pub audio_stream_id: Option<u8>,
+    pub video_stream_id: Option<u16>,
+    pub audio_stream_id: Option<u16>,
 }
 
 // Command response decoders
@@ -315,8 +315,8 @@ pub fn decode_solicit_offer_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
         Ok(SolicitOfferResponse {
                 web_rtc_session_id: item.get_int(&[0]).map(|v| v as u8),
                 deferred_offer: item.get_bool(&[1]),
-                video_stream_id: item.get_int(&[2]).map(|v| v as u8),
-                audio_stream_id: item.get_int(&[3]).map(|v| v as u8),
+                video_stream_id: item.get_int(&[2]).map(|v| v as u16),
+                audio_stream_id: item.get_int(&[3]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))
@@ -329,8 +329,8 @@ pub fn decode_provide_offer_response(inp: &tlv::TlvItemValue) -> anyhow::Result<
         let item = tlv::TlvItem { tag: 0, value: inp.clone() };
         Ok(ProvideOfferResponse {
                 web_rtc_session_id: item.get_int(&[0]).map(|v| v as u8),
-                video_stream_id: item.get_int(&[1]).map(|v| v as u8),
-                audio_stream_id: item.get_int(&[2]).map(|v| v as u8),
+                video_stream_id: item.get_int(&[1]).map(|v| v as u16),
+                audio_stream_id: item.get_int(&[2]).map(|v| v as u16),
         })
     } else {
         Err(anyhow::anyhow!("Expected struct fields"))

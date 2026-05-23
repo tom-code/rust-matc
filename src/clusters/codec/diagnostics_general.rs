@@ -245,6 +245,15 @@ impl From<RadioFault> for u8 {
 // Struct definitions
 
 #[derive(Debug, serde::Serialize)]
+pub struct DeviceLoad {
+    pub current_subscriptions: Option<u16>,
+    pub current_subscriptions_for_fabric: Option<u16>,
+    pub total_subscriptions_established: Option<u32>,
+    pub total_interaction_model_messages_sent: Option<u32>,
+    pub total_interaction_model_messages_received: Option<u32>,
+}
+
+#[derive(Debug, serde::Serialize)]
 pub struct NetworkInterface {
     pub name: Option<String>,
     pub is_operational: Option<bool>,
@@ -418,6 +427,23 @@ pub fn decode_do_not_use(inp: &tlv::TlvItemValue) -> anyhow::Result<u8> {
     }
 }
 
+/// Decode DeviceLoadStatus attribute (0x000A)
+pub fn decode_device_load_status(inp: &tlv::TlvItemValue) -> anyhow::Result<DeviceLoad> {
+    if let tlv::TlvItemValue::List(_fields) = inp {
+        // Struct with fields
+        let item = tlv::TlvItem { tag: 0, value: inp.clone() };
+        Ok(DeviceLoad {
+                current_subscriptions: item.get_int(&[0]).map(|v| v as u16),
+                current_subscriptions_for_fabric: item.get_int(&[1]).map(|v| v as u16),
+                total_subscriptions_established: item.get_int(&[2]).map(|v| v as u32),
+                total_interaction_model_messages_sent: item.get_int(&[3]).map(|v| v as u32),
+                total_interaction_model_messages_received: item.get_int(&[4]).map(|v| v as u32),
+        })
+    } else {
+        Err(anyhow::anyhow!("Expected struct fields"))
+    }
+}
+
 
 // JSON dispatcher function
 
@@ -497,6 +523,12 @@ pub fn decode_attribute_json(cluster_id: u32, attribute_id: u32, tlv_value: &cra
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
         }
+        0x000A => {
+            match decode_device_load_status(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
         _ => format!("{{\"error\": \"Unknown attribute ID: {}\"}}", attribute_id),
     }
 }
@@ -517,6 +549,7 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {
         (0x0007, "ActiveNetworkFaults"),
         (0x0008, "TestEventTriggersEnabled"),
         (0x0009, "DoNotUse"),
+        (0x000A, "DeviceLoadStatus"),
     ]
 }
 
@@ -690,6 +723,12 @@ pub async fn read_test_event_triggers_enabled(conn: &crate::controller::Connecti
 pub async fn read_do_not_use(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<u8> {
     let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_DONOTUSE).await?;
     decode_do_not_use(&tlv)
+}
+
+/// Read `DeviceLoadStatus` attribute from cluster `General Diagnostics`.
+pub async fn read_device_load_status(conn: &crate::controller::Connection, endpoint: u16) -> anyhow::Result<DeviceLoad> {
+    let tlv = conn.read_request2(endpoint, crate::clusters::defs::CLUSTER_ID_GENERAL_DIAGNOSTICS, crate::clusters::defs::CLUSTER_GENERAL_DIAGNOSTICS_ATTR_ID_DEVICELOADSTATUS).await?;
+    decode_device_load_status(&tlv)
 }
 
 #[derive(Debug, serde::Serialize)]
