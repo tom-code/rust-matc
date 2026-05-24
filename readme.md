@@ -3,11 +3,13 @@
 ![build](https://github.com/tom-code/rust-matc/actions/workflows/rust.yml/badge.svg)
 [![doc](https://github.com/tom-code/rust-matc/actions/workflows/doc.yml/badge.svg)](https://tom-code.github.io/rust-matc/matc/)
 
-This is prototype of matter protocol library in rust (controller side).
+This is matter protocol library in rust (controller side).
 
 [API doc](https://tom-code.github.io/rust-matc/matc/)
 
 [Examples](https://github.com/tom-code/rust-matc/tree/main/examples)
+
+[Matter controller desktop application also demonstrates use of this library](https://github.com/tom-code/matc-ui)
 
 It supports controller side of:
 
@@ -19,8 +21,9 @@ It supports controller side of:
   * sign and push certificates to device
   * BLE commissioning with Wi-Fi/Thread credential provisioning (opt-in, `--features ble`)
 * Basic interactions
-  * Read attribute
-  * Invoke command
+  * Read/Write attributes
+  * Invoke commands
+  * Subscribe for notifications
 
 ### BLE commissioning
 
@@ -37,7 +40,9 @@ cargo run --features ble --example simple-ble -- \
   --pairing-code "MT:Y.K908..." --ssid HomeWifi --password secret --node-id 300 --name "kitchen light"
 ```
 
-Use of demo application:
+### Use of demo application:
+note: this is original low level demo application. It is probably better to follow devman_demo for higher level api. See https://github.com/tom-code/rust-matc/tree/main/examples
+
 * Compile demo application using cargo. Binary will be found usually in target/debug/examples/demo.\
   `cargo build --example demo`
 * demo application uses clap. use --help to learn all supported parameters
