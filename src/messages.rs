@@ -504,6 +504,21 @@ pub fn pake3(exchange: u16, key: &[u8], ack: i64) -> Result<Vec<u8>> {
     Ok(b)
 }
 
+pub fn status_report_success(exchange: u16) -> Result<Vec<u8>> {
+    let mut b = ProtocolMessageHeader {
+        exchange_flags: ProtocolMessageHeader::FLAG_INITIATOR,
+        opcode: ProtocolMessageHeader::OPCODE_STATUS,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL,
+        ack_counter: 0,
+    }
+    .encode()?;
+    b.write_u16::<LittleEndian>(0)?; // GeneralStatusCode::SUCCESS
+    b.write_u32::<LittleEndian>(0)?; // ProtocolId::SECURE_CHANNEL
+    b.write_u16::<LittleEndian>(0)?; // ProtocolCode::SUCCESS
+    Ok(b)
+}
+
 pub fn sigma1(exchange: u16, payload: &[u8]) -> Result<Vec<u8>> {
     let mut b = ProtocolMessageHeader {
         exchange_flags: 5,

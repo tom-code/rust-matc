@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use crate::{
     active_connection::ActiveConnection,
@@ -17,6 +17,8 @@ pub struct Controller {
     #[allow(dead_code)]
     transport: Arc<transport::Transport>,
     fabric: fabric::Fabric,
+    /// In-memory CASE session resumption records keyed by peer node ID.
+    resumption: Arc<tokio::sync::Mutex<HashMap<u64, sigma::ResumptionRecord>>>,
 }
 
 pub struct Connection {
@@ -57,6 +59,7 @@ impl Controller {
             certmanager: certmanager.clone(),
             transport: transport.clone(),
             fabric,
+            resumption: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         }))
     }
 
@@ -95,7 +98,7 @@ impl Controller {
         node_id: u64,
         controller_id: u64,
     ) -> Result<Connection> {
-        let session = auth_sigma(
+        let (session, resumption) = auth_sigma(
             connection.as_ref(),
             &self.fabric,
             self.certmanager.as_ref(),
@@ -103,12 +106,16 @@ impl Controller {
             controller_id,
         )
         .await?;
+        if let Some(record) = resumption {
+            self.resumption.lock().await.insert(node_id, record);
+        }
         Ok(Connection {
             active: ActiveConnection::new(connection.clone(), session),
         })
     }
 
     /// Run auth_sigma with automatic BUSY retry.
+    /// Attempts a CASE session resumption first; falls back to full SIGMA on failure.
     /// Returns only the Session so that both initial connect and in-place reauth can use it.
     pub async fn auth_sigma_with_busy_retry(
         &self,
@@ -116,6 +123,10 @@ impl Controller {
         node_id: u64,
         controller_id: u64,
     ) -> Result<session::Session> {
+        if let Some(ses) = self.try_auth_sigma_resume(connection, node_id, controller_id).await? {
+            return Ok(ses);
+        }
+
         const MAX_BUSY_RETRIES: u32 = 5;
         const DEFAULT_BUSY_WAIT: Duration = Duration::from_millis(3000);
         const MAX_BUSY_WAIT: Duration = Duration::from_secs(60);
@@ -123,7 +134,12 @@ impl Controller {
         let mut busy_retries = 0u32;
         loop {
             match auth_sigma(connection.as_ref(), &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await {
-                Ok(ses) => return Ok(ses),
+                Ok((ses, resumption)) => {
+                    if let Some(record) = resumption {
+                        self.resumption.lock().await.insert(node_id, record);
+                    }
+                    return Ok(ses);
+                }
                 Err(e) => {
                     if let Some(busy) = e.downcast_ref::<SigmaBusy>() {
                         if busy_retries < MAX_BUSY_RETRIES {
@@ -147,6 +163,116 @@ impl Controller {
                 }
             }
         }
+    }
+
+    async fn try_auth_sigma_resume(
+        &self,
+        connection: &Arc<dyn ConnectionTrait>,
+        node_id: u64,
+        controller_id: u64,
+    ) -> Result<Option<session::Session>> {
+        let record = {
+            let map = self.resumption.lock().await;
+            map.get(&node_id).cloned()
+        };
+        let record = match record {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        let exchange: u16 = rand::random();
+        let session = session::Session::new();
+        let mut retrctx = retransmit::RetrContext::new(connection.as_ref(), &session);
+        retrctx.subscribe_exchange(exchange);
+
+        let mut ctx = sigma::SigmaContext::new(node_id);
+        let ca_pubkey = self.certmanager.get_ca_key()?.public_key().to_sec1_bytes();
+        sigma::sigma1_resume(&self.fabric, &mut ctx, &ca_pubkey, &record)?;
+        let s1 = messages::sigma1(exchange, &ctx.sigma1_payload)?;
+
+        log::debug!("CASE resume: send Sigma1Resume exchange:{}", exchange);
+        retrctx.send(&s1).await?;
+
+        let sigma2 = retrctx.get_next_message().await?;
+
+        // Responder sent a status report instead of Sigma2 / Sigma2Resume - this includes
+        // Fall back to full SIGMA in all cases.
+        if sigma2.protocol_header.protocol_id == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+            && sigma2.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_STATUS
+        {
+            log::debug!(
+                "CASE resume: responder rejected with status report, falling back to full SIGMA (exchange:{} {:?})",
+                exchange,
+                sigma2.status_report_info
+            );
+            return Ok(None);
+        }
+
+        if !sigma::is_sigma2_resume(&sigma2.payload) {
+            // Responder gracefully fell back to full Sigma2 - evict the stale record so
+            // the next reconnect does a fresh full SIGMA.
+            log::debug!("CASE resume: responder sent full Sigma2, falling back");
+            self.resumption.lock().await.remove(&node_id);
+            return Ok(None);
+        }
+
+        let parsed = match sigma::parse_sigma2_resume(&sigma2.payload) {
+            Ok(p) => p,
+            Err(e) => {
+                log::debug!("CASE resume: malformed Sigma2Resume ({:?}), falling back to full SIGMA", e);
+                self.resumption.lock().await.remove(&node_id);
+                return Ok(None);
+            }
+        };
+
+        if let Err(e) = sigma::verify_sigma2_resume_mic(
+            &record.shared_secret,
+            &ctx.initiator_random,
+            &parsed.new_resumption_id,
+            &parsed.sigma2_resume_mic,
+        ) {
+            log::debug!("CASE resume: MIC verification failed: {:?}, falling back to full SIGMA", e);
+            self.resumption.lock().await.remove(&node_id);
+            return Ok(None);
+        }
+
+        let sr = messages::status_report_success(exchange)?;
+        if let Err(e) = retrctx.send(&sr).await {
+            log::debug!("CASE resume: failed to send StatusReport ({:?}), falling back to full SIGMA", e);
+            self.resumption.lock().await.remove(&node_id);
+            return Ok(None);
+        }
+
+        let keypack = sigma::derive_resumed_session_keys(
+            &record.shared_secret,
+            &ctx.initiator_random,
+            &record.resumption_id,
+        )?;
+
+        let mut ses = session::Session::new();
+        ses.session_id = parsed.responder_session_id;
+        ses.my_session_id = ctx.session_id;
+        ses.set_decrypt_key(&keypack[16..32]);
+        ses.set_encrypt_key(&keypack[..16]);
+
+        let mut local_node = Vec::new();
+        local_node.write_u64::<LittleEndian>(controller_id)?;
+        ses.local_node = Some(local_node);
+
+        let mut remote_node = Vec::new();
+        remote_node.write_u64::<LittleEndian>(node_id)?;
+        ses.remote_node = Some(remote_node);
+
+        // Rotate the resumption ID to the one the responder issued for the next round.
+        {
+            let mut map = self.resumption.lock().await;
+            if let Some(entry) = map.get_mut(&node_id) {
+                entry.resumption_id = parsed.new_resumption_id;
+            }
+        }
+
+        log::info!("CASE session resumed for node_id={}", node_id);
+        Ok(Some(ses))
     }
 
     /// Commission a device that is advertising over BLE.
@@ -663,7 +789,7 @@ pub(crate) async fn auth_sigma(
     cm: &dyn certmanager::CertManager,
     node_id: u64,
     controller_id: u64,
-) -> Result<session::Session> {
+) -> Result<(session::Session, Option<sigma::ResumptionRecord>)> {
     log::debug!("auth_sigma");
     let exchange = rand::random();
     let session = session::Session::new();
@@ -741,9 +867,12 @@ pub(crate) async fn auth_sigma(
     let mut salt = fabric.signed_ipk()?;
     salt.extend_from_slice(&transcript_hash);
     let shared = ctx.shared.context("shared secret not in context")?;
+    let shared_bytes: [u8; 32] = shared.raw_secret_bytes().as_slice()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("shared secret wrong length"))?;
     let keypack = cryptoutil::hkdf_sha256(
         &salt,
-        shared.raw_secret_bytes().as_slice(),
+        &shared_bytes,
         "SessionKeys".as_bytes(),
         16 * 3,
     )?;
@@ -761,6 +890,19 @@ pub(crate) async fn auth_sigma(
     remote_node.write_u64::<LittleEndian>(node_id)?;
     ses.remote_node = Some(remote_node);
 
-    Ok(ses)
+    let resumption = sigma::extract_resumption_id_from_sigma2(
+        fabric,
+        &ctx.sigma1_payload,
+        &ctx.sigma2_payload,
+        &ctx.responder_public,
+        &shared_bytes,
+    )
+    .map(|id| sigma::ResumptionRecord { resumption_id: id, shared_secret: shared_bytes });
+
+    if resumption.is_none() {
+        log::debug!("auth_sigma: responder did not include a NewResumptionID - resumption unavailable for node {}", node_id);
+    }
+
+    Ok((ses, resumption))
 }
 

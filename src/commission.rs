@@ -247,7 +247,8 @@ async fn commissioning_complete(
     controller_id: u64,
     fabric: &Fabric,
 ) -> Result<session::Session> {
-    let ses = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
+    // resumption ignored for now - we do not support resumption on connections used for commissioning
+    let (ses, _resumption) = auth_sigma(connection, fabric, cm, node_id, controller_id).await?;
     let t1 = messages::im_invoke_request(
         0,
         CLUSTER_GENERAL_COMMISSIONING,

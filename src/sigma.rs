@@ -15,6 +15,16 @@ pub struct SigmaContext {
     pub responder_public: Vec<u8>,
     pub responder_session: u16,
     pub shared: Option<p256::ecdh::SharedSecret>,
+    /// Random bytes sent in Sigma1 / Sigma1Resume; available after sigma1() or sigma1_resume().
+    pub initiator_random: [u8; 32],
+}
+
+#[derive(Clone)]
+pub struct ResumptionRecord {
+    /// ID sent in the next Sigma1Resume (rotated after each successful resume).
+    pub resumption_id: [u8; 16],
+    /// Raw ECDH shared secret bytes from the last full SIGMA handshake.
+    pub shared_secret: [u8; 32],
 }
 
 impl SigmaContext {
@@ -29,22 +39,23 @@ impl SigmaContext {
             responder_public: Vec::new(),
             responder_session: 0,
             shared: None,
+            initiator_random: [0; 32],
         }
     }
 }
 
 pub fn sigma1(fabric: &fabric::Fabric, ctx: &mut SigmaContext, ca_pubkey: &[u8]) -> Result<()> {
-    let mut initator_random = [0; 32];
-    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut initator_random);
+    let mut initiator_random = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut initiator_random);
+    ctx.initiator_random = initiator_random;
 
-    // send sigma1
     let mut tlv = tlv::TlvBuffer::new();
     tlv.write_anon_struct()?;
-    tlv.write_octetstring(1, &initator_random)?;
-
+    tlv.write_octetstring(1, &initiator_random)?;
     tlv.write_uint16(2, ctx.session_id)?;
+
     let mut dst = Vec::new();
-    dst.write_all(&initator_random)?;
+    dst.write_all(&initiator_random)?;
     dst.write_all(ca_pubkey)?;
     dst.write_u64::<LittleEndian>(fabric.id)?;
     dst.write_u64::<LittleEndian>(ctx.node_id)?;
@@ -55,6 +66,169 @@ pub fn sigma1(fabric: &fabric::Fabric, ctx: &mut SigmaContext, ca_pubkey: &[u8])
     tlv.write_struct_end()?;
     ctx.sigma1_payload = tlv.data.clone();
     Ok(())
+}
+
+
+pub fn sigma1_resume(
+    fabric: &fabric::Fabric,
+    ctx: &mut SigmaContext,
+    ca_pubkey: &[u8],
+    record: &ResumptionRecord,
+) -> Result<()> {
+    let mut initiator_random = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut initiator_random);
+    ctx.initiator_random = initiator_random;
+
+    let resume1_mic = compute_resume_mic(
+        &record.shared_secret,
+        &initiator_random,
+        &record.resumption_id,
+        b"Sigma1_Resume",
+        b"NCASE_SigmaS1",
+    )?;
+
+    let mut dst = Vec::new();
+    dst.write_all(&initiator_random)?;
+    dst.write_all(ca_pubkey)?;
+    dst.write_u64::<LittleEndian>(fabric.id)?;
+    dst.write_u64::<LittleEndian>(ctx.node_id)?;
+    let dst_id = cryptoutil::hmac_sha256(&dst, &fabric.signed_ipk()?)?;
+
+    let mut tlv = tlv::TlvBuffer::new();
+    tlv.write_anon_struct()?;
+    tlv.write_octetstring(1, &initiator_random)?;
+    tlv.write_uint16(2, ctx.session_id)?;
+    tlv.write_octetstring(3, &dst_id)?;
+    tlv.write_octetstring(4, &ctx.eph_key.public_key().to_sec1_bytes())?;
+    tlv.write_octetstring(6, &record.resumption_id)?;
+    tlv.write_octetstring(7, &resume1_mic)?;
+    tlv.write_struct_end()?;
+    ctx.sigma1_payload = tlv.data.clone();
+    Ok(())
+}
+
+
+fn compute_resume_mic(
+    shared_secret: &[u8; 32],
+    initiator_random: &[u8; 32],
+    resumption_id: &[u8; 16],
+    info: &[u8],
+    nonce: &[u8],
+) -> Result<[u8; 16]> {
+    let mut salt = Vec::with_capacity(48);
+    salt.extend_from_slice(initiator_random);
+    salt.extend_from_slice(resumption_id);
+    let key_bytes = cryptoutil::hkdf_sha256(&salt, shared_secret, info, 16)?;
+
+    let aes_key = aes::cipher::crypto_common::Key::<Aes128Ccm>::from_slice(&key_bytes);
+    let cipher = Aes128Ccm::new(aes_key);
+    let tag = cipher
+        .encrypt(
+            nonce.into(),
+            ccm::aead::Payload { msg: &[], aad: &[] },
+        )
+        .map_err(|e| anyhow::anyhow!("resume MIC encrypt failed {:?}", e))?;
+    tag.try_into().map_err(|_| anyhow::anyhow!("resume MIC wrong length"))
+}
+
+/// Returns true when a raw Sigma2 payload is the resumption variant (Sigma2Resume).
+/// Sigma2Resume has no tag 4 (encrypted TBE blob); full Sigma2 always carries it.
+pub fn is_sigma2_resume(payload: &[u8]) -> bool {
+    let Ok(tlv) = tlv::decode_tlv(payload) else { return false };
+    tlv.get_octet_string(&[4]).is_none()
+}
+
+pub struct Sigma2ResumeParsed {
+    /// New resumption ID to use on the NEXT resume attempt.
+    pub new_resumption_id: [u8; 16],
+    pub sigma2_resume_mic: [u8; 16],
+    pub responder_session_id: u16,
+}
+
+pub fn parse_sigma2_resume(payload: &[u8]) -> Result<Sigma2ResumeParsed> {
+    let tlv = tlv::decode_tlv(payload)?;
+    let id = tlv
+        .get_octet_string(&[1])
+        .ok_or_else(|| anyhow::anyhow!("Sigma2Resume: resumptionID missing"))?;
+    let mic = tlv
+        .get_octet_string(&[2])
+        .ok_or_else(|| anyhow::anyhow!("Sigma2Resume: sigma2ResumeMIC missing"))?;
+    let session_id = tlv
+        .get_int(&[3])
+        .ok_or_else(|| anyhow::anyhow!("Sigma2Resume: responderSessionId missing"))? as u16;
+
+    Ok(Sigma2ResumeParsed {
+        new_resumption_id: id.try_into().map_err(|_| anyhow::anyhow!("Sigma2Resume: resumptionID wrong length"))?,
+        sigma2_resume_mic: mic.try_into().map_err(|_| anyhow::anyhow!("Sigma2Resume: MIC wrong length"))?,
+        responder_session_id: session_id,
+    })
+}
+
+/// Verify the Resume2MIC from the responder.
+pub fn verify_sigma2_resume_mic(
+    shared_secret: &[u8; 32],
+    initiator_random: &[u8; 32],
+    resumption_id: &[u8; 16],
+    mic: &[u8; 16],
+) -> Result<()> {
+    let expected = compute_resume_mic(
+        shared_secret,
+        initiator_random,
+        resumption_id,
+        b"Sigma2_Resume",
+        b"NCASE_SigmaS2",
+    )?;
+    if expected != *mic {
+        anyhow::bail!("Sigma2Resume MIC mismatch");
+    }
+    Ok(())
+}
+
+/// Derive the 48-byte session key pack for a resumed session.
+/// Returns [ I2R(16) || R2I(16) || attestation_challenge(16) ].
+pub fn derive_resumed_session_keys(
+    shared_secret: &[u8; 32],
+    initiator_random: &[u8; 32],
+    resumption_id: &[u8; 16],
+) -> Result<[u8; 48]> {
+    let mut salt = Vec::with_capacity(48);
+    salt.extend_from_slice(initiator_random);
+    salt.extend_from_slice(resumption_id);
+    let kp = cryptoutil::hkdf_sha256(&salt, shared_secret, b"SessionResumptionKeys", 48)?;
+    kp.try_into().map_err(|_| anyhow::anyhow!("session key pack wrong length"))
+}
+
+
+pub fn extract_resumption_id_from_sigma2(
+    fabric: &fabric::Fabric,
+    sigma1_payload: &[u8],
+    sigma2_payload: &[u8],
+    responder_eph_pubkey: &[u8],
+    shared_secret: &[u8; 32],
+) -> Option<[u8; 16]> {
+    let sigma2_tlv = tlv::decode_tlv(sigma2_payload).ok()?;
+    let responder_random = sigma2_tlv.get_octet_string(&[1])?;
+    let encrypted_tbe = sigma2_tlv.get_octet_string(&[4])?;
+
+    let transcript_hash = cryptoutil::sha256(sigma1_payload);
+    let mut s2_salt = fabric.signed_ipk().ok()?;
+    s2_salt.extend_from_slice(responder_random);
+    s2_salt.extend_from_slice(responder_eph_pubkey);
+    s2_salt.extend_from_slice(&transcript_hash);
+    let s2k = cryptoutil::hkdf_sha256(&s2_salt, shared_secret, b"Sigma2", 16).ok()?;
+
+    let aes_key = aes::cipher::crypto_common::Key::<Aes128Ccm>::from_slice(&s2k);
+    let cipher = Aes128Ccm::new(aes_key);
+    let decrypted = cipher
+        .decrypt(
+            "NCASE_Sigma2N".as_bytes().into(),
+            ccm::aead::Payload { msg: encrypted_tbe, aad: &[] },
+        )
+        .ok()?;
+
+    let tbe_tlv = tlv::decode_tlv(&decrypted).ok()?;
+    let id_bytes = tbe_tlv.get_octet_string(&[4])?;
+    id_bytes.try_into().ok()
 }
 
 type Aes128Ccm = ccm::Ccm<aes::Aes128, ccm::consts::U16, ccm::consts::U13>;
@@ -469,6 +643,102 @@ mod tests {
         assert_eq!(tbe_cert, ctrl_matter_cert, "TBE certificate should match controller certificate");
         assert_eq!(tbe_signature.len(), 64, "signature should be 64 bytes");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_sigma1_resume_structure() -> Result<()> {
+        let ca_secret_key = p256::SecretKey::random(&mut rand::thread_rng());
+        let ca_public_key = ca_secret_key.public_key().to_sec1_bytes();
+        let fabric = fabric::Fabric::new(1234, 5678, &ca_public_key, &[0u8; 16]);
+
+        let record = ResumptionRecord {
+            resumption_id: rand::random(),
+            shared_secret: rand::random(),
+        };
+
+        let mut ctx = SigmaContext::new(1111);
+        sigma1_resume(&fabric, &mut ctx, &ca_public_key, &record)?;
+
+        let tlv = tlv::decode_tlv(&ctx.sigma1_payload)?;
+        assert_eq!(tlv.get_octet_string(&[1]).unwrap().len(), 32, "initiator random present");
+        assert!(tlv.get_int(&[2]).is_some(), "session id present");
+        assert!(tlv.get_octet_string(&[3]).is_some(), "destination id present");
+        assert_eq!(tlv.get_octet_string(&[4]).unwrap().len(), 65, "ephemeral key present");
+        assert_eq!(tlv.get_octet_string(&[6]).unwrap(), &record.resumption_id, "resumption ID matches");
+        assert_eq!(tlv.get_octet_string(&[7]).unwrap().len(), 16, "Resume1MIC present");
+        assert_eq!(ctx.initiator_random, tlv.get_octet_string(&[1]).unwrap(), "ctx.initiator_random matches TLV");
+        Ok(())
+    }
+
+    #[test]
+    fn test_resume_mic_roundtrip() -> Result<()> {
+        let shared_secret: [u8; 32] = rand::random();
+        let initiator_random: [u8; 32] = rand::random();
+        let resumption_id: [u8; 16] = rand::random();
+
+        // Initiator computes Resume1MIC
+        let record = ResumptionRecord { resumption_id, shared_secret };
+        let mut ctx = SigmaContext::new(0);
+        ctx.initiator_random = initiator_random;
+
+        let mic1 = compute_resume_mic(&shared_secret, &initiator_random, &resumption_id, b"Sigma1_Resume", b"NCASE_SigmaS1")?;
+        assert_eq!(mic1.len(), 16, "Resume1MIC is 16 bytes");
+
+        // Responder verifies, then builds Sigma2Resume with Resume2MIC
+        let mic2 = compute_resume_mic(&shared_secret, &initiator_random, &resumption_id, b"Sigma2_Resume", b"NCASE_SigmaS2")?;
+
+        // Build a Sigma2Resume TLV
+        let new_id: [u8; 16] = rand::random();
+        let resp_session: u16 = rand::random();
+        let mut tlv = tlv::TlvBuffer::new();
+        tlv.write_anon_struct()?;
+        tlv.write_octetstring(1, &new_id)?;
+        tlv.write_octetstring(2, &mic2)?;
+        tlv.write_uint16(3, resp_session)?;
+        tlv.write_struct_end()?;
+
+        // Detect Sigma2Resume
+        assert!(is_sigma2_resume(&tlv.data), "should be detected as Sigma2Resume");
+
+        // Parse and verify
+        let parsed = parse_sigma2_resume(&tlv.data)?;
+        assert_eq!(parsed.new_resumption_id, new_id);
+        assert_eq!(parsed.responder_session_id, resp_session);
+
+        verify_sigma2_resume_mic(&shared_secret, &initiator_random, &resumption_id, &parsed.sigma2_resume_mic)?;
+
+        // Derive session keys
+        let keypack = derive_resumed_session_keys(&shared_secret, &initiator_random, &resumption_id)?;
+        assert_eq!(keypack.len(), 48);
+
+        // Keys are deterministic
+        let _ = record; // silence unused warning
+        let keypack2 = derive_resumed_session_keys(&shared_secret, &initiator_random, &resumption_id)?;
+        assert_eq!(keypack, keypack2, "key derivation is deterministic");
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_sigma2_resume_distinguishes_full_sigma2() -> Result<()> {
+        // Full Sigma2 has tag 4 (encrypted blob)
+        let mut full = tlv::TlvBuffer::new();
+        full.write_anon_struct()?;
+        full.write_octetstring(1, &[0u8; 32])?; // responderRandom
+        full.write_uint16(2, 1234)?;              // session id
+        full.write_octetstring(3, &[0u8; 65])?;  // eph pubkey
+        full.write_octetstring(4, &[0u8; 32])?;  // encrypted blob
+        full.write_struct_end()?;
+        assert!(!is_sigma2_resume(&full.data), "full Sigma2 should NOT be detected as resume");
+
+        // Sigma2Resume has no tag 4
+        let mut resume = tlv::TlvBuffer::new();
+        resume.write_anon_struct()?;
+        resume.write_octetstring(1, &[0u8; 16])?; // resumption ID
+        resume.write_octetstring(2, &[0u8; 16])?; // MIC
+        resume.write_uint16(3, 1234)?;              // session id
+        resume.write_struct_end()?;
+        assert!(is_sigma2_resume(&resume.data), "Sigma2Resume should be detected as resume");
         Ok(())
     }
 }
