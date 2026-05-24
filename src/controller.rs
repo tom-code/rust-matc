@@ -675,6 +675,7 @@ impl Connection {
         node_id: u64,
         controller_id: u64,
     ) -> Result<()> {
+        self.active.pause_read_loop().await;
         let new_session = controller
             .auth_sigma_with_busy_retry(&self.active.transport_conn, node_id, controller_id)
             .await?;

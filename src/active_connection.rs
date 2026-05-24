@@ -111,13 +111,7 @@ impl ActiveConnection {
         }
     }
 
-    /// Replace the CASE session in place without tearing down the transport channel.
-    /// 1. Stops the current read loop (up to 1 s latency for RECEIVE_TIMEOUT to fire).
-    /// 2. Clears stale in-flight exchange state.
-    /// 3. Installs the new session.
-    /// 4. Spawns a fresh read loop on the same transport connection.
-    pub async fn reauth_with_session(&self, new_session: Session) -> Result<()> {
-        // Stop the current read loop and wait for it to exit.
+    pub(crate) async fn pause_read_loop(&self) {
         let old_state = {
             let mut state = self.read_loop_state.lock().await;
             state.take()
@@ -126,6 +120,11 @@ impl ActiveConnection {
             s.pause.cancel();
             let _ = s.handle.await;
         }
+    }
+
+    pub async fn reauth_with_session(&self, new_session: Session) -> Result<()> {
+        // Stop the current read loop and wait for it to exit (no-op if already paused).
+        self.pause_read_loop().await;
 
         // Discard any pending exchanges from the old session.
         self.pending_exchanges.lock().unwrap().clear();
