@@ -110,6 +110,10 @@ pub fn write_pem(tag: &str, data: &[u8], fname: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn initial_message_counter() -> u32 {
+    (rand::random::<u32>() & 0x0FFF_FFFF) + 1
+}
+
 pub fn secret_key_to_rfc5915(key: &p256::SecretKey) -> Result<Vec<u8>> {
     let mut enc = crate::util::asn1::Encoder::new();
     enc.start_seq(0x30)?;

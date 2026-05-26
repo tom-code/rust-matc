@@ -163,7 +163,7 @@ impl Device {
             salt,
             pbkdf_iterations: 1000,
             operational_key,
-            message_counter: AtomicU32::new(rand::random()),
+            message_counter: AtomicU32::new(crate::util::cryptoutil::initial_message_counter()),
             pase_state: None,
             pase_session: None,
             case_states: HashMap::new(),

@@ -23,7 +23,7 @@ impl Session {
         Self {
             session_id: 0,
             my_session_id: 0,
-            counter: AtomicU32::new(rand::random()),
+            counter: AtomicU32::new(crate::util::cryptoutil::initial_message_counter()),
             local_node: Some([0, 0, 0, 0, 0, 0, 0, 0].to_vec()),
             remote_node: None,
             encrypt_key: None,
