@@ -33,6 +33,8 @@ const TYPE_UINT_4: u8 = 6;
 const TYPE_UINT_8: u8 = 7;
 const TYPE_BOOL_FALSE: u8 = 8;
 const TYPE_BOOL_TRUE: u8 = 9;
+const TYPE_FLOAT_4: u8 = 0xA;
+const TYPE_FLOAT_8: u8 = 0xB;
 const TYPE_UTF8_L1: u8 = 0xC;
 const TYPE_OCTET_STRING_L1: u8 = 0x10;
 const TYPE_OCTET_STRING_L2: u8 = 0x11;
@@ -192,6 +194,7 @@ pub enum TlvItemValue {
     Bool(bool),
     String(String),
     OctetString(Vec<u8>),
+    Float(f64),
     List(Vec<TlvItem>),
     Nil(),
     Invalid(),
@@ -269,6 +272,7 @@ impl fmt::Debug for TlvItemValue {
             Self::List(arg0) => f.debug_tuple("List").field(arg0).finish(),
             Self::Nil() => f.debug_tuple("Nil").finish(),
             Self::Invalid() => f.debug_tuple("Invalid").finish(),
+            Self::Float(arg0) => f.debug_tuple("Float").field(arg0).finish(),
         }
     }
 }
@@ -492,6 +496,22 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::Bool(true),
+                };
+                container.push(item);
+            }
+            TYPE_FLOAT_4 => {
+                let value = cursor.read_f32::<LittleEndian>()?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Float(value as f64),
+                };
+                container.push(item);
+            }
+            TYPE_FLOAT_8 => {
+                let value = cursor.read_f64::<LittleEndian>()?;
+                let item = TlvItem {
+                    tag,
+                    value: TlvItemValue::Float(value),
                 };
                 container.push(item);
             }
