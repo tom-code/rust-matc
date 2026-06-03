@@ -473,13 +473,13 @@ pub(crate) async fn commission_ble_phase(
             connect_network(&mut retrctx, &net_id, e_net2).await?;
             log::debug!("WiFi network connected");
             // Give the device time to join the network before the caller probes mDNS.
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            //tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
         NetworkCreds::Thread { dataset } => {
             let net_id = add_or_update_thread(&mut retrctx, dataset, e_net1).await?;
             connect_network(&mut retrctx, &net_id, e_net2).await?;
             log::debug!("Thread network connected");
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            //tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
         NetworkCreds::AlreadyOnNetwork => {}
     }

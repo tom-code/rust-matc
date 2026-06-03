@@ -298,9 +298,8 @@ impl Controller {
         controller_id: u64,
         network_creds: commission::NetworkCreds,
         mdns: &std::sync::Arc<crate::mdns2::MdnsService>,
-        mdns_receiver: &tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<crate::mdns2::MdnsEvent>>,
     ) -> Result<Connection> {
-        use crate::{btp::BtpConnection, discover};
+        use crate::btp::BtpConnection;
 
         // 1. BLE scan + GATT connect + BTP handshake
         let peripheral = crate::ble::find_by_discriminator(discriminator, short_discriminator, std::time::Duration::from_secs(30))
@@ -324,69 +323,73 @@ impl Controller {
         )
         .await
         .context("BLE commissioning phase")?;
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await; // wait for device to finish BLE-side commissioning before dropping connection
 
         // 4. Drop BTP (BLE connection closes when btp_conn is dropped)
         drop(btp_conn);
 
-        // 5. Rediscover device via operational mDNS
+        // 5 + 6. Rediscover via operational mDNS and commission over UDP
+        for attempt in 0..5 {
+            let addresses = match self.discover_operational_addresses(node_id, mdns).await {
+                Ok(a) => a,
+                Err(e) => {
+                    log::debug!("mDNS discovery failed (attempt {}/{}): {:?}", attempt + 1, 5, e);
+                    continue;
+                }
+            };
+            for address in &addresses {
+                log::debug!("Trying to commission over UDP at {}... (attempt {}/{})", address, attempt + 1, 5);
+                let udp_conn = self.transport.create_connection(&address).await;
+                let ses = commission::commissioning_complete_udp(
+                    udp_conn.as_ref(),
+                    self.certmanager.as_ref(),
+                    node_id,
+                    controller_id,
+                    &self.fabric,
+                )
+                .await;
+                if let Ok(ses) = ses {
+                    return Ok(Connection {
+                        active: ActiveConnection::new(udp_conn, ses),
+                    });
+                } else {
+                    log::debug!("Failed to commission over UDP at {}: {:?}", address, ses.err());
+                }
+            }
+        }
+        Err(anyhow::anyhow!("failed to commission device over UDP at any discovered address"))
+    }
+
+    #[cfg(feature = "ble")]
+    async fn discover_operational_addresses(
+        &self,
+        node_id: u64,
+        mdns: &std::sync::Arc<crate::mdns2::MdnsService>,
+    ) -> Result<Vec<String>> {
+        use crate::discover;
+
         let ca_pubkey = self.certmanager.get_ca_public_key()?;
         let fabric_tmp = fabric::Fabric::new(self.fabric.id, 0, &ca_pubkey, &self.certmanager.get_ipk_epoch_key());
         let compressed = fabric_tmp.compressed().context("compressed fabric ID")?;
         let instance = format!("{}-{:016X}", hex::encode_upper(&compressed), node_id);
         let expected_target = format!("{}._matter._tcp.local.", instance);
 
-        let mut addresses = Vec::new();
-        {
-            let mut rx = mdns_receiver.lock().await;
-            mdns.active_lookup("_matter._tcp.local", 0xff).await;
-            loop {
-                match tokio::time::timeout(std::time::Duration::from_secs(30), rx.recv()).await {
-                    Ok(Some(crate::mdns2::MdnsEvent::ServiceDiscovered { name, records: _, target })) => {
-                        if name != "_matter._tcp.local." || target != expected_target {
-                            continue;
-                        }
-                        let info = discover::extract_matter_info(&target, mdns).await?;
-                        log::debug!("Operational mDNS discovered device: {:?}", info);
+        log::debug!("Discovering operational device via mDNS with target {}", expected_target);
+        let (_, info) = discover::discover_one(
+            mdns,
+            "_matter._tcp.local",
+            "_matter._tcp.local.",
+            std::time::Duration::from_secs(120),
+            move |target, _| target == expected_target,
+        ).await.context(format!("operational mDNS timeout for {}", instance))?;
+        log::debug!("Operational mDNS discovered device: {:?}", info);
 
-                        let port = info.port.unwrap_or(5540);
-                        for ip in &info.ips {
-                            if ip.is_ipv6() {
-                                addresses.push(format!("[{}]:{}", ip, port));
-                            } else {
-                                addresses.push(format!("{}:{}", ip, port));
-                            }
-                        }
-                        break;
-                    }
-                    Ok(_) => continue,
-                    Err(_) => anyhow::bail!("operational mDNS timeout for {}", instance),
-                }
-            }
-        };
-
+        let port = info.port.unwrap_or(5540);
+        let addresses: Vec<String> = info.ips.iter().map(|ip| {
+            if ip.is_ipv6() { format!("[{}]:{}", ip, port) } else { format!("{}:{}", ip, port) }
+        }).collect();
         log::info!("Device discovered at {}", addresses.join(", "));
-
-        // 6. UDP connection + CASE + CommissioningComplete
-        for address in addresses {
-            log::debug!("Trying to commission over UDP at {}...", address);
-            let udp_conn = self.transport.create_connection(&address).await;
-            let ses = commission::commissioning_complete_udp(
-                udp_conn.as_ref(),
-                self.certmanager.as_ref(),
-                node_id,
-                controller_id,
-                &self.fabric,
-            )
-            .await;
-            if let Ok(ses) = ses {
-                return Ok(Connection {
-                    active: ActiveConnection::new(udp_conn, ses),
-                });
-            } else {
-                log::debug!("Failed to commission over UDP at {}: {:?}", address, ses.err());
-            }
-        }
-        Err(anyhow::anyhow!("failed to commission device over UDP at any discovered address"))
+        Ok(addresses)
     }
 }
 

@@ -66,8 +66,6 @@ use anyhow::{Context, Result};
 
 use std::time::Duration;
 
-use tokio::sync::mpsc::UnboundedReceiver;
-
 use crate::{certmanager, controller, discover::{self, MatterDeviceInfo}, fabric::Fabric, mdns2, onboarding, transport};
 
 pub struct DeviceManager {
@@ -78,7 +76,6 @@ pub struct DeviceManager {
     certmanager: Arc<dyn certmanager::CertManager>,
     registry: std::sync::Mutex<device::DeviceRegistry>,
     mdns: Arc<mdns2::MdnsService>,
-    mdns_receiver: tokio::sync::Mutex<UnboundedReceiver<mdns2::MdnsEvent>>,
 }
 
 impl DeviceManager {
@@ -98,7 +95,7 @@ impl DeviceManager {
         let transport = transport::Transport::new(&config.local_address).await?;
         let controller = controller::Controller::new(&cm, &transport, config.fabric_id)?;
         let registry = device::DeviceRegistry::load(&config::devices_path(base_path))?;
-        let (mdns, mdns_receiver) = mdns2::MdnsService::new().await?;
+        let mdns = mdns2::MdnsService::new().await?;
 
         Ok(Self {
             base_path: base_path.to_owned(),
@@ -108,7 +105,6 @@ impl DeviceManager {
             certmanager: cm,
             registry: std::sync::Mutex::new(registry),
             mdns,
-            mdns_receiver: tokio::sync::Mutex::new(mdns_receiver),
         })
     }
 
@@ -120,7 +116,7 @@ impl DeviceManager {
         let transport = transport::Transport::new(&config.local_address).await?;
         let controller = controller::Controller::new(&cm, &transport, config.fabric_id)?;
         let registry = device::DeviceRegistry::load(&config::devices_path(base_path))?;
-        let (mdns, mdns_receiver) = mdns2::MdnsService::new().await?;
+        let mdns = mdns2::MdnsService::new().await?;
 
         Ok(Self {
             base_path: base_path.to_owned(),
@@ -130,7 +126,6 @@ impl DeviceManager {
             certmanager: cm,
             registry: std::sync::Mutex::new(registry),
             mdns,
-            mdns_receiver: tokio::sync::Mutex::new(mdns_receiver),
         })
     }
 
@@ -245,48 +240,25 @@ impl DeviceManager {
 
         log::info!("Discovering device with discriminator {}...", discriminator);
 
-        let mut receiver = self.mdns_receiver.lock().await;
-        self.mdns.active_lookup("_matterc._udp.local", 0xff).await;
+        let is_short = info.is_short_discriminator;
+        let (_, matter_info) = discover::discover_one(
+            &self.mdns,
+            "_matterc._udp.local",
+            "_matterc._udp.local.",
+            Duration::from_secs(10),
+            move |_, i| {
+                if let Some(ref d) = i.discriminator {
+                    if let Ok(mut disc) = d.parse::<u16>() {
+                        if is_short { disc &= 0xf00; }
+                        return disc == discriminator;
+                    }
+                }
+                false
+            },
+        ).await.context(format!("discovering device with discriminator {}", discriminator))?;
 
-        let discovery_timeout = Duration::from_secs(10);
-        let start_time = std::time::Instant::now();
-        let (ips, port) = loop {
-            if start_time.elapsed() > discovery_timeout {
-                anyhow::bail!("timed out waiting for device with discriminator {}", discriminator);
-            }
-            let remaining = discovery_timeout.checked_sub(start_time.elapsed()).unwrap_or_default();
-            let event = tokio::time::timeout(remaining, receiver.recv())
-                .await
-                .map_err(|_| anyhow::anyhow!("timed out waiting for device with discriminator {}", discriminator))?;
-            match event {
-                Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
-                    if svc_name != "_matterc._udp.local." {
-                        continue;
-                    }
-                    let matter_info = match discover::extract_matter_info(&target, &self.mdns).await {
-                        Ok(i) => i,
-                        Err(e) => {
-                            log::debug!("Failed to extract Matter info from {}: {}", target, e);
-                            continue;
-                        }
-                    };
-                    if let Some(ref d) = matter_info.discriminator {
-                        let mut mdns_discriminator = d.parse::<u16>()?;
-                        if info.is_short_discriminator {
-                            mdns_discriminator &= 0xf00;
-                        }
-                        if mdns_discriminator == discriminator {
-                            break (matter_info.ips, matter_info.port.unwrap_or(5540));
-                        }
-                    }
-                }
-                None => {
-                    anyhow::bail!("no commissionable device found with discriminator {}", discriminator);
-                }
-                _ => {}
-            }
-        };
-        drop(receiver);
+        let ips = matter_info.ips;
+        let port = matter_info.port.unwrap_or(5540);
 
         if ips.is_empty() {
             anyhow::bail!("discovered device with discriminator {} but no IPs returned", discriminator);
@@ -343,7 +315,6 @@ impl DeviceManager {
                 self.config.controller_id,
                 network_creds,
                 &self.mdns,
-                &self.mdns_receiver,
             )
             .await?;
 
@@ -372,40 +343,17 @@ impl DeviceManager {
 
         log::info!("Operational discovery for instance {}...", instance_name);
 
-        let mut receiver = self.mdns_receiver.lock().await;
-        self.mdns.active_lookup("_matter._tcp.local", 0xff).await;
+        let (_, matter_info) = discover::discover_one(
+            &self.mdns,
+            "_matter._tcp.local",
+            "_matter._tcp.local.",
+            timeout,
+            move |target, _| target == expected_target,
+        ).await.context(format!("operational discovery for node {}", node_id))?;
 
-        let (ips, port) = loop {
-            let event = tokio::time::timeout(timeout, receiver.recv())
-                .await
-                .map_err(|_| anyhow::anyhow!("operational discovery timeout for node {}", node_id))?;
-            match event {
-                Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
-                    if svc_name != "_matter._tcp.local." {
-                        continue;
-                    }
-                    if target != expected_target {
-                        continue;
-                    }
-                    let matter_info = match discover::extract_matter_info(&target, &self.mdns).await {
-                        Ok(i) => i,
-                        Err(e) => {
-                            log::debug!("Failed to extract Matter info from {}: {}", target, e);
-                            continue;
-                        }
-                    };
-                    break (matter_info.ips, matter_info.port.unwrap_or(5540));
-                }
-                None => {
-                    anyhow::bail!("no operational mDNS result for instance {}", instance_name);
-                }
-                _ => {}
-            }
-        };
-        drop(receiver);
-
-        let ip = ips.first()
+        let ip = matter_info.ips.into_iter().next()
             .context(format!("discovered {} but no IPs in response", instance_name))?;
+        let port = matter_info.port.unwrap_or(5540);
         let address = if ip.is_ipv6() {
             format!("[{}]:{}", ip, port)
         } else {
@@ -417,38 +365,12 @@ impl DeviceManager {
     }
 
     pub async fn discover_commissionable_devices(&self, timeout: Duration) -> Result<Vec<(String, MatterDeviceInfo)>> {
-        let mut receiver = self.mdns_receiver.lock().await;
-        self.mdns.active_lookup("_matterc._udp.local", 0xff).await;
-
-        let mut devices = Vec::new();
-        let start = std::time::Instant::now();
-        while start.elapsed() < timeout {
-            let remaining = timeout.checked_sub(start.elapsed()).unwrap_or_default();
-            let event = tokio::time::timeout(remaining, receiver.recv())
-                .await;
-            let event = match event {
-                Ok(e) => e,
-                Err(_) => break, // timeout, stop waiting for more
-            };
-            match event {
-                Some(mdns2::MdnsEvent::ServiceDiscovered { name: svc_name, records: _, target }) => {
-                    if svc_name != "_matterc._udp.local." {
-                        continue;
-                    }
-                    let matter_info = match discover::extract_matter_info(&target, &self.mdns).await {
-                        Ok(i) => i,
-                        Err(e) => {
-                            log::debug!("Failed to extract Matter info from {}: {}", target, e);
-                            continue;
-                        }
-                    };
-                    devices.push((target, matter_info));
-                }
-                None => break,
-                _ => {}
-            }
-        }
-        Ok(devices)
+        discover::discover_all(
+            &self.mdns,
+            "_matterc._udp.local",
+            "_matterc._udp.local.",
+            timeout,
+        ).await
     }
 
     /// List all registered devices.

@@ -96,19 +96,24 @@ async fn main() {
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
         .init();
 
-    let (mdns, mut receiver) = matc::mdns2::MdnsService::new().await.unwrap();
+    let mdns = matc::mdns2::MdnsService::new().await.unwrap();
+    let mut receiver = mdns.subscribe();
     mdns.add_query("_matter._tcp.local", 0xff, Duration::from_secs(10)).await;
     mdns.add_query("_matterc._udp.local", 0xff, Duration::from_secs(10)).await;
 
     let mut cache = HashMap::new();
 
-    while let Some(dns) = receiver.recv().await {
-        match dns {
-            matc::mdns2::MdnsEvent::ServiceDiscovered {name, records: _, target } => {
+    loop {
+        match receiver.recv().await {
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                log::warn!("discover: dropped {} events due to lag", n);
+            }
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+            Ok(matc::mdns2::MdnsEvent::ServiceDiscovered { name, records: _, target }) => {
                 if name != "_matter._tcp.local." && name != "_matterc._udp.local." {
                     continue;
                 }
-                let matter_info = match matc::discover::extract_matter_info(&target, &mdns) .await {
+                let matter_info = match matc::discover::extract_matter_info(&target, &mdns).await {
                     Ok(info) => info,
                     Err(e) => {
                         log::warn!("Error extracting Matter info for service {}: {:?}", name, e);
@@ -120,9 +125,7 @@ async fn main() {
                         log::debug!("Already seen instance {}, skipping", matter_info.instance);
                         continue;
                     }
-                    None => {
-                        // continue
-                    }
+                    None => {}
                 }
                 if cli.compact {
                     matter_info.print_compact();
@@ -132,10 +135,10 @@ async fn main() {
                         log::warn!("Error processing service {}: {:?}", name, e);
                     }
                 }
-            },
-            matc::mdns2::MdnsEvent::ServiceExpired { name, rtype } => {
+            }
+            Ok(matc::mdns2::MdnsEvent::ServiceExpired { name, rtype }) => {
                 log::debug!("Service expired: {} (type {})", name, rtype);
-            },
+            }
         }
     }
 

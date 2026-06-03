@@ -345,6 +345,102 @@ pub async fn discover_commissioned2(timeout: Duration, device: &Option<String>) 
 
 
 
+/// Discover the first device matching a predicate.
+///
+/// Subscribes to the broadcast channel, sends `query` as an active mDNS lookup, then
+/// drains events until one matching `service_name` passes `predicate`. Lag events (dropped
+/// due to buffer overflow) are logged and skipped; discovery continues normally.
+///
+/// `predicate` receives the full instance target string and the parsed `MatterDeviceInfo`.
+pub async fn discover_one<F>(
+    mdns: &mdns2::MdnsService,
+    query: &str,
+    service_name: &str,
+    timeout: Duration,
+    predicate: F,
+) -> Result<(String, MatterDeviceInfo)>
+where
+    F: Fn(&str, &MatterDeviceInfo) -> bool,
+{
+    let mut rx = mdns.subscribe();
+    mdns.active_lookup(query, mdns::QTYPE_ANY).await;
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            anyhow::bail!("mDNS discovery timeout for {}", query);
+        }
+        match tokio::time::timeout(remaining, rx.recv()).await {
+            Err(_) => anyhow::bail!("mDNS discovery timeout for {}", query),
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(n))) => {
+                log::warn!("mDNS discovery: dropped {} events due to lag, continuing", n);
+            }
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
+                anyhow::bail!("mDNS service closed");
+            }
+            Ok(Ok(mdns2::MdnsEvent::ServiceExpired { .. })) => {}
+            Ok(Ok(mdns2::MdnsEvent::ServiceDiscovered { name, target, .. })) => {
+                if name != service_name {
+                    continue;
+                }
+                let info = match extract_matter_info(&target, mdns).await {
+                    Ok(i) => i,
+                    Err(e) => {
+                        log::debug!("failed to extract Matter info from {}: {}", target, e);
+                        continue;
+                    }
+                };
+                if predicate(&target, &info) {
+                    return Ok((target, info));
+                }
+            }
+        }
+    }
+}
+
+/// Discover all matching devices until the timeout expires.
+///
+/// Like [`discover_one`] but collects every device whose `ServiceDiscovered` event
+/// matches `service_name` and for which `extract_matter_info` succeeds, until `timeout`
+/// elapses. Returns an empty `Vec` if no devices are found (not an error).
+pub async fn discover_all(
+    mdns: &mdns2::MdnsService,
+    query: &str,
+    service_name: &str,
+    timeout: Duration,
+) -> Result<Vec<(String, MatterDeviceInfo)>> {
+    let mut rx = mdns.subscribe();
+    mdns.active_lookup(query, mdns::QTYPE_ANY).await;
+    let deadline = std::time::Instant::now() + timeout;
+    let mut out = Vec::new();
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match tokio::time::timeout(remaining, rx.recv()).await {
+            Err(_) => break,
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(n))) => {
+                log::warn!("mDNS discover_all: dropped {} events due to lag, continuing", n);
+            }
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => break,
+            Ok(Ok(mdns2::MdnsEvent::ServiceExpired { .. })) => {}
+            Ok(Ok(mdns2::MdnsEvent::ServiceDiscovered { name, target, .. })) => {
+                if name != service_name {
+                    continue;
+                }
+                match extract_matter_info(&target, mdns).await {
+                    Ok(info) => out.push((target, info)),
+                    Err(e) => {
+                        log::debug!("failed to extract Matter info from {}: {}", target, e);
+                    }
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
 pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Result<MatterDeviceInfo> {
     let txt_records = mdns.lookup(target, mdns::TYPE_TXT).await;
     let mut txt_info = HashMap::new();

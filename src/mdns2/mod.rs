@@ -4,6 +4,8 @@
 //! - Runs continuous discovery with periodic re-queries
 //! - Caches discovered records with TTL-based expiration
 //! - Registers local services and responds to incoming mDNS queries
+//! - Emits discovery events via a broadcast channel; call [`MdnsService::subscribe`] to get
+//!   an independent event stream per caller, supporting concurrent discovery operations
 
 mod dnssd;
 mod protocol;
@@ -18,8 +20,9 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use tokio::net::UdpSocket;
+use tokio::sync::broadcast;
 use tokio::sync::Mutex;
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
 use crate::mdns;
@@ -42,10 +45,13 @@ struct MdnsServiceInner {
     local_ips_v6: Vec<Ipv6Addr>,
 }
 
+const EVENT_CHANNEL_CAPACITY: usize = 256;
+
 /// Long-running mDNS service with discovery, caching, and service registration.
 pub struct MdnsService {
     inner: Arc<Mutex<MdnsServiceInner>>,
     send_tx: UnboundedSender<SendCommand>,
+    event_tx: broadcast::Sender<MdnsEvent>,
     cancel: CancellationToken,
 }
 
@@ -53,7 +59,7 @@ async fn recv_loop(
     socket: Arc<UdpSocket>,
     inner: Arc<Mutex<MdnsServiceInner>>,
     send_tx: UnboundedSender<SendCommand>,
-    event_tx: UnboundedSender<MdnsEvent>,
+    event_tx: broadcast::Sender<MdnsEvent>,
     cancel: CancellationToken,
 ) {
     let mut buf = vec![0u8; 9000];
@@ -146,7 +152,7 @@ async fn recv_loop(
 async fn periodic_loop(
     inner: Arc<Mutex<MdnsServiceInner>>,
     send_tx: UnboundedSender<SendCommand>,
-    event_tx: UnboundedSender<MdnsEvent>,
+    event_tx: broadcast::Sender<MdnsEvent>,
     cancel: CancellationToken,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
@@ -190,9 +196,12 @@ async fn periodic_loop(
 }
 
 impl MdnsService {
-    /// Create a new mDNS service. Returns the service handle and a receiver for events.
-    pub async fn new() -> Result<(Arc<Self>, UnboundedReceiver<MdnsEvent>)> {
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
+    /// Create a new mDNS service.
+    ///
+    /// Call [`subscribe`](Self::subscribe) on the returned handle to receive discovery events.
+    /// Multiple independent subscribers may receive events concurrently.
+    pub async fn new() -> Result<Arc<Self>> {
+        let (event_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         let (send_tx, send_rx) = mpsc::unbounded_channel();
         let cancel = CancellationToken::new();
 
@@ -286,10 +295,22 @@ impl MdnsService {
         let service = Arc::new(MdnsService {
             inner,
             send_tx,
+            event_tx,
             cancel,
         });
 
-        Ok((service, event_rx))
+        Ok(service)
+    }
+
+    /// Subscribe to discovery events.
+    ///
+    /// Returns an independent [`broadcast::Receiver`]; each subscriber receives every event.
+    /// Subscribe before calling [`active_lookup`](Self::active_lookup) to avoid missing
+    /// responses that arrive before the next `recv()` call.
+    /// On lag (`RecvError::Lagged`), log a warning and keep draining — events are recoverable
+    /// by re-issuing [`active_lookup`](Self::active_lookup).
+    pub fn subscribe(&self) -> broadcast::Receiver<MdnsEvent> {
+        self.event_tx.subscribe()
     }
 
     /// Add a periodic query. The query will be sent immediately, then every interval.

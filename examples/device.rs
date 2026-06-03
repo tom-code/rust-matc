@@ -104,12 +104,7 @@ async fn main() -> Result<()> {
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
         .init();
 
-    let (mdns, mut receiver) = matc::mdns2::MdnsService::new().await.unwrap();
-    tokio::spawn(async move {
-        while let Some(_event) = receiver.recv().await {
-            //log::info!("mDNS event: {:?}", event);
-        }
-    });
+    let mdns = matc::mdns2::MdnsService::new().await.unwrap();
     let state_dir = "device-state".to_string();
     let config = DeviceConfig {
         pin: 123456,

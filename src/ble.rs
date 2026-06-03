@@ -211,7 +211,7 @@ pub async fn connect_peripheral(peripheral: Peripheral) -> Result<BlePeripheral>
         }
     });
 
-    tokio::spawn(async move {
+    let c2_handle = tokio::spawn(async move {
         log::debug!("BLE: waiting for C2 notifications...");
         while let Some(notif) = notifs.next().await {
             log::debug!(
@@ -227,7 +227,15 @@ pub async fn connect_peripheral(peripheral: Peripheral) -> Result<BlePeripheral>
         }
         log::debug!("BLE C2 notification stream ended");
     });
+    let c2_abort = c2_handle.abort_handle();
 
+    let periph_disconnect = peripheral.clone();
+    let disconnect = Box::new(move || {
+        tokio::spawn(async move {
+            log::debug!("BTP: disconnecting BLE peripheral");
+            let _ = periph_disconnect.disconnect().await;
+        });
+    }) as Box<dyn FnOnce() + Send>;
 
     // how to get negotiated mtu? change to 23?
     let att_mtu: usize = 185;
@@ -236,6 +244,8 @@ pub async fn connect_peripheral(peripheral: Peripheral) -> Result<BlePeripheral>
         write_c1: write_tx,
         read_c2: read_rx,
         att_mtu,
+        c2_abort,
+        disconnect,
     })
 }
 
