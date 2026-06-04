@@ -378,6 +378,25 @@ async fn add_or_update_wifi(
 }
 
 #[cfg(feature = "ble")]
+// Parse a Thread Operational Dataset (simple TLV: 1-byte type, 1-byte length, N-byte value)
+// and return the Extended PAN ID bytes (type 0x02, length 8).
+fn extract_thread_extended_pan_id(dataset: &[u8]) -> Option<&[u8]> {
+    let mut i = 0;
+    while i + 2 <= dataset.len() {
+        let tlv_type = dataset[i];
+        let tlv_len = dataset[i + 1] as usize;
+        if i + 2 + tlv_len > dataset.len() {
+            break;
+        }
+        if tlv_type == 0x02 && tlv_len == 8 {
+            return Some(&dataset[i + 2..i + 2 + tlv_len]);
+        }
+        i += 2 + tlv_len;
+    }
+    None
+}
+
+#[cfg(feature = "ble")]
 async fn add_or_update_thread(
     retrctx: &mut retransmit::RetrContext<'_>,
     dataset: &[u8],
@@ -399,8 +418,10 @@ async fn add_or_update_thread(
     if status != 0 {
         return Err(anyhow::anyhow!("AddOrUpdateThreadNetwork failed with status {}", status));
     }
-    // Return first 8 bytes as network ID (typically the Extended PAN ID)
-    Ok(dataset[..dataset.len().min(8)].to_vec())
+    let ext_pan_id = extract_thread_extended_pan_id(dataset)
+        .ok_or_else(|| anyhow::anyhow!("Thread dataset missing Extended PAN ID (TLV type 0x02)"))?
+        .to_vec();
+    Ok(ext_pan_id)
 }
 
 #[cfg(feature = "ble")]
