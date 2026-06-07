@@ -132,6 +132,79 @@ pub fn get_attribute_list() -> Vec<(u32, &'static str)> {{
     return function
 
 
+def generate_event_json_dispatcher_function(cluster_id: str, events) -> str:
+    """Generate a JSON dispatcher function that routes event decoding based on event ID."""
+    if not events:
+        return ""
+
+    match_arms = []
+    seen_ids = set()
+    for event in events:
+        if event.id in seen_ids:
+            continue
+        seen_ids.add(event.id)
+
+        if event.fields:
+            func_name = f"decode_{convert_to_snake_case(event.name)}_event"
+            match_arm = f'''        {event.id} => {{
+            match {func_name}(tlv_value) {{
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{{{\\\"error\\\": \\\"{{}}\\\"}}}}", e),
+            }}
+        }}'''
+        else:
+            match_arm = f'        {event.id} => "{{}}".to_string(),'
+        match_arms.append(match_arm)
+
+    match_arms_str = "\n".join(match_arms)
+    has_fielded = any(e.fields for e in events)
+    tlv_param = "tlv_value" if has_fielded else "_tlv_value"
+
+    return f'''
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, {tlv_param}: &crate::tlv::TlvItemValue) -> String {{
+    if cluster_id != {cluster_id} {{
+        return format!("{{{{\\\"error\\\": \\\"Invalid cluster ID. Expected {cluster_id}, got {{}}\\\"}}}}", cluster_id);
+    }}
+
+    match event_id {{
+{match_arms_str}
+        _ => format!("{{{{\\\"error\\\": \\\"Unknown event ID: {{}}\\\"}}}}", event_id),
+    }}
+}}
+
+'''
+
+
+def generate_event_list_function(cluster_id: str, events) -> str:
+    """Generate a function that returns all events for this cluster as a list."""
+    if not events:
+        return ""
+
+    entries = []
+    seen_ids = set()
+    for event in events:
+        if event.id in seen_ids:
+            continue
+        seen_ids.add(event.id)
+        entries.append(f'        ({event.id}, "{event.name}"),')
+    entries_str = "\n".join(entries)
+
+    return f'''/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {{
+    vec![
+{entries_str}
+    ]
+}}
+
+'''
+
+
 def _resolve_field_typedefs(fields, typedefs: Dict[str, str]) -> None:
     """Resolve typedef names in MatterField objects to their base types in-place."""
     for field in fields:
@@ -250,7 +323,7 @@ def generate_rust_code(xml_file: str, typedefs: Optional[Dict[str, str]] = None)
         imports += "use crate::tlv;\n"
     if commands_with_fields or commands or attributes or response_commands_with_fields or events_with_fields:
         imports += "use anyhow;\n"
-    if attributes or commands:
+    if attributes or commands or events:
         imports += "use serde_json;\n"
 
     # Check which specific serialization helpers are needed
@@ -460,6 +533,9 @@ use crate::clusters::helpers::{{{helpers_import}}};
                 code += event.generate_decode_function(structs, enums, bitmaps) + "\n\n"
                 generated_functions.add(func_name)
 
+        code += generate_event_json_dispatcher_function(parser.cluster_id, events)
+        code += generate_event_list_function(parser.cluster_id, events)
+
     return code
 
 
@@ -567,6 +643,52 @@ def generate_main_dispatcher(cluster_info: List[Dict[str, str]]) -> str:
 def generate_main_attribute_list_dispatcher(cluster_info: List[Dict[str, str]]) -> str:
     """Generate the main get_attribute_list dispatcher function."""
     return _generate_cluster_dispatcher(cluster_info, "attribute")
+
+
+def generate_main_event_dispatcher(cluster_info: List[Dict[str, str]]) -> str:
+    """Generate the main decode_event_json dispatcher function."""
+    seen_cluster_ids = set()
+    match_arms = []
+    for info in sorted(cluster_info, key=lambda x: x['cluster_id']):
+        if info.get('has_events') and info['cluster_id'] not in seen_cluster_ids:
+            mod = info['module_name']
+            match_arms.append(
+                f"        {info['cluster_id']} => {mod}::decode_event_json(cluster_id, event_id, tlv_value),"
+            )
+            seen_cluster_ids.add(info['cluster_id'])
+    match_arms_str = '\n'.join(match_arms)
+
+    return f'''
+/// Main dispatcher for decoding event TLV values to JSON strings
+pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {{
+    match cluster_id {{
+{match_arms_str}
+        _ => format!("{{{{\\\"error\\\": \\\"Unsupported cluster ID: {{}}\\\"}}}}", cluster_id),
+    }}
+}}
+'''
+
+
+def generate_main_event_list_dispatcher(cluster_info: List[Dict[str, str]]) -> str:
+    """Generate the main get_event_list dispatcher function."""
+    seen_cluster_ids = set()
+    match_arms = []
+    for info in sorted(cluster_info, key=lambda x: x['cluster_id']):
+        if info.get('has_events') and info['cluster_id'] not in seen_cluster_ids:
+            match_arms.append(
+                f"        {info['cluster_id']} => {info['module_name']}::get_event_list(),"
+            )
+            seen_cluster_ids.add(info['cluster_id'])
+    match_arms_str = '\n'.join(match_arms)
+
+    return f'''/// Main dispatcher for getting event lists by cluster ID
+pub fn get_event_list(cluster_id: u32) -> Vec<(u32, &\'static str)> {{
+    match cluster_id {{
+{match_arms_str}
+        _ => vec![],
+    }}
+}}
+'''
 
 
 # ---------------------------------------------------------------------------
@@ -1269,9 +1391,15 @@ def generate_mod_file(output_dir: str, rust_files: List[str], cluster_info: List
         f.write("\n")
         f.write(generate_main_attribute_list_dispatcher(cluster_info))
 
-        # Command dispatchers (new)
+        # Command dispatchers
         f.write("\n")
         f.write(_generate_command_dispatchers(cluster_info))
+
+        # Event dispatchers
+        f.write("\n")
+        f.write(generate_main_event_dispatcher(cluster_info))
+        f.write("\n")
+        f.write(generate_main_event_list_dispatcher(cluster_info))
 
     print(f"  ✓ Generated mod.rs with {len(rust_files)} modules and dispatchers")
 
@@ -1338,11 +1466,14 @@ def process_xml_files(xml_dir: str, output_dir: str) -> None:
                     for cmd in commands_elem.findall('command')
                 )
 
+            has_events = len(root.findall(".//event")) > 0
+
             cluster_info.append({
                 'cluster_id': cluster_id,
                 'module_name': module_name,
                 'has_attributes': has_attributes,
                 'has_commands': has_commands,
+                'has_events': has_events,
                 'xml_filename': xml_filename
             })
 

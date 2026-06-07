@@ -16,6 +16,7 @@ A feature-rich CLI built on top of `DeviceManager` — the high-level API that h
 | `commission <addr> <node_id> <pin> <name>` | Commission a device at a known IP:port |
 | `commission-with-discovery <code> <node_id> <name>` | Commission using manual pairing code + mDNS auto-discovery |
 | `commission-ble <code> <node_id> <name> <ssid> [--password]` | Commission a Wi-Fi device over BLE *(requires `--features ble`)* |
+| `commission-ble-thread <code> <node_id> <name> <dataset_hex>` | Commission a Thread device over BLE *(requires `--features ble`)* |
 | `list` | List all registered devices |
 | `on/off/toggle <device>` | Send On/Off cluster commands (device by name or node ID) |
 | `remove <device>` | Remove a device from the registry |
@@ -35,6 +36,10 @@ cargo run --example devman_demo -- -d ./matter-data commission-with-discovery "0
 # 2c. Commission over BLE (Wi-Fi provisioning)
 cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble \
   "MT:Y.K908..." 300 "kitchen light" HomeWifi --password "secret"
+
+# 2d. Commission over BLE (Thread provisioning, dataset from `ot-ctl dataset active -x`)
+cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble-thread \
+  "MT:Y.K908..." 300 "kitchen sensor" 0e080000000000010000...
 
 # 3. Control
 cargo run --example devman_demo -- -d ./matter-data on "kitchen light"

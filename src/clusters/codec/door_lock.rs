@@ -2975,3 +2975,61 @@ pub fn decode_lock_user_change_event(inp: &tlv::TlvItemValue) -> anyhow::Result<
     }
 }
 
+
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
+    if cluster_id != 0x0101 {
+        return format!("{{\"error\": \"Invalid cluster ID. Expected 0x0101, got {}\"}}", cluster_id);
+    }
+
+    match event_id {
+        0x00 => {
+            match decode_door_lock_alarm_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x01 => {
+            match decode_door_state_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x02 => {
+            match decode_lock_operation_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x03 => {
+            match decode_lock_operation_error_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x04 => {
+            match decode_lock_user_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        _ => format!("{{\"error\": \"Unknown event ID: {}\"}}", event_id),
+    }
+}
+
+/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "DoorLockAlarm"),
+        (0x01, "DoorStateChange"),
+        (0x02, "LockOperation"),
+        (0x03, "LockOperationError"),
+        (0x04, "LockUserChange"),
+    ]
+}
+

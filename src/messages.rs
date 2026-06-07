@@ -729,6 +729,46 @@ pub fn im_subscribe_request_attr(endpoint: Option<u16>, cluster: Option<u32>, at
     Ok(tlv.data)
 }
 
+/// Build a SubscribeRequest for an event path (EventRequests, tag 4).
+/// Any `None` field is omitted from the EventPathIB, acting as a wildcard.
+pub fn im_subscribe_request_event(endpoint: Option<u16>, cluster: Option<u32>, event: Option<u32>, exchange: u16, keep_subscriptions: bool) -> Result<Vec<u8>> {
+    let b = ProtocolMessageHeader {
+        exchange_flags: 5,
+        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ,
+        exchange_id: exchange,
+        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+        ack_counter: 0,
+    }
+    .encode()?;
+
+    let mut tlv = tlv::TlvBuffer::from_vec(b);
+    tlv.write_anon_struct()?;
+    tlv.write_bool(0, keep_subscriptions)?;
+    tlv.write_uint16(1, 0)?;
+    tlv.write_uint16(2, 60)?;
+    tlv.write_array(4)?;            // EventRequests
+
+    tlv.write_anon_list()?;
+    if let Some(endpoint) = endpoint {
+        tlv.write_uint16(1, endpoint)?;
+    }
+    if let Some(cluster) = cluster {
+        tlv.write_uint32(2, cluster)?;
+    }
+    if let Some(event) = event {
+        tlv.write_uint32(3, event)?;
+    }
+    tlv.write_bool(4, true)?; // urgent
+
+    tlv.write_struct_end()?;        // end EventPathIB
+    tlv.write_struct_end()?;        // end EventRequests array
+
+    tlv.write_bool(7, false)?;
+    tlv.write_uint8(0xff, 10)?;
+    tlv.write_struct_end()?;
+    Ok(tlv.data)
+}
+
 /// Build a SubscribeRequest with `KeepSubscriptions = false` and no attribute/event paths.
 /// Sending this causes the device to cancel all existing subscriptions for this session.
 pub fn im_unsubscribe_all(exchange: u16) -> Result<Vec<u8>> {

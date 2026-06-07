@@ -2509,3 +2509,82 @@ pub fn decode_active_preset_change_event(inp: &tlv::TlvItemValue) -> anyhow::Res
     }
 }
 
+
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
+    if cluster_id != 0x0201 {
+        return format!("{{\"error\": \"Invalid cluster ID. Expected 0x0201, got {}\"}}", cluster_id);
+    }
+
+    match event_id {
+        0x00 => {
+            match decode_system_mode_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x01 => {
+            match decode_local_temperature_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x02 => {
+            match decode_occupancy_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x03 => {
+            match decode_setpoint_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x04 => {
+            match decode_running_state_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x05 => {
+            match decode_running_mode_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x06 => {
+            match decode_active_schedule_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x07 => {
+            match decode_active_preset_change_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        _ => format!("{{\"error\": \"Unknown event ID: {}\"}}", event_id),
+    }
+}
+
+/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SystemModeChange"),
+        (0x01, "LocalTemperatureChange"),
+        (0x02, "OccupancyChange"),
+        (0x03, "SetpointChange"),
+        (0x04, "RunningStateChange"),
+        (0x05, "RunningModeChange"),
+        (0x06, "ActiveScheduleChange"),
+        (0x07, "ActivePresetChange"),
+    ]
+}
+

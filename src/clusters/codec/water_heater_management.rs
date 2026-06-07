@@ -347,3 +347,35 @@ pub fn decode_boost_started_event(inp: &tlv::TlvItemValue) -> anyhow::Result<Boo
     }
 }
 
+
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
+    if cluster_id != 0x0094 {
+        return format!("{{\"error\": \"Invalid cluster ID. Expected 0x0094, got {}\"}}", cluster_id);
+    }
+
+    match event_id {
+        0x00 => {
+            match decode_boost_started_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x01 => "{}".to_string(),
+        _ => format!("{{\"error\": \"Unknown event ID: {}\"}}", event_id),
+    }
+}
+
+/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "BoostStarted"),
+        (0x01, "BoostEnded"),
+    ]
+}
+

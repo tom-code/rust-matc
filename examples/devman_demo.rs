@@ -14,6 +14,10 @@
 ///   cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble \
 ///     "MT:Y.K908..." 300 "kitchen light" HomeWifi --password "secret"
 ///
+///   # Commission a Thread device over BLE (requires --features ble):
+///   cargo run --features ble --example devman_demo -- -d ./matter-data commission-ble-thread \
+///     "MT:Y.K908..." 300 "kitchen sensor" 0e080000000000010000000300001235...
+///
 ///   # Scan for BLE commissionable devices (requires --features ble):
 ///   cargo run --features ble --example devman_demo -- scan-ble --timeout-secs 5
 ///
@@ -106,6 +110,18 @@ enum Commands {
         /// Wi-Fi password to provision
         #[clap(long, default_value = "")]
         password: String,
+    },
+    /// Commission a Thread device over BLE (requires --features ble)
+    #[cfg(feature = "ble")]
+    CommissionBleThread {
+        /// Manual or QR pairing code
+        pairing_code: String,
+        /// Node ID to assign
+        node_id: u64,
+        /// Friendly name
+        name: String,
+        /// Thread operational dataset (hex-encoded, from `ot-ctl dataset active -x`)
+        dataset: String,
     },
     /// Scan for BLE commissionable Matter devices (requires --features ble)
     #[cfg(feature = "ble")]
@@ -328,6 +344,30 @@ async fn main() -> Result<()> {
                     ssid: ssid.into_bytes(),
                     creds: password.into_bytes(),
                 },
+            ).await?;
+            println!("Commissioned '{}' (node {})", name, node_id);
+
+            if let Ok(server_list) = descriptor_cluster::read_server_list(&conn, 0).await {
+                println!("Supported clusters:");
+                for c in server_list {
+                    match clusters::names::get_cluster_name(c) {
+                        Some(name) => println!("  {}", name),
+                        None => println!("  unknown (0x{:x})", c),
+                    }
+                }
+            }
+        }
+        #[cfg(feature = "ble")]
+        Commands::CommissionBleThread { pairing_code, node_id, name, dataset } => {
+            let dm = DeviceManager::load(data_dir).await?;
+            let dataset = hex::decode(&dataset)
+                .map_err(|e| anyhow::anyhow!("dataset hex decode: {}", e))?;
+            println!("Scanning for BLE commissionable device (pairing code: {})", pairing_code);
+            let conn = dm.commission_ble_with_code(
+                &pairing_code,
+                node_id,
+                &name,
+                NetworkCreds::Thread { dataset },
             ).await?;
             println!("Commissioned '{}' (node {})", name, node_id);
 

@@ -683,3 +683,60 @@ pub async fn read_alarm_mask(conn: &crate::controller::Connection, endpoint: u16
     decode_alarm_mask(&tlv)
 }
 
+
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, _tlv_value: &crate::tlv::TlvItemValue) -> String {
+    if cluster_id != 0x0200 {
+        return format!("{{\"error\": \"Invalid cluster ID. Expected 0x0200, got {}\"}}", cluster_id);
+    }
+
+    match event_id {
+        0x00 => "{}".to_string(),
+        0x01 => "{}".to_string(),
+        0x02 => "{}".to_string(),
+        0x03 => "{}".to_string(),
+        0x04 => "{}".to_string(),
+        0x05 => "{}".to_string(),
+        0x06 => "{}".to_string(),
+        0x07 => "{}".to_string(),
+        0x08 => "{}".to_string(),
+        0x09 => "{}".to_string(),
+        0x0A => "{}".to_string(),
+        0x0B => "{}".to_string(),
+        0x0C => "{}".to_string(),
+        0x0D => "{}".to_string(),
+        0x0E => "{}".to_string(),
+        0x0F => "{}".to_string(),
+        0x10 => "{}".to_string(),
+        _ => format!("{{\"error\": \"Unknown event ID: {}\"}}", event_id),
+    }
+}
+
+/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SupplyVoltageLow"),
+        (0x01, "SupplyVoltageHigh"),
+        (0x02, "PowerMissingPhase"),
+        (0x03, "SystemPressureLow"),
+        (0x04, "SystemPressureHigh"),
+        (0x05, "DryRunning"),
+        (0x06, "MotorTemperatureHigh"),
+        (0x07, "PumpMotorFatalFailure"),
+        (0x08, "ElectronicTemperatureHigh"),
+        (0x09, "PumpBlocked"),
+        (0x0A, "SensorFailure"),
+        (0x0B, "ElectronicNonFatalFailure"),
+        (0x0C, "ElectronicFatalFailure"),
+        (0x0D, "GeneralFault"),
+        (0x0E, "Leakage"),
+        (0x0F, "AirDetection"),
+        (0x10, "TurbineOperation"),
+    ]
+}
+

@@ -850,3 +850,30 @@ pub async fn read_block_content_time_window(conn: &crate::controller::Connection
     decode_block_content_time_window(&tlv)
 }
 
+
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, _tlv_value: &crate::tlv::TlvItemValue) -> String {
+    if cluster_id != 0x050F {
+        return format!("{{\"error\": \"Invalid cluster ID. Expected 0x050F, got {}\"}}", cluster_id);
+    }
+
+    match event_id {
+        0x00 => "{}".to_string(),
+        0x01 => "{}".to_string(),
+        _ => format!("{{\"error\": \"Unknown event ID: {}\"}}", event_id),
+    }
+}
+
+/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "RemainingScreenTimeExpired"),
+        (0x01, "EnteringBlockContentTimeWindow"),
+    ]
+}
+

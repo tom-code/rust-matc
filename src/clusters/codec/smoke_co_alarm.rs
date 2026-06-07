@@ -702,3 +702,73 @@ pub fn decode_interconnect_co_alarm_event(inp: &tlv::TlvItemValue) -> anyhow::Re
     }
 }
 
+
+// Event JSON dispatcher
+
+/// Decode event value and return as JSON string
+pub fn decode_event_json(cluster_id: u32, event_id: u32, tlv_value: &crate::tlv::TlvItemValue) -> String {
+    if cluster_id != 0x005C {
+        return format!("{{\"error\": \"Invalid cluster ID. Expected 0x005C, got {}\"}}", cluster_id);
+    }
+
+    match event_id {
+        0x00 => {
+            match decode_smoke_alarm_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x01 => {
+            match decode_co_alarm_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x02 => {
+            match decode_low_battery_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x03 => "{}".to_string(),
+        0x04 => "{}".to_string(),
+        0x05 => "{}".to_string(),
+        0x06 => "{}".to_string(),
+        0x07 => "{}".to_string(),
+        0x08 => {
+            match decode_interconnect_smoke_alarm_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x09 => {
+            match decode_interconnect_co_alarm_event(tlv_value) {
+                Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| "null".to_string()),
+                Err(e) => format!("{{\"error\": \"{}\"}}", e),
+            }
+        }
+        0x0A => "{}".to_string(),
+        _ => format!("{{\"error\": \"Unknown event ID: {}\"}}", event_id),
+    }
+}
+
+/// Get list of all events supported by this cluster
+///
+/// # Returns
+/// Vector of tuples containing (event_id, event_name)
+pub fn get_event_list() -> Vec<(u32, &'static str)> {
+    vec![
+        (0x00, "SmokeAlarm"),
+        (0x01, "COAlarm"),
+        (0x02, "LowBattery"),
+        (0x03, "HardwareFault"),
+        (0x04, "EndOfService"),
+        (0x05, "SelfTestComplete"),
+        (0x06, "AlarmMuted"),
+        (0x07, "MuteEnded"),
+        (0x08, "InterconnectSmokeAlarm"),
+        (0x09, "InterconnectCOAlarm"),
+        (0x0A, "AllClear"),
+    ]
+}
+

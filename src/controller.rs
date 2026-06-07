@@ -593,6 +593,22 @@ impl Connection {
         self.active.request(exchange, &msg).await
     }
 
+    pub async fn im_subscribe_request_event2(
+        &self,
+        endpoint: Option<u16>,
+        cluster: Option<u32>,
+        event: Option<u32>,
+        keep_subscriptions: bool,
+    ) -> Result<Message> {
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "im_subscribe_request_event exch:{} endpoint:{:?} cluster:{:?} event:{:?} keep:{}",
+            exchange, endpoint, cluster, event, keep_subscriptions
+        );
+        let msg = messages::im_subscribe_request_event(endpoint, cluster, event, exchange, keep_subscriptions)?;
+        self.active.request(exchange, &msg).await
+    }
+
     /// Cancel all subscriptions on this session by sending a SubscribeRequest with
     /// `KeepSubscriptions = false` and no paths. The device drops all prior subscriptions.
     pub async fn im_unsubscribe_all(&self) -> Result<Message> {

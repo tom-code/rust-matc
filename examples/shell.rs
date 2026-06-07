@@ -45,11 +45,11 @@ const DISCOVER_TIMEOUT_SECS: u64 = 5;
 const COMMANDS: &[&str] = &[
     "help", "quit", "exit",
     "list", "status",
-    "init", "commission", "commission-discover", "discover",
+    "init", "commission", "commission-discover", "commission-ble-wifi", "commission-ble-thread", "discover",
     "connect", "connect-all", "disconnect",
     "on", "off", "toggle", "level", "hue",
     "read", "read-all", "clusters", "parts", "invoke",
-    "subscribe", "subscribe-onoff", "subscribe-all", "unsubscribe", "subscriptions",
+    "subscribe", "subscribe-onoff", "subscribe-all", "subscribe-events", "unsubscribe", "subscriptions",
     "rename", "remove",
 ];
 
@@ -57,7 +57,7 @@ const COMMANDS: &[&str] = &[
 const DEVICE_COMMANDS: &[&str] = &[
     "on", "off", "toggle", "level", "hue",
     "read", "read-all", "clusters", "parts", "invoke",
-    "subscribe", "subscribe-onoff", "subscribe-all", "unsubscribe",
+    "subscribe", "subscribe-onoff", "subscribe-all", "subscribe-events", "unsubscribe",
     "connect", "disconnect", "rename", "remove",
 ];
 
@@ -180,6 +180,8 @@ struct DeviceSubscriptions {
     handle: tokio::task::JoinHandle<()>,
     /// Set when a wildcard subscribe-all is active. Inner Option = endpoint filter (None = all endpoints).
     wildcard: Option<Option<u16>>,
+    /// Each entry is one active subscribe-events call; inner Option = endpoint filter.
+    wildcard_events: Vec<Option<u16>>,
 }
 
 struct Shell {
@@ -344,6 +346,10 @@ Matter Interactive Shell — available commands:
                                           Commission device at known address
     commission-discover <pairing_code> <node_id> <name>
                                           Commission via mDNS discovery
+    commission-ble-wifi <pairing_code> <node_id> <name> <ssid> <password>
+                                          Commission via BLE, provision Wi-Fi (requires --features ble)
+    commission-ble-thread <pairing_code> <node_id> <name> <dataset_hex>
+                                          Commission via BLE, provision Thread (requires --features ble)
     discover [--timeout N]               Discover commissionable devices (default 5s)
 
   Connection management:
@@ -375,6 +381,7 @@ Matter Interactive Shell — available commands:
                                           Subscribe to any attribute change
     subscribe-onoff <device> [endpoint]   Shorthand: subscribe to OnOff (default ep 1)
     subscribe-all <device> [endpoint]     Subscribe to all attributes (optionally filtered to one endpoint)
+    subscribe-events <device> [endpoint]  Subscribe to all events
     unsubscribe <device>                  Cancel all subscriptions on a device
     subscriptions                         List all active subscriptions
 
@@ -466,6 +473,63 @@ async fn cmd_commission_discover(shell: &mut Shell, args: &[String]) -> Result<(
     let conn = Arc::new(shell.dm.commission_with_code(code, node_id, name).await?);
     println!("Commissioned '{}' (node {}).", name, node_id);
     shell.connections.insert(node_id, conn);
+    Ok(())
+}
+
+#[cfg(feature = "ble")]
+async fn cmd_commission_ble_wifi(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.len() < 5 {
+        println!("usage: commission-ble-wifi <pairing_code> <node_id> <name> <ssid> <password>");
+        return Ok(());
+    }
+    let code = &args[0];
+    let node_id = parse_u64(&args[1])?;
+    let name = &args[2];
+    let ssid = &args[3];
+    let password = &args[4];
+    println!("Scanning BLE for '{}' (node {}) …", name, node_id);
+    let conn = Arc::new(shell.dm.commission_ble_with_code(
+        code, node_id, name,
+        matc::NetworkCreds::WiFi {
+            ssid: ssid.as_bytes().to_vec(),
+            creds: password.as_bytes().to_vec(),
+        },
+    ).await?);
+    println!("Commissioned '{}' (node {}).", name, node_id);
+    shell.connections.insert(node_id, conn);
+    Ok(())
+}
+
+#[cfg(not(feature = "ble"))]
+async fn cmd_commission_ble_wifi(_shell: &mut Shell, _args: &[String]) -> Result<()> {
+    println!("commission-ble-wifi requires building with --features ble");
+    Ok(())
+}
+
+#[cfg(feature = "ble")]
+async fn cmd_commission_ble_thread(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.len() < 4 {
+        println!("usage: commission-ble-thread <pairing_code> <node_id> <name> <dataset_hex>");
+        return Ok(());
+    }
+    let code = &args[0];
+    let node_id = parse_u64(&args[1])?;
+    let name = &args[2];
+    let dataset = hex::decode(&args[3])
+        .map_err(|e| anyhow::anyhow!("dataset hex decode: {}", e))?;
+    println!("Scanning BLE for '{}' (node {}) …", name, node_id);
+    let conn = Arc::new(shell.dm.commission_ble_with_code(
+        code, node_id, name,
+        matc::NetworkCreds::Thread { dataset },
+    ).await?);
+    println!("Commissioned '{}' (node {}).", name, node_id);
+    shell.connections.insert(node_id, conn);
+    Ok(())
+}
+
+#[cfg(not(feature = "ble"))]
+async fn cmd_commission_ble_thread(_shell: &mut Shell, _args: &[String]) -> Result<()> {
+    println!("commission-ble-thread requires building with --features ble");
     Ok(())
 }
 
@@ -807,6 +871,11 @@ fn attr_label(cluster: u32, attr: u32) -> String {
     format!("{}/{}", cluster_name, attr_name)
 }
 
+fn event_label(cluster: u32, event: u32) -> String {
+    let cluster_name = matc::clusters::names::get_cluster_name(cluster).unwrap_or("?");
+    format!("{}/0x{:04x}", cluster_name, event)
+}
+
 /// Decode all (endpoint, cluster, attr, value) tuples from a ReportData TLV.
 /// Iterates the full AttributeReports list so batched reports are not missed.
 fn decode_attr_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, matc::tlv::TlvItemValue)> {
@@ -824,6 +893,29 @@ fn decode_attr_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, matc::tl
                 let val = report_ib.get(&[1, 2]).cloned();
                 if let (Some(ep), Some(cl), Some(att), Some(val)) = (ep, cl, att, val) {
                     out.push((ep, cl, att, val));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Decode all (endpoint, cluster, event, event_number, data) tuples from a ReportData TLV.
+/// EventReports = tag 2, List of EventReportIB. Within each:
+///   EventData (tag 1): Path (tag 0) -> ep=[1,0,1], cluster=[1,0,2], event=[1,0,3];
+///   EventNumber=[1,1]; Data=[1,7].
+fn decode_event_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, u64, matc::tlv::TlvItemValue)> {
+    let mut out = Vec::new();
+    if let Some(event_reports) = tlv.get_item(&[2]) {
+        if let matc::tlv::TlvItemValue::List(reports) = &event_reports.value {
+            for report_ib in reports {
+                let ep  = report_ib.get_u16(&[1, 0, 1]);
+                let cl  = report_ib.get_u32(&[1, 0, 2]);
+                let ev  = report_ib.get_u32(&[1, 0, 3]);
+                let num = report_ib.get_u64(&[1, 1]);
+                let val = report_ib.get(&[1, 7]).cloned();
+                if let (Some(ep), Some(cl), Some(ev), Some(num), Some(val)) = (ep, cl, ev, num, val) {
+                    out.push((ep, cl, ev, num, val));
                 }
             }
         }
@@ -855,6 +947,10 @@ fn spawn_listener(
                         };
                         let json = matc::clusters::codec::decode_attribute_json(rep_cl, rep_att, &val);
                         println!("[{}] ep{} {} = {}", device_name, rep_ep, lbl, json);
+                    }
+                    for (rep_ep, rep_cl, rep_ev, num, val) in decode_event_reports(&ev.tlv) {
+                        let json = matc::clusters::codec::decode_event_json(rep_cl, rep_ev, &val);
+                        println!("[{}] ep{} EVENT {} #{} = {}", device_name, rep_ep, event_label(rep_cl, rep_ev), num, json);
                     }
                     let status_flags =
                         if ev.protocol_header.exchange_flags & matc::messages::ProtocolMessageHeader::FLAG_INITIATOR == 0 {
@@ -924,7 +1020,7 @@ async fn do_subscribe(
     if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
         let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
         let handle = spawn_listener(conn, device.to_string(), entries.clone());
-        e.insert(DeviceSubscriptions { entries, handle, wildcard: None });
+        e.insert(DeviceSubscriptions { entries, handle, wildcard: None, wildcard_events: vec![] });
     }
 
     // Register the new entry
@@ -995,7 +1091,7 @@ async fn cmd_subscribe_all(shell: &mut Shell, args: &[String]) -> Result<()> {
     if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
         let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
         let handle = spawn_listener(conn, device.clone(), entries.clone());
-        e.insert(DeviceSubscriptions { entries, handle, wildcard: Some(endpoint) });
+        e.insert(DeviceSubscriptions { entries, handle, wildcard: Some(endpoint), wildcard_events: vec![] });
     } else {
         shell.subscriptions.get_mut(&node_id).unwrap().wildcard = Some(endpoint);
     }
@@ -1003,6 +1099,57 @@ async fn cmd_subscribe_all(shell: &mut Shell, args: &[String]) -> Result<()> {
     match endpoint {
         Some(ep) => println!("Subscribed (wildcard ep{}): [{}]. Use 'unsubscribe {}' to stop.", ep, device, device),
         None     => println!("Subscribed (wildcard all): [{}]. Use 'unsubscribe {}' to stop.", device, device),
+    }
+    Ok(())
+}
+
+async fn cmd_subscribe_events(shell: &mut Shell, args: &[String]) -> Result<()> {
+    if args.is_empty() {
+        println!("usage: subscribe-events <device> [endpoint]");
+        return Ok(());
+    }
+    let device = args[0].clone();
+    let endpoint: Option<u16> = if args.len() > 1 { Some(parse_u16(&args[1])?) } else { None };
+
+    let node_id = shell.resolve_node_id(&device)?;
+    if !shell.connections.contains_key(&node_id) {
+        println!("  connecting to '{}' ...", device);
+        let conn = Arc::new(shell.dm.connect(node_id).await?);
+        shell.connections.insert(node_id, conn);
+    }
+    let conn = shell.connections.get(&node_id).unwrap().clone();
+
+    let keep = shell.subscriptions.contains_key(&node_id);
+    let res = conn.im_subscribe_request_event2(endpoint, None, None, keep).await?;
+
+    if res.protocol_header.opcode != matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
+        println!("unexpected subscribe response opcode 0x{:x}", res.protocol_header.opcode);
+        return Ok(());
+    }
+
+    let priming = decode_event_reports(&res.tlv);
+    if priming.is_empty() {
+        println!("[{}] event subscription active (no priming events)", device);
+    } else {
+        for (ep, cl, ev, num, val) in &priming {
+            let json = matc::clusters::codec::decode_event_json(*cl, *ev, val);
+            println!("[{}] ep{} EVENT {} #{} = {} (current)", device, ep, event_label(*cl, *ev), num, json);
+        }
+    }
+
+    conn.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await?;
+
+    if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
+        let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
+        let handle = spawn_listener(conn, device.clone(), entries.clone());
+        e.insert(DeviceSubscriptions { entries, handle, wildcard: None, wildcard_events: vec![endpoint] });
+    } else {
+        shell.subscriptions.get_mut(&node_id).unwrap().wildcard_events.push(endpoint);
+    }
+
+    match endpoint {
+        Some(ep) => println!("Subscribed (events ep{}): [{}]. Use 'unsubscribe {}' to stop.", ep, device, device),
+        None     => println!("Subscribed (events all): [{}]. Use 'unsubscribe {}' to stop.", device, device),
     }
     Ok(())
 }
@@ -1045,6 +1192,12 @@ fn cmd_subscriptions(shell: &Shell) -> Result<()> {
             Some(None)     => println!("  {} (node {}) ep* <all attributes>", name, node_id),
             None           => {}
         }
+        for ep_filter in &ds.wildcard_events {
+            match ep_filter {
+                Some(ep) => println!("  {} (node {}) ep{} <all events>", name, node_id, ep),
+                None     => println!("  {} (node {}) ep* <all events>", name, node_id),
+            }
+        }
     }
     Ok(())
 }
@@ -1086,6 +1239,8 @@ async fn dispatch(shell: &mut Shell, tokens: &[String]) -> Result<bool> {
 
         "commission" => cmd_commission(shell, args).await?,
         "commission-discover" => cmd_commission_discover(shell, args).await?,
+        "commission-ble-wifi" => cmd_commission_ble_wifi(shell, args).await?,
+        "commission-ble-thread" => cmd_commission_ble_thread(shell, args).await?,
         "discover" => cmd_discover(args).await?,
 
         "list" | "ls" => cmd_list(shell)?,
@@ -1113,6 +1268,7 @@ async fn dispatch(shell: &mut Shell, tokens: &[String]) -> Result<bool> {
         "subscribe" => cmd_subscribe(shell, args).await?,
         "subscribe-onoff" => cmd_subscribe_onoff(shell, args).await?,
         "subscribe-all" => cmd_subscribe_all(shell, args).await?,
+        "subscribe-events" => cmd_subscribe_events(shell, args).await?,
         "unsubscribe" => cmd_unsubscribe(shell, args).await?,
         "subscriptions" => cmd_subscriptions(shell)?,
 
