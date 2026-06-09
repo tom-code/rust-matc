@@ -199,23 +199,46 @@ pub fn derive_resumed_session_keys(
 }
 
 
-pub fn extract_resumption_id_from_sigma2(
-    fabric: &fabric::Fabric,
-    sigma1_payload: &[u8],
-    sigma2_payload: &[u8],
-    responder_eph_pubkey: &[u8],
-    shared_secret: &[u8; 32],
-) -> Option<[u8; 16]> {
-    let sigma2_tlv = tlv::decode_tlv(sigma2_payload).ok()?;
-    let responder_random = sigma2_tlv.get_octet_string(&[1])?;
-    let encrypted_tbe = sigma2_tlv.get_octet_string(&[4])?;
+fn verify_p256_signature(public_key_sec1: &[u8], message: &[u8], signature: &[u8]) -> Result<()> {
+    let public_key = p256::PublicKey::from_sec1_bytes(public_key_sec1)?;
+    let verifying_key = ecdsa::VerifyingKey::from(public_key);
+    let signature = ecdsa::Signature::<p256::NistP256>::from_slice(signature)?;
+    ecdsa::signature::Verifier::verify(&verifying_key, message, &signature)
+        .map_err(|e| anyhow::anyhow!("signature verification failed: {}", e))
+}
 
-    let transcript_hash = cryptoutil::sha256(sigma1_payload);
-    let mut s2_salt = fabric.signed_ipk().ok()?;
+/// Decrypt and verify Sigma2 TBEData on the initiator (controller) side.
+/// Checks that the responder NOC is signed by the fabric CA, that its subject matches the
+/// node and fabric we are connecting to, and that the TBE signature over the Sigma2 TBS
+/// proves possession of the NOC private key.
+/// Returns the resumption ID from the TBE when present.
+pub fn verify_sigma2(
+    fabric: &fabric::Fabric,
+    ctx: &SigmaContext,
+    ca_public_key: &[u8],
+) -> Result<Option<[u8; 16]>> {
+    let sigma2_tlv = tlv::decode_tlv(&ctx.sigma2_payload)?;
+    let responder_random = sigma2_tlv
+        .get_octet_string(&[1])
+        .ok_or_else(|| anyhow::anyhow!("sigma2: responder random missing"))?;
+    let encrypted_tbe = sigma2_tlv
+        .get_octet_string(&[4])
+        .ok_or_else(|| anyhow::anyhow!("sigma2: encrypted TBE missing"))?;
+
+    let responder_public_key = p256::PublicKey::from_sec1_bytes(&ctx.responder_public)?;
+    let shared = ctx.eph_key.diffie_hellman(&responder_public_key);
+
+    let transcript_hash = cryptoutil::sha256(&ctx.sigma1_payload);
+    let mut s2_salt = fabric.signed_ipk()?;
     s2_salt.extend_from_slice(responder_random);
-    s2_salt.extend_from_slice(responder_eph_pubkey);
+    s2_salt.extend_from_slice(&ctx.responder_public);
     s2_salt.extend_from_slice(&transcript_hash);
-    let s2k = cryptoutil::hkdf_sha256(&s2_salt, shared_secret, b"Sigma2", 16).ok()?;
+    let s2k = cryptoutil::hkdf_sha256(
+        &s2_salt,
+        shared.raw_secret_bytes().as_slice(),
+        b"Sigma2",
+        16,
+    )?;
 
     let aes_key = aes::cipher::crypto_common::Key::<Aes128Ccm>::from_slice(&s2k);
     let cipher = Aes128Ccm::new(aes_key);
@@ -224,11 +247,64 @@ pub fn extract_resumption_id_from_sigma2(
             "NCASE_Sigma2N".as_bytes().into(),
             ccm::aead::Payload { msg: encrypted_tbe, aad: &[] },
         )
-        .ok()?;
+        .map_err(|e| anyhow::anyhow!("sigma2 TBE decrypt failed {:?}", e))?;
 
-    let tbe_tlv = tlv::decode_tlv(&decrypted).ok()?;
-    let id_bytes = tbe_tlv.get_octet_string(&[4])?;
-    id_bytes.try_into().ok()
+    let tbe_tlv = tlv::decode_tlv(&decrypted)?;
+    let noc = tbe_tlv
+        .get_octet_string(&[1])
+        .ok_or_else(|| anyhow::anyhow!("sigma2 TBE: NOC missing"))?;
+    if tbe_tlv.get_octet_string(&[2]).is_some() {
+        anyhow::bail!("sigma2 TBE: ICAC present - intermediate CAs are not supported");
+    }
+    let tbe_signature = tbe_tlv
+        .get_octet_string(&[3])
+        .ok_or_else(|| anyhow::anyhow!("sigma2 TBE: signature missing"))?;
+    let resumption_id = tbe_tlv
+        .get_octet_string(&[4])
+        .and_then(|v| v.try_into().ok());
+
+    let noc_tlv = tlv::decode_tlv(noc)?;
+    let noc_node_id = noc_tlv
+        .get_int(&[6, 17])
+        .ok_or_else(|| anyhow::anyhow!("sigma2 NOC: node id missing"))?;
+    if noc_node_id != ctx.node_id {
+        anyhow::bail!(
+            "sigma2 NOC: node id mismatch (expected {}, got {})",
+            ctx.node_id,
+            noc_node_id
+        );
+    }
+    let noc_fabric_id = noc_tlv
+        .get_int(&[6, 21])
+        .ok_or_else(|| anyhow::anyhow!("sigma2 NOC: fabric id missing"))?;
+    if noc_fabric_id != fabric.id {
+        anyhow::bail!(
+            "sigma2 NOC: fabric id mismatch (expected {}, got {})",
+            fabric.id,
+            noc_fabric_id
+        );
+    }
+    let noc_public_key = noc_tlv
+        .get_octet_string(&[9])
+        .ok_or_else(|| anyhow::anyhow!("sigma2 NOC: public key missing"))?;
+    let noc_signature = noc_tlv
+        .get_octet_string(&[11])
+        .ok_or_else(|| anyhow::anyhow!("sigma2 NOC: signature missing"))?;
+
+    let noc_x509_tbs = crate::cert_x509::matter_cert_to_x509_tbs(noc)?;
+    verify_p256_signature(ca_public_key, &noc_x509_tbs, noc_signature)
+        .map_err(|e| anyhow::anyhow!("sigma2 NOC: not signed by fabric CA: {}", e))?;
+
+    let mut tbs = tlv::TlvBuffer::new();
+    tbs.write_anon_struct()?;
+    tbs.write_octetstring(1, noc)?;
+    tbs.write_octetstring(3, &ctx.responder_public)?;
+    tbs.write_octetstring(4, &ctx.eph_key.public_key().to_sec1_bytes())?;
+    tbs.write_struct_end()?;
+    verify_p256_signature(noc_public_key, &tbs.data, tbe_signature)
+        .map_err(|e| anyhow::anyhow!("sigma2: TBS signature invalid: {}", e))?;
+
+    Ok(resumption_id)
 }
 
 type Aes128Ccm = ccm::Ccm<aes::Aes128, ccm::consts::U16, ccm::consts::U13>;
@@ -643,6 +719,115 @@ mod tests {
         assert_eq!(tbe_cert, ctrl_matter_cert, "TBE certificate should match controller certificate");
         assert_eq!(tbe_signature.len(), 64, "signature should be 64 bytes");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_verify_sigma2() -> Result<()> {
+        const CA_NODE_ID: u64 = 5678;
+        const FABRIC_ID: u64 = 1234;
+        const NODE_ID: u64 = 1111;
+
+        let ca_secret = p256::SecretKey::random(&mut rand::thread_rng());
+        let ca_public = ca_secret.public_key().to_sec1_bytes();
+        let fabric = fabric::Fabric::new(FABRIC_ID, CA_NODE_ID, &ca_public, &[0u8; 16]);
+
+        let device_secret = p256::SecretKey::random(&mut rand::thread_rng());
+        let device_public = device_secret.public_key().to_sec1_bytes();
+        let device_x509 = cert_x509::encode_x509(
+            &device_public,
+            NODE_ID,
+            FABRIC_ID,
+            CA_NODE_ID,
+            &ca_secret,
+            false,
+        )?;
+        let device_matter = cert_matter::convert_x509_bytes_to_matter(&device_x509, &ca_public)?;
+
+        let mut ctx = SigmaContext::new(NODE_ID);
+        sigma1(&fabric, &mut ctx, &ca_public)?;
+
+        let resp = sigma2_respond(
+            &fabric,
+            &ctx.sigma1_payload,
+            &device_secret,
+            &device_matter,
+            None,
+            &ca_public,
+            NODE_ID,
+        )?;
+        ctx.sigma2_payload = resp.sigma2_payload.clone();
+        let s2 = tlv::decode_tlv(&ctx.sigma2_payload)?;
+        ctx.responder_public = s2.get_octet_string(&[3]).unwrap().to_vec();
+
+        let resumption = verify_sigma2(&fabric, &ctx, &ca_public)?;
+        assert_eq!(resumption, Some([0u8; 16]), "resumption id from sigma2_respond");
+
+        // wrong target node id must be rejected
+        ctx.node_id = NODE_ID + 1;
+        assert!(verify_sigma2(&fabric, &ctx, &ca_public).is_err());
+        ctx.node_id = NODE_ID;
+
+        // tampered encrypted TBE must be rejected
+        let mut tampered = ctx.sigma2_payload.clone();
+        let last = tampered.len() - 5;
+        tampered[last] ^= 0xff;
+        let ctx_tampered = SigmaContext {
+            sigma2_payload: tampered,
+            ..ctx
+        };
+        assert!(verify_sigma2(&fabric, &ctx_tampered, &ca_public).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_verify_sigma2_rejects_foreign_ca() -> Result<()> {
+        const CA_NODE_ID: u64 = 5678;
+        const FABRIC_ID: u64 = 1234;
+        const NODE_ID: u64 = 1111;
+
+        let ca_secret = p256::SecretKey::random(&mut rand::thread_rng());
+        let ca_public = ca_secret.public_key().to_sec1_bytes();
+        let fabric = fabric::Fabric::new(FABRIC_ID, CA_NODE_ID, &ca_public, &[0u8; 16]);
+
+        // attacker knows the IPK but holds a cert from a different CA with the same identity
+        let rogue_ca_secret = p256::SecretKey::random(&mut rand::thread_rng());
+        let rogue_ca_public = rogue_ca_secret.public_key().to_sec1_bytes();
+        let rogue_secret = p256::SecretKey::random(&mut rand::thread_rng());
+        let rogue_public = rogue_secret.public_key().to_sec1_bytes();
+        let rogue_x509 = cert_x509::encode_x509(
+            &rogue_public,
+            NODE_ID,
+            FABRIC_ID,
+            CA_NODE_ID,
+            &rogue_ca_secret,
+            false,
+        )?;
+        let rogue_matter = cert_matter::convert_x509_bytes_to_matter(&rogue_x509, &rogue_ca_public)?;
+
+        let mut ctx = SigmaContext::new(NODE_ID);
+        sigma1(&fabric, &mut ctx, &ca_public)?;
+
+        let resp = sigma2_respond(
+            &fabric,
+            &ctx.sigma1_payload,
+            &rogue_secret,
+            &rogue_matter,
+            None,
+            &ca_public,
+            NODE_ID,
+        )?;
+        ctx.sigma2_payload = resp.sigma2_payload.clone();
+        let s2 = tlv::decode_tlv(&ctx.sigma2_payload)?;
+        ctx.responder_public = s2.get_octet_string(&[3]).unwrap().to_vec();
+
+        let err = verify_sigma2(&fabric, &ctx, &ca_public).unwrap_err();
+        assert!(
+            err.to_string().contains("not signed by fabric CA"),
+            "unexpected error: {}",
+            err
+        );
         Ok(())
     }
 

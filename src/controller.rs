@@ -847,6 +847,10 @@ pub(crate) async fn auth_sigma(
         .context("responder public tlv missing in sigma2")?
         .to_vec();
 
+    log::debug!("verify sigma2 {}", exchange);
+    let resumption_id =
+        sigma::verify_sigma2(fabric, &ctx, &ca_pubkey).context("sigma2 verification failed")?;
+
     let controller_private = cm.get_user_key(controller_id)?;
     let controller_x509 = cm.get_user_cert(controller_id)?;
     let controller_matter_cert =
@@ -910,14 +914,8 @@ pub(crate) async fn auth_sigma(
     remote_node.write_u64::<LittleEndian>(node_id)?;
     ses.remote_node = Some(remote_node);
 
-    let resumption = sigma::extract_resumption_id_from_sigma2(
-        fabric,
-        &ctx.sigma1_payload,
-        &ctx.sigma2_payload,
-        &ctx.responder_public,
-        &shared_bytes,
-    )
-    .map(|id| sigma::ResumptionRecord { resumption_id: id, shared_secret: shared_bytes });
+    let resumption = resumption_id
+        .map(|id| sigma::ResumptionRecord { resumption_id: id, shared_secret: shared_bytes });
 
     if resumption.is_none() {
         log::debug!("auth_sigma: responder did not include a NewResumptionID - resumption unavailable for node {}", node_id);
