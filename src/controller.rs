@@ -1,8 +1,8 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use crate::{
-    active_connection::ActiveConnection,
-    cert_matter, certmanager, commission, fabric,
+    active_connection::{ActiveConnection, Exchange},
+    cert_matter, certmanager, commission, fabric, im,
     messages::{self, Message},
     retransmit, session, sigma, spake2p,
     tlv::TlvItemValue,
@@ -10,6 +10,7 @@ use crate::{
     util::cryptoutil,
 };
 use anyhow::{Context, Result};
+use tokio::sync::mpsc;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 pub struct Controller {
@@ -413,36 +414,73 @@ impl Connection {
     }
 
     /// Read attribute from device and return tlv with attribute value.
+    /// Reassembles chunked reports (MoreChunkedMessages) transparently.
     pub async fn read_request2(
         &self,
         endpoint: u16,
         cluster: u32,
         attr: u32,
     ) -> Result<TlvItemValue> {
-        let res = self.read_request(endpoint, cluster, attr).await?;
-        if (res.protocol_header.protocol_id
-            != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION)
-            || (res.protocol_header.opcode
-                != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA)
-        {
-            Err(anyhow::anyhow!(
-                "response is not expected report_data {:?}",
-                res.protocol_header
-            ))
-        } else {
-            match res.tlv.get(&[1, 0, 1, 2]) {
-                Some(a) => Ok(a.clone()),
-                None => {
-                    let s = res
-                        .tlv
-                        .get(&[1, 0, 0, 1, 0])
-                        .context("report data format not recognized1")?;
-                    if let TlvItemValue::Int(status) = s {
-                        Err(anyhow::anyhow!("report data with status {}", status))
-                    } else {
-                        Err(anyhow::anyhow!("report data format not recognized2"))
-                    }
-                }
+        let exchange: u16 = rand::random();
+        let msg = messages::im_read_request(endpoint, cluster, attr, exchange)?;
+        let mut ex = self.active.open_exchange(exchange);
+        ex.send(&msg).await?;
+        let report = self.collect_reports(&mut ex).await?;
+        let first = report
+            .attribute_reports
+            .into_iter()
+            .next()
+            .context("report data contains no attribute reports")?;
+        match first.data {
+            im::AttributeData::Value(v) => Ok(v),
+            im::AttributeData::Status { status, .. } => {
+                Err(anyhow::anyhow!("report data with status {}", status))
+            }
+        }
+    }
+
+    /// Receive ReportData chunks on the exchange until the last chunk,
+    /// sending the IM StatusResponse between chunks as required, and return
+    /// the merged report. The final StatusResponse is only sent when the
+    /// device did not set SuppressResponse (e.g. subscribe priming reports).
+    async fn collect_reports(&self, exchange: &mut Exchange<'_>) -> Result<im::ReportData> {
+        let mut merged: Option<im::ReportData> = None;
+        loop {
+            let msg = exchange.recv().await?;
+            if let Some(status) = &msg.status_report_info {
+                return Err(anyhow::anyhow!(
+                    "status report while waiting for report data: {:?}",
+                    status
+                ));
+            }
+            if msg.protocol_header.protocol_id
+                != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+                || msg.protocol_header.opcode
+                    != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA
+            {
+                return Err(anyhow::anyhow!(
+                    "response is not expected report_data {:?}",
+                    msg.protocol_header
+                ));
+            }
+            let report = im::ReportData::parse(&msg.tlv)?;
+            let more = report.more_chunks;
+            let respond = more || !report.suppress_response;
+            match merged.as_mut() {
+                Some(m) => m.merge(report),
+                None => merged = Some(report),
+            }
+            if respond {
+                let flags = messages::im_status_flags_for(msg.protocol_header.exchange_flags);
+                let resp = messages::im_status_response(
+                    exchange.id,
+                    flags,
+                    msg.message_header.message_counter,
+                )?;
+                exchange.send(&resp).await?;
+            }
+            if !more {
+                return merged.context("no report data received");
             }
         }
     }
@@ -536,77 +574,99 @@ impl Connection {
         Ok(())
     }
 
-    pub async fn im_subscribe_request(
-        &self,
-        endpoint: u16,
-        cluster: u32,
-        event: u32,
-    ) -> Result<Message> {
-        let exchange: u16 = rand::random();
-        log::debug!(
-            "im_subscribe_request exch:{} endpoint:{} cluster:{} event:{}",
-            exchange,
-            endpoint,
-            cluster,
-            event
-        );
-        let msg = messages::im_subscribe_request(endpoint, cluster, exchange, event)?;
-        self.active.request(exchange, &msg).await
-    }
-
-    /// Subscribe to attribute changes. Returns the initial ReportData message.
+    /// Subscribe to attribute changes. `None` path fields act as wildcards.
     /// Set `keep_subscriptions = true` when adding a second subscription on the same
     /// connection so the device does not cancel the first one.
-    pub async fn im_subscribe_request_attr(
-        &self,
-        endpoint: u16,
-        cluster: u32,
-        attr: u32,
-        keep_subscriptions: bool,
-    ) -> Result<Message> {
-        let exchange: u16 = rand::random();
-        log::debug!(
-            "im_subscribe_request_attr exch:{} endpoint:{} cluster:{} attr:{} keep:{}",
-            exchange, endpoint, cluster, attr, keep_subscriptions
-        );
-        let msg = messages::im_subscribe_request_attr(
-            Some(endpoint),
-            Some(cluster),
-            Some(attr),
-            exchange,
-            keep_subscriptions)?;
-        self.active.request(exchange, &msg).await
-    }
-    pub async fn im_subscribe_request_attr2(
+    ///
+    /// Handles the full subscribe transaction (chunked priming report, IM
+    /// StatusResponse acks, SubscribeResponse) and returns a [Subscription]
+    /// delivering decoded updates; updates are acked automatically by the
+    /// background read loop.
+    pub async fn subscribe_attrs(
         &self,
         endpoint: Option<u16>,
         cluster: Option<u32>,
         attr: Option<u32>,
         keep_subscriptions: bool,
-    ) -> Result<Message> {
+    ) -> Result<Subscription> {
         let exchange: u16 = rand::random();
         log::debug!(
-            "im_subscribe_request_attr exch:{} endpoint:{:?} cluster:{:?} attr:{:?} keep:{}",
+            "subscribe_attrs exch:{} endpoint:{:?} cluster:{:?} attr:{:?} keep:{}",
             exchange, endpoint, cluster, attr, keep_subscriptions
         );
         let msg = messages::im_subscribe_request_attr(endpoint, cluster, attr, exchange, keep_subscriptions)?;
-        self.active.request(exchange, &msg).await
+        self.subscribe_internal(exchange, &msg).await
     }
 
-    pub async fn im_subscribe_request_event2(
+    /// Subscribe to events. `None` path fields act as wildcards.
+    /// See [Connection::subscribe_attrs] for transaction details.
+    pub async fn subscribe_events(
         &self,
         endpoint: Option<u16>,
         cluster: Option<u32>,
         event: Option<u32>,
         keep_subscriptions: bool,
-    ) -> Result<Message> {
+    ) -> Result<Subscription> {
         let exchange: u16 = rand::random();
         log::debug!(
-            "im_subscribe_request_event exch:{} endpoint:{:?} cluster:{:?} event:{:?} keep:{}",
+            "subscribe_events exch:{} endpoint:{:?} cluster:{:?} event:{:?} keep:{}",
             exchange, endpoint, cluster, event, keep_subscriptions
         );
         let msg = messages::im_subscribe_request_event(endpoint, cluster, event, exchange, keep_subscriptions)?;
-        self.active.request(exchange, &msg).await
+        self.subscribe_internal(exchange, &msg).await
+    }
+
+    async fn subscribe_internal(&self, exchange_id: u16, msg: &[u8]) -> Result<Subscription> {
+        let mut exchange = self.active.open_exchange(exchange_id);
+        exchange.send(msg).await?;
+        let priming = self.collect_reports(&mut exchange).await?;
+        let subscription_id = priming
+            .subscription_id
+            .context("priming report missing subscription id")?;
+
+        // Register before awaiting the SubscribeResponse so no update can be
+        // missed; the device cannot report before the transaction completes.
+        let rx = self.active.register_subscription(subscription_id);
+        let registry = self.active.subscriptions_handle();
+
+        let response = async {
+            let resp = exchange.recv().await?;
+            if resp.protocol_header.protocol_id
+                != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+                || resp.protocol_header.opcode
+                    != messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP
+            {
+                anyhow::bail!(
+                    "response is not expected subscribe_resp {:?}",
+                    resp.protocol_header
+                );
+            }
+            let sr = im::SubscribeResponse::parse(&resp.tlv)?;
+            if sr.subscription_id != subscription_id {
+                anyhow::bail!(
+                    "subscribe response id {} does not match priming report id {}",
+                    sr.subscription_id,
+                    subscription_id
+                );
+            }
+            Ok(sr)
+        }
+        .await;
+
+        match response {
+            Ok(sr) => Ok(Subscription {
+                subscription_id,
+                max_interval: sr.max_interval,
+                priming_attribute_reports: priming.attribute_reports,
+                priming_event_reports: priming.event_reports,
+                rx,
+                registry,
+            }),
+            Err(e) => {
+                registry.lock().unwrap().remove(&subscription_id);
+                Err(e)
+            }
+        }
     }
 
     /// Cancel all subscriptions on this session by sending a SubscribeRequest with
@@ -618,14 +678,11 @@ impl Connection {
         self.active.request(exchange, &msg).await
     }
 
-    pub async fn im_status_response(
-        &self,
-        exchange: u16,
-        flags: u8,
-        ack: u32
-    ) -> Result<()> {
-        let msg = messages::im_status_response(exchange, flags, ack)?;
-        self.active.send(&msg).await
+    /// Enable or disable automatic IM StatusResponse replies to unsolicited
+    /// ReportData (enabled by default). Disable only when acking reports
+    /// manually via the raw message API.
+    pub fn set_auto_status_response(&self, enabled: bool) {
+        self.active.set_auto_status_response(enabled);
     }
 
     /// Invoke command with timed interaction
@@ -675,7 +732,11 @@ impl Connection {
         self.active.request(exchange, &msg).await
     }
 
-    /// Receive next event (for subscriptions). Returns None when connection is closed.
+    /// Receive next unsolicited raw message not handled elsewhere (subscription
+    /// reports are delivered decoded via [Subscription]; only reports with an
+    /// unknown subscription id and other unsolicited messages end up here).
+    /// Returns None when connection is closed. Messages may be dropped when
+    /// nobody drains this channel.
     pub async fn recv_event(&self) -> Option<Message> {
         self.active.recv_event().await
     }
@@ -699,6 +760,37 @@ impl Connection {
             .auth_sigma_with_busy_retry(&self.active.transport_conn, node_id, controller_id)
             .await?;
         self.active.reauth_with_session(new_session).await
+    }
+}
+
+/// Active subscription created by [Connection::subscribe_attrs] or
+/// [Connection::subscribe_events]. Decoded updates are delivered via [Subscription::next];
+/// the background read loop acks them automatically. Dropping the handle stops
+/// delivery (the device-side subscription stays active until it expires or is
+/// cancelled via [Connection::im_unsubscribe_all]).
+pub struct Subscription {
+    pub subscription_id: u32,
+    /// Maximum reporting interval in seconds granted by the device.
+    pub max_interval: u16,
+    /// Attribute reports from the priming report (current values at subscribe time).
+    pub priming_attribute_reports: Vec<im::AttributeReport>,
+    /// Event reports from the priming report.
+    pub priming_event_reports: Vec<im::EventReport>,
+    rx: mpsc::Receiver<im::ReportUpdate>,
+    registry: Arc<std::sync::Mutex<HashMap<u32, mpsc::Sender<im::ReportUpdate>>>>,
+}
+
+impl Subscription {
+    /// Receive the next decoded update. Returns None when the connection is
+    /// closed or re-authenticated (the subscription is then gone; resubscribe).
+    pub async fn next(&mut self) -> Option<im::ReportUpdate> {
+        self.rx.recv().await
+    }
+}
+
+impl Drop for Subscription {
+    fn drop(&mut self) {
+        self.registry.lock().unwrap().remove(&self.subscription_id);
     }
 }
 
@@ -924,3 +1016,363 @@ pub(crate) async fn auth_sigma(
     Ok((ses, resumption))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::messages::ProtocolMessageHeader;
+    use crate::tlv;
+    use std::time::Duration;
+
+    // Loopback transport: the test acts as the device on the other end.
+    struct MockConn {
+        inbound: tokio::sync::Mutex<mpsc::Receiver<Vec<u8>>>,
+        outbound: mpsc::UnboundedSender<Vec<u8>>,
+    }
+
+    #[async_trait::async_trait]
+    impl ConnectionTrait for MockConn {
+        async fn send(&self, data: &[u8]) -> Result<()> {
+            self.outbound
+                .send(data.to_vec())
+                .map_err(|_| anyhow::anyhow!("mock closed"))
+        }
+        async fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
+            let mut rx = self.inbound.lock().await;
+            match tokio::time::timeout(timeout, rx.recv()).await {
+                Ok(Some(d)) => Ok(d),
+                Ok(None) => Err(anyhow::anyhow!("mock closed")),
+                Err(_) => Err(anyhow::anyhow!("timeout")),
+            }
+        }
+        fn is_reliable(&self) -> bool {
+            true
+        }
+    }
+
+    struct MockDevice {
+        rx: mpsc::UnboundedReceiver<Vec<u8>>,
+        tx: mpsc::Sender<Vec<u8>>,
+        session: session::Session,
+    }
+
+    impl MockDevice {
+        async fn recv(&mut self) -> Message {
+            let data = tokio::time::timeout(Duration::from_secs(2), self.rx.recv())
+                .await
+                .expect("timeout waiting for controller message")
+                .expect("mock closed");
+            Message::decode(&data).unwrap()
+        }
+
+        async fn expect_status_response(&mut self, want_flags: u8, want_ack: u32) {
+            let msg = self.recv().await;
+            assert_eq!(
+                msg.protocol_header.protocol_id,
+                ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+            );
+            assert_eq!(
+                msg.protocol_header.opcode,
+                ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
+            );
+            assert_eq!(
+                msg.protocol_header.exchange_flags,
+                ProtocolMessageHeader::FLAG_RELIABILITY | want_flags
+            );
+            assert_eq!(msg.protocol_header.ack_counter, want_ack);
+            assert_eq!(msg.tlv.get_int(&[0]), Some(0));
+        }
+
+        async fn expect_silence(&mut self) {
+            assert!(
+                tokio::time::timeout(Duration::from_millis(200), self.rx.recv())
+                    .await
+                    .is_err(),
+                "unexpected message from controller"
+            );
+        }
+
+        async fn send(&self, payload: &[u8]) -> u32 {
+            let encoded = self.session.encode_message(payload).unwrap();
+            let (header, _) = messages::MessageHeader::decode(&encoded).unwrap();
+            self.tx.send(encoded).await.unwrap();
+            header.message_counter
+        }
+    }
+
+    fn mock_pair() -> (Connection, MockDevice) {
+        let (to_ctrl_tx, to_ctrl_rx) = mpsc::channel(32);
+        let (to_dev_tx, to_dev_rx) = mpsc::unbounded_channel();
+        let mock = Arc::new(MockConn {
+            inbound: tokio::sync::Mutex::new(to_ctrl_rx),
+            outbound: to_dev_tx,
+        });
+        let conn = Connection::from_parts(mock, session::Session::new());
+        let device = MockDevice {
+            rx: to_dev_rx,
+            tx: to_ctrl_tx,
+            session: session::Session::new(),
+        };
+        (conn, device)
+    }
+
+    fn report_data(
+        exchange: u16,
+        flags: u8,
+        sub_id: Option<u32>,
+        values: &[(u16, bool)],
+        more: bool,
+        suppress: bool,
+    ) -> Vec<u8> {
+        let b = ProtocolMessageHeader {
+            exchange_flags: flags,
+            opcode: ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA,
+            exchange_id: exchange,
+            protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+            ack_counter: 0,
+        }
+        .encode()
+        .unwrap();
+        let mut t = tlv::TlvBuffer::from_vec(b);
+        t.write_anon_struct().unwrap();
+        if let Some(id) = sub_id {
+            t.write_uint32(0, id).unwrap();
+        }
+        t.write_array(1).unwrap();
+        for (endpoint, value) in values {
+            t.write_anon_struct().unwrap();
+            t.write_struct(1).unwrap();
+            t.write_uint32(0, 0).unwrap();
+            t.write_list(1).unwrap();
+            t.write_uint16(2, *endpoint).unwrap();
+            t.write_uint32(3, 6).unwrap();
+            t.write_uint32(4, 0).unwrap();
+            t.write_struct_end().unwrap();
+            t.write_bool(2, *value).unwrap();
+            t.write_struct_end().unwrap();
+            t.write_struct_end().unwrap();
+        }
+        t.write_struct_end().unwrap();
+        if more {
+            t.write_bool(3, true).unwrap();
+        }
+        if suppress {
+            t.write_bool(4, true).unwrap();
+        }
+        t.write_struct_end().unwrap();
+        t.data
+    }
+
+    fn subscribe_response(exchange: u16, sub_id: u32, max_interval: u16) -> Vec<u8> {
+        let b = ProtocolMessageHeader {
+            exchange_flags: 0,
+            opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP,
+            exchange_id: exchange,
+            protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+            ack_counter: 0,
+        }
+        .encode()
+        .unwrap();
+        let mut t = tlv::TlvBuffer::from_vec(b);
+        t.write_anon_struct().unwrap();
+        t.write_uint32(0, sub_id).unwrap();
+        t.write_uint16(2, max_interval).unwrap();
+        t.write_struct_end().unwrap();
+        t.data
+    }
+
+    const FLAGS_RESPONDER: u8 = 0;
+    const FLAGS_DEVICE_INITIATED: u8 = ProtocolMessageHeader::FLAG_INITIATOR;
+    const ACK_AND_INITIATOR: u8 =
+        ProtocolMessageHeader::FLAG_INITIATOR | ProtocolMessageHeader::FLAG_ACK;
+
+    #[tokio::test]
+    async fn test_read_request2_single_chunk() {
+        let (conn, mut device) = mock_pair();
+        let task = tokio::spawn(async move {
+            let req = device.recv().await;
+            assert_eq!(
+                req.protocol_header.opcode,
+                ProtocolMessageHeader::INTERACTION_OPCODE_READ_REQ
+            );
+            let exchange = req.protocol_header.exchange_id;
+            device
+                .send(&report_data(exchange, FLAGS_RESPONDER, None, &[(1, true)], false, true))
+                .await;
+            device.expect_silence().await;
+        });
+        let val = conn.read_request2(1, 6, 0).await.unwrap();
+        assert_eq!(val, TlvItemValue::Bool(true));
+        task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_read_request2_chunked() {
+        let (conn, mut device) = mock_pair();
+        let task = tokio::spawn(async move {
+            let req = device.recv().await;
+            let exchange = req.protocol_header.exchange_id;
+            let counter = device
+                .send(&report_data(exchange, FLAGS_RESPONDER, None, &[(1, true)], true, false))
+                .await;
+            device.expect_status_response(ACK_AND_INITIATOR, counter).await;
+            device
+                .send(&report_data(exchange, FLAGS_RESPONDER, None, &[(2, false)], false, true))
+                .await;
+            device.expect_silence().await;
+        });
+        let val = conn.read_request2(1, 6, 0).await.unwrap();
+        assert_eq!(val, TlvItemValue::Bool(true));
+        task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_and_updates() {
+        let (conn, mut device) = mock_pair();
+        let task = tokio::spawn(async move {
+            let req = device.recv().await;
+            assert_eq!(
+                req.protocol_header.opcode,
+                ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ
+            );
+            let exchange = req.protocol_header.exchange_id;
+            let counter = device
+                .send(&report_data(exchange, FLAGS_RESPONDER, Some(7), &[(1, true)], true, false))
+                .await;
+            device.expect_status_response(ACK_AND_INITIATOR, counter).await;
+            let counter = device
+                .send(&report_data(exchange, FLAGS_RESPONDER, Some(7), &[(2, false)], false, false))
+                .await;
+            device.expect_status_response(ACK_AND_INITIATOR, counter).await;
+            device.send(&subscribe_response(exchange, 7, 60)).await;
+
+            // device-initiated update on a fresh exchange
+            let counter = device
+                .send(&report_data(0x4001, FLAGS_DEVICE_INITIATED, Some(7), &[(1, false)], false, false))
+                .await;
+            device
+                .expect_status_response(ProtocolMessageHeader::FLAG_ACK, counter)
+                .await;
+            device
+        });
+
+        let mut sub = conn.subscribe_attrs(Some(1), Some(6), Some(0), false).await.unwrap();
+        assert_eq!(sub.subscription_id, 7);
+        assert_eq!(sub.max_interval, 60);
+        assert_eq!(sub.priming_attribute_reports.len(), 2);
+        assert_eq!(sub.priming_attribute_reports[0].path.endpoint, Some(1));
+        assert_eq!(sub.priming_attribute_reports[1].path.endpoint, Some(2));
+
+        let update = sub.next().await.unwrap();
+        assert_eq!(update.subscription_id, 7);
+        assert_eq!(update.attribute_reports.len(), 1);
+        assert_eq!(
+            update.attribute_reports[0].data,
+            im::AttributeData::Value(TlvItemValue::Bool(false))
+        );
+        task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_chunked_unsolicited_report() {
+        let (conn, mut device) = mock_pair();
+        let task = tokio::spawn(async move {
+            let req = device.recv().await;
+            let exchange = req.protocol_header.exchange_id;
+            let counter = device
+                .send(&report_data(exchange, FLAGS_RESPONDER, Some(9), &[(1, true)], false, false))
+                .await;
+            device.expect_status_response(ACK_AND_INITIATOR, counter).await;
+            device.send(&subscribe_response(exchange, 9, 60)).await;
+
+            // chunked device-initiated update
+            let counter = device
+                .send(&report_data(0x4002, FLAGS_DEVICE_INITIATED, Some(9), &[(1, false)], true, false))
+                .await;
+            device
+                .expect_status_response(ProtocolMessageHeader::FLAG_ACK, counter)
+                .await;
+            let counter = device
+                .send(&report_data(0x4002, FLAGS_DEVICE_INITIATED, Some(9), &[(2, true)], false, false))
+                .await;
+            device
+                .expect_status_response(ProtocolMessageHeader::FLAG_ACK, counter)
+                .await;
+        });
+
+        let mut sub = conn.subscribe_attrs(Some(1), Some(6), Some(0), false).await.unwrap();
+        let update = sub.next().await.unwrap();
+        assert_eq!(update.attribute_reports.len(), 2);
+        assert_eq!(update.attribute_reports[0].path.endpoint, Some(1));
+        assert_eq!(update.attribute_reports[1].path.endpoint, Some(2));
+        task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_unregistered_subscription_id() {
+        let (conn, mut device) = mock_pair();
+
+        let counter = device
+            .send(&report_data(0x4003, FLAGS_DEVICE_INITIATED, Some(99), &[(1, true)], false, false))
+            .await;
+        device
+            .expect_status_response(ProtocolMessageHeader::FLAG_ACK, counter)
+            .await;
+        let raw = conn.recv_event().await.unwrap();
+        assert_eq!(
+            raw.protocol_header.opcode,
+            ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA
+        );
+
+        conn.set_auto_status_response(false);
+        device
+            .send(&report_data(0x4004, FLAGS_DEVICE_INITIATED, Some(99), &[(1, true)], false, false))
+            .await;
+        device.expect_silence().await;
+        let raw = conn.recv_event().await.unwrap();
+        assert_eq!(raw.protocol_header.exchange_id, 0x4004);
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_message_dropped() {
+        let (conn, mut device) = mock_pair();
+
+        let payload =
+            report_data(0x4005, FLAGS_DEVICE_INITIATED, Some(99), &[(1, true)], false, false);
+        let encoded = device.session.encode_message(&payload).unwrap();
+        let (header, _) = messages::MessageHeader::decode(&encoded).unwrap();
+        device.tx.send(encoded.clone()).await.unwrap();
+        device
+            .expect_status_response(ProtocolMessageHeader::FLAG_ACK, header.message_counter)
+            .await;
+        let raw = conn.recv_event().await.unwrap();
+        assert_eq!(raw.protocol_header.exchange_id, 0x4005);
+
+        // replayed frame must be dropped: no status response, no event
+        device.tx.send(encoded).await.unwrap();
+        device.expect_silence().await;
+        assert!(conn.try_recv_event().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_initiator_flag_not_misrouted() {
+        let (conn, mut device) = mock_pair();
+        let task = tokio::spawn(async move {
+            let req = device.recv().await;
+            let exchange = req.protocol_header.exchange_id;
+            // device-initiated report colliding with the pending exchange id
+            // must not resolve the pending read request
+            let counter = device
+                .send(&report_data(exchange, FLAGS_DEVICE_INITIATED, None, &[(5, false)], false, false))
+                .await;
+            device
+                .expect_status_response(ProtocolMessageHeader::FLAG_ACK, counter)
+                .await;
+            device
+                .send(&report_data(exchange, FLAGS_RESPONDER, None, &[(1, true)], false, true))
+                .await;
+        });
+        let val = conn.read_request2(1, 6, 0).await.unwrap();
+        assert_eq!(val, TlvItemValue::Bool(true));
+        task.await.unwrap();
+    }
+}

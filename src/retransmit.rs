@@ -8,8 +8,6 @@ const MAX_RETRANSMIT_TIME: Duration = Duration::from_secs(10);
 const RELIABLE_MAX_WAIT_TIME: Duration = Duration::from_secs(60);
 
 pub struct RetrContext<'a> {
-    /// ids of already received messages to detect duplicates
-    received: HashMap<u32, bool>,
     /// sent messages not yet acknowledged, keyed by message_counter, value is (exchange_id, bytes)
     sent: HashMap<u32, (u16, Vec<u8>)>,
     /// exchange-ids use is interested in. empty for all
@@ -24,7 +22,6 @@ impl<'b> RetrContext<'b> {
         session: &'a session::Session,
     ) -> Self {
         Self {
-            received: HashMap::new(),
             sent: HashMap::new(),
             subscribed_exchanges: HashMap::new(),
             connection,
@@ -46,14 +43,6 @@ impl<'b> RetrContext<'b> {
 
     fn implicit_ack_exchange(&mut self, exchange_id: u16) {
         self.sent.retain(|_, (eid, _)| *eid != exchange_id);
-    }
-    fn received(&mut self, c: u32) -> bool {
-        if let std::collections::hash_map::Entry::Vacant(e) = self.received.entry(c) {
-            e.insert(true);
-            true
-        } else {
-            false
-        }
     }
     fn to_resend(&self) -> Option<Vec<u8>> {
         if let Some((cnt, (_eid, msg))) = self.sent.iter().next() {
@@ -124,20 +113,24 @@ impl<'b> RetrContext<'b> {
 
             self.implicit_ack_exchange(decoded.protocol_header.exchange_id);
 
-            // duplicit check says we already did see this message
-            if !self.received(decoded.message_header.message_counter) {
-                // only thing to do is to send ack - lost ack may be reason to see duplicit message
-                let ack = messages::ack(
-                    decoded.protocol_header.exchange_id,
-                    decoded.message_header.message_counter as i64,
-                )?;
-                let out = self.session.encode_message(&ack)?;
-                self.connection.send(&out).await?;
-                log::trace!(
-                    "sending ack for exchange:{} counter:{}",
-                    decoded.protocol_header.exchange_id,
-                    decoded.message_header.message_counter
-                );
+            if !self.session.counter_is_new(decoded.message_header.message_counter) {
+                // lost ack may be reason to see duplicit message
+                if decoded.protocol_header.exchange_flags
+                    & messages::ProtocolMessageHeader::FLAG_RELIABILITY
+                    != 0
+                {
+                    let ack = messages::ack(
+                        decoded.protocol_header.exchange_id,
+                        decoded.message_header.message_counter as i64,
+                    )?;
+                    let out = self.session.encode_message(&ack)?;
+                    self.connection.send(&out).await?;
+                    log::trace!(
+                        "sending ack for exchange:{} counter:{}",
+                        decoded.protocol_header.exchange_id,
+                        decoded.message_header.message_counter
+                    );
+                }
                 log::trace!(
                     "dropping duplicit message exchange:{} counter:{}",
                     decoded.protocol_header.exchange_id,

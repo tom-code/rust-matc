@@ -21,9 +21,9 @@
 use anyhow::Result;
 use matc::{
     clusters::{self, defs::*},
-    controller::Connection,
+    controller::{Connection, Subscription},
     devman::{DeviceManager, ManagerConfig},
-    discover,
+    discover, im,
 };
 use rustyline::{
     completion::{Completer, Pair},
@@ -167,21 +167,25 @@ fn parse_args() -> Args {
 
 struct SubscriptionEntry {
     endpoint: u16,
-    cluster: u32,
-    attr: u32,
     /// Human-readable label, e.g. "OnOff/OnOff"
     label: String,
 }
 
 struct DeviceSubscriptions {
-    /// List of active subscriptions, shared with the background listener.
-    entries: Arc<Mutex<Vec<SubscriptionEntry>>>,
-    /// Background listener task (one per device).
-    handle: tokio::task::JoinHandle<()>,
+    /// List of active per-attribute subscriptions (for display).
+    entries: Vec<SubscriptionEntry>,
+    /// Background listener tasks, one per subscription.
+    handles: Vec<tokio::task::JoinHandle<()>>,
     /// Set when a wildcard subscribe-all is active. Inner Option = endpoint filter (None = all endpoints).
     wildcard: Option<Option<u16>>,
     /// Each entry is one active subscribe-events call; inner Option = endpoint filter.
     wildcard_events: Vec<Option<u16>>,
+}
+
+impl DeviceSubscriptions {
+    fn new() -> Self {
+        Self { entries: Vec::new(), handles: Vec::new(), wildcard: None, wildcard_events: vec![] }
+    }
 }
 
 struct Shell {
@@ -614,7 +618,9 @@ fn cmd_disconnect(shell: &mut Shell, args: &[String]) -> Result<()> {
     }
     let node_id = shell.resolve_node_id(&args[0])?;
     if let Some(ds) = shell.subscriptions.remove(&node_id) {
-        ds.handle.abort();
+        for handle in ds.handles {
+            handle.abort();
+        }
     }
     if shell.connections.remove(&node_id).is_some() {
         println!("Disconnected (node {}).", node_id);
@@ -876,96 +882,45 @@ fn event_label(cluster: u32, event: u32) -> String {
     format!("{}/0x{:04x}", cluster_name, event)
 }
 
-/// Decode all (endpoint, cluster, attr, value) tuples from a ReportData TLV.
-/// Iterates the full AttributeReports list so batched reports are not missed.
-fn decode_attr_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, matc::tlv::TlvItemValue)> {
-    let mut out = Vec::new();
-    // AttributeReports = tag 1, value = List of AttributeReportIB
-    if let Some(attr_reports) = tlv.get_item(&[1]) {
-        if let matc::tlv::TlvItemValue::List(reports) = &attr_reports.value {
-            for report_ib in reports {
-                // Within each AttributeReportIB, navigate AttributeDataIB (tag 1):
-                //   tag 1 = AttributePathIB → tag 2=endpoint, 3=cluster, 4=attr
-                //   tag 2 = Data value
-                let ep  = report_ib.get_u16(&[1, 1, 2]);
-                let cl  = report_ib.get_u32(&[1, 1, 3]);
-                let att = report_ib.get_u32(&[1, 1, 4]);
-                let val = report_ib.get(&[1, 2]).cloned();
-                if let (Some(ep), Some(cl), Some(att), Some(val)) = (ep, cl, att, val) {
-                    out.push((ep, cl, att, val));
-                }
-            }
+/// Print one decoded attribute report.
+fn print_attr_report(device_name: &str, rep: &im::AttributeReport, suffix: &str) {
+    let (Some(ep), Some(cl), Some(att)) = (rep.path.endpoint, rep.path.cluster, rep.path.attribute) else {
+        return;
+    };
+    match &rep.data {
+        im::AttributeData::Value(val) => {
+            let json = matc::clusters::codec::decode_attribute_json(cl, att, val);
+            println!("[{}] ep{} {} = {}{}", device_name, ep, attr_label(cl, att), json, suffix);
+        }
+        im::AttributeData::Status { status, .. } => {
+            println!("[{}] ep{} {} status {}{}", device_name, ep, attr_label(cl, att), status, suffix);
         }
     }
-    out
 }
 
-/// Decode all (endpoint, cluster, event, event_number, data) tuples from a ReportData TLV.
-/// EventReports = tag 2, List of EventReportIB. Within each:
-///   EventData (tag 1): Path (tag 0) -> ep=[1,0,1], cluster=[1,0,2], event=[1,0,3];
-///   EventNumber=[1,1]; Data=[1,7].
-fn decode_event_reports(tlv: &matc::tlv::TlvItem) -> Vec<(u16, u32, u32, u64, matc::tlv::TlvItemValue)> {
-    let mut out = Vec::new();
-    if let Some(event_reports) = tlv.get_item(&[2]) {
-        if let matc::tlv::TlvItemValue::List(reports) = &event_reports.value {
-            for report_ib in reports {
-                let ep  = report_ib.get_u16(&[1, 0, 1]);
-                let cl  = report_ib.get_u32(&[1, 0, 2]);
-                let ev  = report_ib.get_u32(&[1, 0, 3]);
-                let num = report_ib.get_u64(&[1, 1]);
-                let val = report_ib.get(&[1, 7]).cloned();
-                if let (Some(ep), Some(cl), Some(ev), Some(num), Some(val)) = (ep, cl, ev, num, val) {
-                    out.push((ep, cl, ev, num, val));
-                }
-            }
-        }
+/// Print one decoded event report.
+fn print_event_report(device_name: &str, ev: &im::EventReport, suffix: &str) {
+    let (Some(ep), Some(cl), Some(evt)) = (ev.endpoint, ev.cluster, ev.event) else {
+        return;
+    };
+    let num = ev.event_number.unwrap_or(0);
+    if let Some(val) = &ev.data {
+        let json = matc::clusters::codec::decode_event_json(cl, evt, val);
+        println!("[{}] ep{} EVENT {} #{} = {}{}", device_name, ep, event_label(cl, evt), num, json, suffix);
     }
-    out
 }
 
-/// Spawn the background listener task for subscription updates on a device connection.
-fn spawn_listener(
-    conn: Arc<Connection>,
-    device_name: String,
-    entries: Arc<Mutex<Vec<SubscriptionEntry>>>,
-) -> tokio::task::JoinHandle<()> {
+/// Spawn a background task printing decoded updates from one subscription.
+/// Updates are acked automatically by the library; the task ends when the
+/// connection closes or is re-authenticated.
+fn spawn_subscription_listener(mut sub: Subscription, device_name: String) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        loop {
-            let ev = match conn.recv_event().await {
-                Some(e) => e,
-                None => break,
-            };
-            match ev.protocol_header.opcode {
-                matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
-                    for (rep_ep, rep_cl, rep_att, val) in decode_attr_reports(&ev.tlv) {
-                        let lbl = {
-                            let entries = entries.lock().unwrap();
-                            entries.iter()
-                                .find(|e| e.endpoint == rep_ep && e.cluster == rep_cl && e.attr == rep_att)
-                                .map(|e| e.label.clone())
-                                .unwrap_or_else(|| attr_label(rep_cl, rep_att))
-                        };
-                        let json = matc::clusters::codec::decode_attribute_json(rep_cl, rep_att, &val);
-                        println!("[{}] ep{} {} = {}", device_name, rep_ep, lbl, json);
-                    }
-                    for (rep_ep, rep_cl, rep_ev, num, val) in decode_event_reports(&ev.tlv) {
-                        let json = matc::clusters::codec::decode_event_json(rep_cl, rep_ev, &val);
-                        println!("[{}] ep{} EVENT {} #{} = {}", device_name, rep_ep, event_label(rep_cl, rep_ev), num, json);
-                    }
-                    let status_flags =
-                        if ev.protocol_header.exchange_flags & matc::messages::ProtocolMessageHeader::FLAG_INITIATOR == 0 {
-                            matc::messages::ProtocolMessageHeader::FLAG_INITIATOR | matc::messages::ProtocolMessageHeader::FLAG_ACK
-                        } else {
-                            matc::messages::ProtocolMessageHeader::FLAG_ACK
-                        };
-                    let _ = conn.im_status_response(ev.protocol_header.exchange_id, status_flags, ev.message_header.message_counter).await;
-                }
-                matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP => {
-                    // periodic heartbeat — ignore
-                }
-                _ => {
-                    log::debug!("[{}] subscription: unhandled opcode 0x{:x}", device_name, ev.protocol_header.opcode);
-                }
+        while let Some(update) = sub.next().await {
+            for rep in &update.attribute_reports {
+                print_attr_report(&device_name, rep, "");
+            }
+            for ev in &update.event_reports {
+                print_event_report(&device_name, ev, "");
             }
         }
         log::debug!("[{}] subscription listener exited", device_name);
@@ -993,39 +948,22 @@ async fn do_subscribe(
 
     // Keep existing subscriptions alive when adding a second one on the same connection.
     let keep = shell.subscriptions.contains_key(&node_id);
-    let res = conn.im_subscribe_request_attr(endpoint, cluster, attr, keep).await?;
-
-    if res.protocol_header.opcode != matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
-        println!("unexpected subscribe response opcode 0x{:x}", res.protocol_header.opcode);
-        return Ok(());
-    }
+    let sub = conn.subscribe_attrs(Some(endpoint), Some(cluster), Some(attr), keep).await?;
 
     // Print priming report (current state)
     let label = attr_label(cluster, attr);
-    let priming = decode_attr_reports(&res.tlv);
-    if let Some((_, _, _, val)) = priming.first() {
-        let json = matc::clusters::codec::decode_attribute_json(cluster, attr, val);
-        println!("[{}] ep{} {} = {} (current)", device, endpoint, label, json);
-    } else {
+    if sub.priming_attribute_reports.is_empty() {
         println!("[{}] ep{} {} subscribed (no initial value)", device, endpoint, label);
+    } else {
+        for rep in &sub.priming_attribute_reports {
+            print_attr_report(device, rep, " (current)");
+        }
     }
 
-    // Ack priming report
-    conn.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await?;
-
-    // Do NOT wait for SubscribeResponse here: if a listener is already running it holds
-    // the recv_event lock and we would deadlock. The listener receives and ignores it.
-
-    // If first subscription on this device, start the background listener
-    if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
-        let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
-        let handle = spawn_listener(conn, device.to_string(), entries.clone());
-        e.insert(DeviceSubscriptions { entries, handle, wildcard: None, wildcard_events: vec![] });
-    }
-
-    // Register the new entry
-    let entry = SubscriptionEntry { endpoint, cluster, attr, label: label.clone() };
-    shell.subscriptions.get(&node_id).unwrap().entries.lock().unwrap().push(entry);
+    let handle = spawn_subscription_listener(sub, device.to_string());
+    let ds = shell.subscriptions.entry(node_id).or_insert_with(DeviceSubscriptions::new);
+    ds.handles.push(handle);
+    ds.entries.push(SubscriptionEntry { endpoint, label: label.clone() });
 
     println!("Subscribed: [{}] ep{} {}. Use 'unsubscribe {}' to stop.", device, endpoint, label, device);
     Ok(())
@@ -1069,32 +1007,20 @@ async fn cmd_subscribe_all(shell: &mut Shell, args: &[String]) -> Result<()> {
     let conn = shell.connections.get(&node_id).unwrap().clone();
 
     let keep = shell.subscriptions.contains_key(&node_id);
-    let res = conn.im_subscribe_request_attr2(endpoint, None, None, keep).await?;
+    let sub = conn.subscribe_attrs(endpoint, None, None, keep).await?;
 
-    if res.protocol_header.opcode != matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
-        println!("unexpected subscribe response opcode 0x{:x}", res.protocol_header.opcode);
-        return Ok(());
-    }
-
-    let priming = decode_attr_reports(&res.tlv);
-    if priming.is_empty() {
+    if sub.priming_attribute_reports.is_empty() {
         println!("[{}] wildcard subscribed (no initial values)", device);
     } else {
-        for (ep, cl, att, val) in &priming {
-            let json = matc::clusters::codec::decode_attribute_json(*cl, *att, val);
-            println!("[{}] ep{} {} = {} (current)", device, ep, attr_label(*cl, *att), json);
+        for rep in &sub.priming_attribute_reports {
+            print_attr_report(&device, rep, " (current)");
         }
     }
 
-    conn.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await?;
-
-    if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
-        let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
-        let handle = spawn_listener(conn, device.clone(), entries.clone());
-        e.insert(DeviceSubscriptions { entries, handle, wildcard: Some(endpoint), wildcard_events: vec![] });
-    } else {
-        shell.subscriptions.get_mut(&node_id).unwrap().wildcard = Some(endpoint);
-    }
+    let handle = spawn_subscription_listener(sub, device.clone());
+    let ds = shell.subscriptions.entry(node_id).or_insert_with(DeviceSubscriptions::new);
+    ds.handles.push(handle);
+    ds.wildcard = Some(endpoint);
 
     match endpoint {
         Some(ep) => println!("Subscribed (wildcard ep{}): [{}]. Use 'unsubscribe {}' to stop.", ep, device, device),
@@ -1120,32 +1046,20 @@ async fn cmd_subscribe_events(shell: &mut Shell, args: &[String]) -> Result<()> 
     let conn = shell.connections.get(&node_id).unwrap().clone();
 
     let keep = shell.subscriptions.contains_key(&node_id);
-    let res = conn.im_subscribe_request_event2(endpoint, None, None, keep).await?;
+    let sub = conn.subscribe_events(endpoint, None, None, keep).await?;
 
-    if res.protocol_header.opcode != matc::messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
-        println!("unexpected subscribe response opcode 0x{:x}", res.protocol_header.opcode);
-        return Ok(());
-    }
-
-    let priming = decode_event_reports(&res.tlv);
-    if priming.is_empty() {
+    if sub.priming_event_reports.is_empty() {
         println!("[{}] event subscription active (no priming events)", device);
     } else {
-        for (ep, cl, ev, num, val) in &priming {
-            let json = matc::clusters::codec::decode_event_json(*cl, *ev, val);
-            println!("[{}] ep{} EVENT {} #{} = {} (current)", device, ep, event_label(*cl, *ev), num, json);
+        for ev in &sub.priming_event_reports {
+            print_event_report(&device, ev, " (current)");
         }
     }
 
-    conn.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await?;
-
-    if let std::collections::hash_map::Entry::Vacant(e) = shell.subscriptions.entry(node_id) {
-        let entries: Arc<Mutex<Vec<SubscriptionEntry>>> = Arc::new(Mutex::new(Vec::new()));
-        let handle = spawn_listener(conn, device.clone(), entries.clone());
-        e.insert(DeviceSubscriptions { entries, handle, wildcard: None, wildcard_events: vec![endpoint] });
-    } else {
-        shell.subscriptions.get_mut(&node_id).unwrap().wildcard_events.push(endpoint);
-    }
+    let handle = spawn_subscription_listener(sub, device.clone());
+    let ds = shell.subscriptions.entry(node_id).or_insert_with(DeviceSubscriptions::new);
+    ds.handles.push(handle);
+    ds.wildcard_events.push(endpoint);
 
     match endpoint {
         Some(ep) => println!("Subscribed (events ep{}): [{}]. Use 'unsubscribe {}' to stop.", ep, device, device),
@@ -1161,7 +1075,9 @@ async fn cmd_unsubscribe(shell: &mut Shell, args: &[String]) -> Result<()> {
     }
     let node_id = shell.resolve_node_id(&args[0])?;
     if let Some(ds) = shell.subscriptions.remove(&node_id) {
-        ds.handle.abort();
+        for handle in ds.handles {
+            handle.abort();
+        }
         // Tell the device to cancel all subscriptions on this session.
         if let Some(conn) = shell.connections.get(&node_id) {
             let _ = conn.im_unsubscribe_all().await;
@@ -1183,8 +1099,7 @@ fn cmd_subscriptions(shell: &Shell) -> Result<()> {
             .ok().flatten()
             .map(|d| d.name)
             .unwrap_or_else(|| node_id.to_string());
-        let entries = ds.entries.lock().unwrap();
-        for e in entries.iter() {
+        for e in ds.entries.iter() {
             println!("  {} (node {}) ep{} {}", name, node_id, e.endpoint, e.label);
         }
         match ds.wildcard {
@@ -1214,7 +1129,9 @@ fn cmd_remove(shell: &mut Shell, args: &[String]) -> Result<()> {
     if args.is_empty() { println!("usage: remove <device>"); return Ok(()); }
     let node_id = shell.resolve_node_id(&args[0])?;
     if let Some(ds) = shell.subscriptions.remove(&node_id) {
-        ds.handle.abort();
+        for handle in ds.handles {
+            handle.abort();
+        }
     }
     shell.connections.remove(&node_id);
     shell.dm.remove_device(node_id)?;

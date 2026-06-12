@@ -14,6 +14,10 @@
 //!                              [read attributes](controller::Connection::read_request) and [invoke commands](controller::Connection::invoke_request).
 //! - [tlv](tlv) - Module with simple matter tlv encoders and decoders which can be used to encode command parameters
 //!                and decode complex responses.
+//! - [im](im) - Typed Interaction Model report layer - decoded attribute/event reports used by
+//!              [Connection::read_request2](controller::Connection::read_request2) and the subscription API
+//!              ([Connection::subscribe_attrs](controller::Connection::subscribe_attrs) returns a
+//!              [Subscription](controller::Subscription) delivering decoded updates).
 //! - [discover](discover) - simple mdns based discovery of matter devices on local network
 //! - [devman](devman) - High level device manager which uses all above components to provide simpler api.
 //!                      It stores device information and certificates in specified directory and allows
@@ -284,6 +288,7 @@ mod device_messages;
 pub mod devman;
 pub mod discover;
 pub mod fabric;
+pub mod im;
 pub mod mdns;
 pub mod mdns2;
 pub mod messages;

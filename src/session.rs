@@ -6,10 +6,60 @@ use anyhow::Result;
 use std::io::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+/// Message Reception State per Matter spec 4.6.5: sliding-window duplicate
+/// and replay detection. Tracks the largest received counter plus a bitmap
+/// of the MSG_COUNTER_WINDOW_SIZE counters below it. Counters older than the
+/// window are rejected. No-rollover semantics (secure unicast counters never
+/// wrap; initial counters are random in [1, 2^28]).
+#[derive(Default)]
+pub(crate) struct MessageReceptionState {
+    max_counter: u32,
+    /// Bit i set means counter (max_counter - 1 - i) was received.
+    window: u32,
+    initialized: bool,
+}
+
+impl MessageReceptionState {
+    /// Returns true if the counter is new (accepted) and records it;
+    /// false if it is a duplicate or older than the window.
+    pub(crate) fn counter_is_new(&mut self, counter: u32) -> bool {
+        if !self.initialized {
+            self.initialized = true;
+            self.max_counter = counter;
+            self.window = 0;
+            return true;
+        }
+        if counter == self.max_counter {
+            return false;
+        }
+        if counter > self.max_counter {
+            let shift = counter - self.max_counter;
+            self.window = if shift > 32 {
+                0
+            } else {
+                self.window.checked_shl(shift).unwrap_or(0) | (1 << (shift - 1))
+            };
+            self.max_counter = counter;
+            return true;
+        }
+        let diff = self.max_counter - counter;
+        if diff > 32 {
+            return false;
+        }
+        let bit = 1u32 << (diff - 1);
+        if self.window & bit != 0 {
+            return false;
+        }
+        self.window |= bit;
+        true
+    }
+}
+
 pub struct Session {
     pub session_id: u16,
     pub my_session_id: u16,
     counter: AtomicU32,
+    reception_state: std::sync::Mutex<MessageReceptionState>,
     pub local_node: Option<Vec<u8>>,
     pub remote_node: Option<Vec<u8>>,
     pub encrypt_key: Option<crypto_common::Key<Aes128Ccm>>,
@@ -24,6 +74,7 @@ impl Session {
             session_id: 0,
             my_session_id: 0,
             counter: AtomicU32::new(crate::util::cryptoutil::initial_message_counter()),
+            reception_state: std::sync::Mutex::new(MessageReceptionState::default()),
             local_node: Some([0, 0, 0, 0, 0, 0, 0, 0].to_vec()),
             remote_node: None,
             encrypt_key: None,
@@ -88,6 +139,13 @@ impl Session {
         Ok(out)
     }
 
+    /// Check an incoming message counter against this session's reception
+    /// state. Must be called only after the message authenticated (decrypted
+    /// successfully) so forged counters cannot poison the window.
+    pub(crate) fn counter_is_new(&self, counter: u32) -> bool {
+        self.reception_state.lock().unwrap().counter_is_new(counter)
+    }
+
     fn make_nonce3(&self, counter: u32) -> Result<Vec<u8>> {
         Self::make_nonce3_extern(counter, self.local_node.as_deref())
     }
@@ -108,5 +166,84 @@ impl Session {
 impl Default for Session {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MessageReceptionState;
+
+    #[test]
+    fn in_order_and_duplicates() {
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(100));
+        assert!(!s.counter_is_new(100));
+        assert!(s.counter_is_new(101));
+        assert!(s.counter_is_new(102));
+        assert!(!s.counter_is_new(101));
+        assert!(!s.counter_is_new(102));
+    }
+
+    #[test]
+    fn reorder_within_window() {
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(100));
+        assert!(s.counter_is_new(105));
+        assert!(s.counter_is_new(103));
+        assert!(s.counter_is_new(104));
+        assert!(s.counter_is_new(101));
+        assert!(s.counter_is_new(102));
+        for c in 100..=105 {
+            assert!(!s.counter_is_new(c), "counter {} must be duplicate", c);
+        }
+    }
+
+    #[test]
+    fn stale_beyond_window_rejected() {
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(1000));
+        assert!(!s.counter_is_new(1000 - 33));
+        assert!(!s.counter_is_new(900));
+        assert!(s.counter_is_new(1000 - 32));
+        assert!(!s.counter_is_new(1000 - 32));
+    }
+
+    #[test]
+    fn window_shift_boundaries() {
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(100));
+        assert!(s.counter_is_new(132));
+        assert!(!s.counter_is_new(100));
+        assert!(s.counter_is_new(101));
+
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(100));
+        assert!(s.counter_is_new(133));
+        assert!(!s.counter_is_new(100));
+        assert!(!s.counter_is_new(133));
+        assert!(s.counter_is_new(132));
+    }
+
+    #[test]
+    fn large_jump_clears_window() {
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(100));
+        assert!(s.counter_is_new(101));
+        assert!(s.counter_is_new(1_000_000));
+        assert!(s.counter_is_new(1_000_000 - 1));
+        assert!(!s.counter_is_new(101));
+    }
+
+    #[test]
+    fn mixed_sequence_bookkeeping() {
+        let mut s = MessageReceptionState::default();
+        assert!(s.counter_is_new(10));
+        assert!(s.counter_is_new(12));
+        assert!(!s.counter_is_new(12));
+        assert!(s.counter_is_new(11));
+        assert!(!s.counter_is_new(11));
+        assert!(!s.counter_is_new(10));
+        assert!(s.counter_is_new(13));
+        assert!(!s.counter_is_new(12));
     }
 }

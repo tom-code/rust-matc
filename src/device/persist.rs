@@ -174,7 +174,7 @@ impl Device {
             fabrics,
             next_fabric_index: state.next_fabric_index,
             pending_root_cert: None,
-            received_counters: HashSet::new(),
+            unencrypted_reception: HashMap::new(),
             endpoints: vec![0],
             attributes: HashMap::new(),
             dirty_attributes: HashSet::new(),

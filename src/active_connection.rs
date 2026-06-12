@@ -1,19 +1,24 @@
 use anyhow::{Context, Result};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::Arc,
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{messages::{self, Message, ProtocolMessageHeader}, session::Session, transport::ConnectionTrait};
+use crate::{im, messages::{self, Message, ProtocolMessageHeader}, session::Session, transport::ConnectionTrait};
 
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(1);
+const EXCHANGE_CHANNEL_CAPACITY: usize = 8;
+const SUBSCRIPTION_CHANNEL_CAPACITY: usize = 16;
 const RETRANSMIT_THRESHOLD: Duration = Duration::from_secs(3);
 const MAX_RETRANSMIT_AGE: Duration = Duration::from_secs(10);
-const MAX_CACHED_COUNTERS: usize = 512;
+const PARTIAL_REPORT_MAX_AGE: Duration = Duration::from_secs(60);
 
 struct UnackedMessage {
     data: Vec<u8>,
@@ -22,39 +27,29 @@ struct UnackedMessage {
     exchange_id: Option<u16>,
 }
 
-struct ReceivedCounters {
-    set: HashSet<u32>,
-    order: VecDeque<u32>,
-    max_size: usize,
-}
-
-impl ReceivedCounters {
-    fn new(max_size: usize) -> Self {
-        Self {
-            set: HashSet::new(),
-            order: VecDeque::new(),
-            max_size,
-        }
-    }
-
-    fn insert(&mut self, counter: u32) -> bool {
-        if !self.set.insert(counter) {
-            return false;
-        }
-        self.order.push_back(counter);
-        while self.order.len() > self.max_size {
-            if let Some(old) = self.order.pop_front() {
-                self.set.remove(&old);
-            }
-        }
-        true
-    }
-}
-
 struct ReadLoopState {
     // Child of the permanent cancel token; firing this stops the current loop iteration.
     pause: CancellationToken,
     handle: JoinHandle<()>,
+}
+
+// Shared state handed to the background read loop task.
+struct ReadLoopCtx {
+    transport_conn: Arc<dyn ConnectionTrait>,
+    session: Arc<Session>,
+    pending_exchanges: Arc<std::sync::Mutex<HashMap<u16, mpsc::Sender<Message>>>>,
+    unacked: Arc<Mutex<HashMap<u32, UnackedMessage>>>,
+    event_tx: mpsc::Sender<Message>,
+    subscriptions: Arc<std::sync::Mutex<HashMap<u32, mpsc::Sender<im::ReportUpdate>>>>,
+    auto_status_response: Arc<AtomicBool>,
+}
+
+// Reassembly state for a chunked unsolicited (device-initiated) ReportData,
+// keyed by the device's exchange id. Owned locally by the read loop.
+struct PartialReport {
+    merged: im::ReportData,
+    raw: Vec<Message>,
+    started: Instant,
 }
 
 /// Active connection with background read task for continuous message handling.
@@ -63,11 +58,16 @@ pub struct ActiveConnection {
     // Stores the current session Arc; updated atomically on reauth.
     session_holder: std::sync::Mutex<Arc<Session>>,
 
-    pending_exchanges: Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
+    pending_exchanges: Arc<std::sync::Mutex<HashMap<u16, mpsc::Sender<Message>>>>,
     unacked: Arc<Mutex<HashMap<u32, UnackedMessage>>>,
 
     event_tx: mpsc::Sender<Message>,
     event_rx: Mutex<mpsc::Receiver<Message>>,
+
+    // Decoded subscription updates routed by subscription id.
+    subscriptions: Arc<std::sync::Mutex<HashMap<u32, mpsc::Sender<im::ReportUpdate>>>>,
+    // When set, the read loop replies to unsolicited ReportData with an IM StatusResponse.
+    auto_status_response: Arc<AtomicBool>,
 
     // Fired by Drop to permanently shut down the read loop.
     cancel: CancellationToken,
@@ -85,17 +85,21 @@ impl ActiveConnection {
         let session_holder = std::sync::Mutex::new(session_arc.clone());
         let pending_exchanges = Arc::new(std::sync::Mutex::new(HashMap::new()));
         let unacked = Arc::new(Mutex::new(HashMap::new()));
-        let received_counters = Arc::new(std::sync::Mutex::new(ReceivedCounters::new(MAX_CACHED_COUNTERS)));
+        let subscriptions = Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let auto_status_response = Arc::new(AtomicBool::new(true));
 
         // The read loop is cancelled by either this pause token or the parent cancel token.
         let pause = cancel.child_token();
         let handle = tokio::spawn(connection_read_loop(
-            conn.clone(),
-            session_arc,
-            pending_exchanges.clone(),
-            unacked.clone(),
-            received_counters,
-            event_tx.clone(),
+            ReadLoopCtx {
+                transport_conn: conn.clone(),
+                session: session_arc,
+                pending_exchanges: pending_exchanges.clone(),
+                unacked: unacked.clone(),
+                event_tx: event_tx.clone(),
+                subscriptions: subscriptions.clone(),
+                auto_status_response: auto_status_response.clone(),
+            },
             pause.clone(),
         ));
 
@@ -106,6 +110,8 @@ impl ActiveConnection {
             unacked,
             event_tx,
             event_rx: Mutex::new(event_rx),
+            subscriptions,
+            auto_status_response,
             cancel,
             read_loop_state: Mutex::new(Some(ReadLoopState { pause, handle })),
         }
@@ -129,21 +135,27 @@ impl ActiveConnection {
         // Discard any pending exchanges from the old session.
         self.pending_exchanges.lock().unwrap().clear();
         self.unacked.lock().await.clear();
+        // Subscriptions do not survive a new session; closing the channels
+        // makes Subscription::next() return None.
+        self.subscriptions.lock().unwrap().clear();
 
         // Install the new session.
         *self.session_holder.lock().unwrap() = Arc::new(new_session);
         let new_session_arc = self.session_holder.lock().unwrap().clone();
 
         // Spawn a fresh read loop on the same transport connection.
+        // The new session carries fresh message reception state.
         let new_pause = self.cancel.child_token();
-        let new_received_counters = Arc::new(std::sync::Mutex::new(ReceivedCounters::new(MAX_CACHED_COUNTERS)));
         let handle = tokio::spawn(connection_read_loop(
-            self.transport_conn.clone(),
-            new_session_arc,
-            self.pending_exchanges.clone(),
-            self.unacked.clone(),
-            new_received_counters,
-            self.event_tx.clone(),
+            ReadLoopCtx {
+                transport_conn: self.transport_conn.clone(),
+                session: new_session_arc,
+                pending_exchanges: self.pending_exchanges.clone(),
+                unacked: self.unacked.clone(),
+                event_tx: self.event_tx.clone(),
+                subscriptions: self.subscriptions.clone(),
+                auto_status_response: self.auto_status_response.clone(),
+            },
             new_pause.clone(),
         ));
 
@@ -165,29 +177,39 @@ impl ActiveConnection {
         Ok(())
     }
 
-    pub async fn request(&self, exchange_id: u16, data: &[u8]) -> Result<Message> {
-        let (tx, rx) = oneshot::channel();
-        {
-            let mut pending = self.pending_exchanges.lock().unwrap();
-            pending.insert(exchange_id, tx);
-        }
-
-        if let Err(e) = self.send_internal(exchange_id, data).await {
-            log::debug!("error sending request on exchange {}: {:?}; cleanup retransmit/exchange maps", exchange_id, e);
-            let mut pending = self.pending_exchanges.lock().unwrap();
-            pending.remove(&exchange_id);
-            return Err(e);
-        }
-
-        rx.await.context("channel closed while waiting for response")
+    /// Open a logical exchange: messages received for this exchange id are
+    /// routed to the returned handle until it is dropped. Allows multi-message
+    /// transactions (chunked reports, subscribe priming + response).
+    pub(crate) fn open_exchange(&self, exchange_id: u16) -> Exchange<'_> {
+        let (tx, rx) = mpsc::channel(EXCHANGE_CHANNEL_CAPACITY);
+        self.pending_exchanges.lock().unwrap().insert(exchange_id, tx);
+        Exchange { conn: self, id: exchange_id, rx }
     }
 
-    pub async fn send(&self, data: &[u8]) -> Result<()> {
-        let session = self.session_holder.lock().unwrap().clone();
-        let encoded = session.encode_message(data)?;
-        self.track_sent(&encoded, None).await;
-        self.transport_conn.send(&encoded).await?;
-        Ok(())
+    pub async fn request(&self, exchange_id: u16, data: &[u8]) -> Result<Message> {
+        let mut exchange = self.open_exchange(exchange_id);
+        exchange.send(data).await?;
+        exchange.recv().await
+    }
+
+    /// Register a subscription id; decoded updates for it are delivered to the
+    /// returned receiver instead of the raw event channel.
+    pub(crate) fn register_subscription(&self, id: u32) -> mpsc::Receiver<im::ReportUpdate> {
+        let (tx, rx) = mpsc::channel(SUBSCRIPTION_CHANNEL_CAPACITY);
+        self.subscriptions.lock().unwrap().insert(id, tx);
+        rx
+    }
+
+    pub(crate) fn subscriptions_handle(
+        &self,
+    ) -> Arc<std::sync::Mutex<HashMap<u32, mpsc::Sender<im::ReportUpdate>>>> {
+        self.subscriptions.clone()
+    }
+
+    /// Enable or disable automatic IM StatusResponse replies to unsolicited
+    /// ReportData (enabled by default).
+    pub fn set_auto_status_response(&self, enabled: bool) {
+        self.auto_status_response.store(enabled, Ordering::Relaxed);
     }
 
     pub async fn recv_event(&self) -> Option<Message> {
@@ -227,39 +249,58 @@ impl Drop for ActiveConnection {
     }
 }
 
-async fn connection_read_loop(
-    transport_conn: Arc<dyn ConnectionTrait>,
-    session: Arc<Session>,
-    pending_exchanges: Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
-    unacked: Arc<Mutex<HashMap<u32, UnackedMessage>>>,
-    received_counters: Arc<std::sync::Mutex<ReceivedCounters>>,
-    event_tx: mpsc::Sender<Message>,
-    cancel: CancellationToken,
-) {
+/// Handle for a multi-message exchange. Incoming messages for the exchange id
+/// are delivered to [Exchange::recv] until the handle is dropped.
+pub(crate) struct Exchange<'a> {
+    conn: &'a ActiveConnection,
+    pub(crate) id: u16,
+    rx: mpsc::Receiver<Message>,
+}
+
+impl Exchange<'_> {
+    pub(crate) async fn send(&self, data: &[u8]) -> Result<()> {
+        self.conn.send_internal(self.id, data).await
+    }
+
+    pub(crate) async fn recv(&mut self) -> Result<Message> {
+        self.rx
+            .recv()
+            .await
+            .context("channel closed while waiting for response")
+    }
+}
+
+impl Drop for Exchange<'_> {
+    fn drop(&mut self) {
+        self.conn.pending_exchanges.lock().unwrap().remove(&self.id);
+    }
+}
+
+async fn connection_read_loop(ctx: ReadLoopCtx, cancel: CancellationToken) {
+    let mut partial_reports: HashMap<u16, PartialReport> = HashMap::new();
     loop {
         tokio::select! {
             _ = cancel.cancelled() => break,
 
-            result = transport_conn.receive(RECEIVE_TIMEOUT) => {
+            result = ctx.transport_conn.receive(RECEIVE_TIMEOUT) => {
                 match result {
                     Ok(data) => {
                         log::trace!("received {} bytes", data.len());
-                        if let Err(e) = process_incoming(
-                            &data,
-                            &session,
-                            &transport_conn,
-                            &pending_exchanges,
-                            &unacked,
-                            &received_counters,
-                            &event_tx,
-                        ).await {
+                        if let Err(e) = process_incoming(&data, &ctx, &mut partial_reports).await {
                             log::debug!("error processing incoming message: {:?}", e);
                         }
                     }
                     Err(_) => {
-                        if !transport_conn.is_reliable() {
-                            check_retransmit(&transport_conn, &unacked, &pending_exchanges).await;
+                        if !ctx.transport_conn.is_reliable() {
+                            check_retransmit(&ctx.transport_conn, &ctx.unacked, &ctx.pending_exchanges).await;
                         }
+                        partial_reports.retain(|exchange, partial| {
+                            let keep = partial.started.elapsed() < PARTIAL_REPORT_MAX_AGE;
+                            if !keep {
+                                log::debug!("discarding stale partial report on exchange {}", exchange);
+                            }
+                            keep
+                        });
                     }
                 }
             }
@@ -269,15 +310,11 @@ async fn connection_read_loop(
 
 async fn process_incoming(
     data: &[u8],
-    session: &Arc<Session>,
-    transport_conn: &Arc<dyn ConnectionTrait>,
-    pending_exchanges: &Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
-    unacked: &Arc<Mutex<HashMap<u32, UnackedMessage>>>,
-    received_counters: &Arc<std::sync::Mutex<ReceivedCounters>>,
-    event_tx: &mpsc::Sender<Message>,
+    ctx: &ReadLoopCtx,
+    partial_reports: &mut HashMap<u16, PartialReport>,
 ) -> Result<()> {
     log::trace!("received raw data: {:x?}", data);
-    let decoded_data = session.decode_message(data);
+    let decoded_data = ctx.session.decode_message(data);
     let decoded_data = match decoded_data {
         Ok(d) => d,
         Err(e) => {
@@ -290,7 +327,7 @@ async fn process_incoming(
     log::trace!("received message {:?}", message);
 
     if message.protocol_header.exchange_flags & ProtocolMessageHeader::FLAG_ACK != 0 {
-        let mut unacked_lock = unacked.lock().await;
+        let mut unacked_lock = ctx.unacked.lock().await;
         unacked_lock.remove(&message.protocol_header.ack_counter);
         log::trace!(
             "received ack for counter:{}",
@@ -298,13 +335,10 @@ async fn process_incoming(
         );
     }
 
-    let is_new = {
-        let mut received = received_counters.lock().unwrap();
-        received.insert(message.message_header.message_counter)
-    };
-
-    if !is_new {
-        send_ack(session, transport_conn, &message).await?;
+    if !ctx.session.counter_is_new(message.message_header.message_counter) {
+        if message.protocol_header.exchange_flags & ProtocolMessageHeader::FLAG_RELIABILITY != 0 {
+            send_ack(&ctx.session, &ctx.transport_conn, &message).await?;
+        }
         log::trace!(
             "dropping duplicate message exchange:{} counter:{}",
             message.protocol_header.exchange_id,
@@ -314,7 +348,7 @@ async fn process_incoming(
     }
 
     if message.protocol_header.exchange_flags & ProtocolMessageHeader::FLAG_RELIABILITY != 0 {
-        send_ack(session, transport_conn, &message).await?;
+        send_ack(&ctx.session, &ctx.transport_conn, &message).await?;
     }
 
     if message.protocol_header.protocol_id
@@ -330,17 +364,118 @@ async fn process_incoming(
     }
 
     let exchange_id = message.protocol_header.exchange_id;
-    let sender = {
-        let mut pending = pending_exchanges.lock().unwrap();
-        pending.remove(&exchange_id)
+    // Only messages on exchanges we initiated may match a pending exchange;
+    // a device-initiated exchange can reuse the same id without conflict.
+    let from_initiator =
+        message.protocol_header.exchange_flags & ProtocolMessageHeader::FLAG_INITIATOR != 0;
+    let sender = if from_initiator {
+        None
+    } else {
+        ctx.pending_exchanges.lock().unwrap().get(&exchange_id).cloned()
     };
 
-    match sender {
-        Some(tx) => {
-            let _ = tx.send(message);
+    if let Some(tx) = sender {
+        if let Err(e) = tx.try_send(message) {
+            log::debug!("dropping message for exchange {}: {}", exchange_id, e);
         }
-        None => {
-            let _ = event_tx.send(message).await;
+        return Ok(());
+    }
+
+    if message.protocol_header.protocol_id == ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+        && message.protocol_header.opcode == ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA
+    {
+        return handle_unsolicited_report(ctx, partial_reports, message).await;
+    }
+
+    if ctx.event_tx.try_send(message).is_err() {
+        log::debug!("event channel full or closed, dropping message for exchange {}", exchange_id);
+    }
+
+    Ok(())
+}
+
+// Handles a (typically subscription) ReportData on an exchange with no pending
+// requester: acks it at the IM level, reassembles chunks, and delivers the
+// decoded update to the registered subscription channel.
+async fn handle_unsolicited_report(
+    ctx: &ReadLoopCtx,
+    partial_reports: &mut HashMap<u16, PartialReport>,
+    message: Message,
+) -> Result<()> {
+    let exchange_id = message.protocol_header.exchange_id;
+
+    let report = match im::ReportData::parse(&message.tlv) {
+        Ok(r) => r,
+        Err(e) => {
+            log::debug!("unparseable report data on exchange {}: {}", exchange_id, e);
+            if ctx.event_tx.try_send(message).is_err() {
+                log::debug!("event channel full or closed, dropping report on exchange {}", exchange_id);
+            }
+            return Ok(());
+        }
+    };
+
+    if ctx.auto_status_response.load(Ordering::Relaxed) && !report.suppress_response {
+        let flags = messages::im_status_flags_for(message.protocol_header.exchange_flags);
+        let resp = messages::im_status_response(
+            exchange_id,
+            flags,
+            message.message_header.message_counter,
+        )?;
+        let encoded = ctx.session.encode_message(&resp)?;
+        if !ctx.transport_conn.is_reliable() {
+            if let Ok((header, _)) = messages::MessageHeader::decode(&encoded) {
+                let now = Instant::now();
+                ctx.unacked.lock().await.insert(header.message_counter, UnackedMessage {
+                    data: encoded.clone(),
+                    original_time: now,
+                    last_sent: now,
+                    exchange_id: None,
+                });
+            }
+        }
+        ctx.transport_conn.send(&encoded).await?;
+        log::trace!("sent status response for report on exchange {}", exchange_id);
+    }
+
+    let more_chunks = report.more_chunks;
+    let partial = partial_reports.entry(exchange_id).or_insert_with(|| PartialReport {
+        merged: im::ReportData::default(),
+        raw: Vec::new(),
+        started: Instant::now(),
+    });
+    partial.merged.merge(report);
+    partial.raw.push(message);
+
+    if more_chunks {
+        return Ok(());
+    }
+
+    let partial = partial_reports.remove(&exchange_id).unwrap();
+    let subscription_sender = partial
+        .merged
+        .subscription_id
+        .and_then(|id| ctx.subscriptions.lock().unwrap().get(&id).cloned());
+
+    match (subscription_sender, partial.merged.subscription_id) {
+        (Some(tx), Some(id)) => {
+            let update = im::ReportUpdate {
+                subscription_id: id,
+                attribute_reports: partial.merged.attribute_reports,
+                event_reports: partial.merged.event_reports,
+            };
+            if let Err(mpsc::error::TrySendError::Closed(_)) = tx.try_send(update) {
+                ctx.subscriptions.lock().unwrap().remove(&id);
+                log::debug!("subscription {} receiver dropped, deregistering", id);
+            }
+        }
+        _ => {
+            for raw in partial.raw {
+                if ctx.event_tx.try_send(raw).is_err() {
+                    log::debug!("event channel full or closed, dropping report on exchange {}", exchange_id);
+                    break;
+                }
+            }
         }
     }
 
@@ -369,7 +504,7 @@ async fn send_ack(
 async fn check_retransmit(
     transport_conn: &Arc<dyn ConnectionTrait>,
     unacked: &Arc<Mutex<HashMap<u32, UnackedMessage>>>,
-    pending_exchanges: &Arc<std::sync::Mutex<HashMap<u16, oneshot::Sender<Message>>>>,
+    pending_exchanges: &Arc<std::sync::Mutex<HashMap<u16, mpsc::Sender<Message>>>>,
 ) {
     let mut to_retransmit = Vec::new();
     {

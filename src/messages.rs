@@ -656,39 +656,6 @@ pub fn im_write_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16, d
     Ok(tlv.data)
 }
 
-pub fn im_subscribe_request(endpoint: u16, cluster: u32, exchange: u16, event: u32) -> Result<Vec<u8>> {
-    let b = ProtocolMessageHeader {
-        exchange_flags: 5,
-        opcode: ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_REQ,
-        exchange_id: exchange,
-        protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
-        ack_counter: 0,
-    }
-    .encode()?;
-
-    let mut tlv = tlv::TlvBuffer::from_vec(b);
-    tlv.write_anon_struct()?;
-    tlv.write_bool(0, false)?; // keep subscriptions
-    tlv.write_uint16(1, 10)?; // min interval
-    tlv.write_uint16(2, 30)?; // max interval
-    tlv.write_array(4)?;
-
-
-    tlv.write_anon_list()?;
-    tlv.write_uint16(1, endpoint)?;
-    tlv.write_uint32(2, cluster)?;
-    tlv.write_uint32(3, event)?;
-    tlv.write_bool(4, true)?; // urgent
-
-    tlv.write_struct_end()?;
-    tlv.write_struct_end()?;
-
-    tlv.write_bool(7, false)?;  // fabric filtered
-    tlv.write_uint8(0xff, 10)?;
-    tlv.write_struct_end()?;
-    Ok(tlv.data)
-}
-
 /// Build a SubscribeRequest for an attribute path (AttributeRequests, tag 3).
 /// `keep_subscriptions`: if true the device keeps existing subscriptions alive;
 /// if false the device cancels all prior subscriptions before creating this one.
@@ -792,6 +759,18 @@ pub fn im_unsubscribe_all(exchange: u16) -> Result<Vec<u8>> {
     tlv.write_uint8(0xff, 10)?;      // InteractionModelRevision
     tlv.write_struct_end()?;
     Ok(tlv.data)
+}
+
+/// Compute exchange flags for a StatusResponse acknowledging a message with
+/// `incoming_exchange_flags`. On an exchange we initiated (incoming message has
+/// FLAG_INITIATOR clear) our reply keeps FLAG_INITIATOR set; on a peer-initiated
+/// exchange it must be clear.
+pub fn im_status_flags_for(incoming_exchange_flags: u8) -> u8 {
+    if incoming_exchange_flags & ProtocolMessageHeader::FLAG_INITIATOR == 0 {
+        ProtocolMessageHeader::FLAG_INITIATOR | ProtocolMessageHeader::FLAG_ACK
+    } else {
+        ProtocolMessageHeader::FLAG_ACK
+    }
 }
 
 pub fn im_status_response(exchange: u16, flags: u8, ack: u32) -> Result<Vec<u8>> {

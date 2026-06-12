@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 use matc::{
     certmanager::{self, FileCertManager},
     clusters::{self, defs::{CLUSTER_DOOR_LOCK_CMD_ID_GETUSER, CLUSTER_ID_DOOR_LOCK}},
-    controller, discover, messages, onboarding, tlv::{self, TlvItem}, transport,
+    controller, discover, messages, onboarding, tlv, transport,
 };
 
 const DEFAULT_FABRIC: u64 = 0x110;
@@ -1041,44 +1041,17 @@ fn command_cmd(
                 }
             },
             CommandCommand::MonitorDoorState{} => {
-                fn decode_door_change_state_event(tlv: TlvItem) {
-                    let tlv_stat = tlv.get(&[2]);
-                    if let Some(tlv_stat) =  tlv_stat {
-                        if let tlv::TlvItemValue::List(lst) = tlv_stat {
-                            for item in lst {
-                                let par = item.get(&[1, 7]);
-                                if let Some(par) = par {
-                                    println!("status: {:?}", clusters::codec::door_lock::decode_door_state_change_event(par));
-                                }
-                            }
-                        } else {
-                            println!("no events in report data");
+                fn print_door_state_events(events: &[matc::im::EventReport]) {
+                    for ev in events {
+                        if let Some(data) = &ev.data {
+                            println!("status: {:?}", clusters::codec::door_lock::decode_door_state_change_event(data));
                         }
                     }
                 }
-                let res = connection.im_subscribe_request(1, 0x101, 1).await.unwrap();
-                if res.protocol_header.opcode != messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA {
-                    log::warn!("unexpected response opcode 0x{:x}", res.protocol_header.opcode);
-                } else {
-                    decode_door_change_state_event(res.tlv.clone());
-                }
-                connection.im_status_response(res.protocol_header.exchange_id, 1 | 2, res.message_header.message_counter).await.unwrap();
-                loop {
-                    let ev = connection.recv_event().await.unwrap();
-                    match ev.protocol_header.opcode {
-                        messages::ProtocolMessageHeader::INTERACTION_OPCODE_REPORT_DATA => {
-                            println!("this is Event/Report Data {}", ev.protocol_header.exchange_id);
-                            decode_door_change_state_event(ev.tlv.clone());
-                            connection.im_status_response(ev.protocol_header.exchange_id, 2, ev.message_header.message_counter).await.unwrap();
-                            println!("sent status response");
-                        }
-                        messages::ProtocolMessageHeader::INTERACTION_OPCODE_SUBSCRIBE_RESP => {
-                            println!("this is Subscribe Response {}", ev.protocol_header.exchange_id);
-                        }
-                        _ => {
-                            println!("unhandled event opcode 0x{:x}", ev.protocol_header.opcode);
-                        }
-                    }
+                let mut sub = connection.subscribe_events(Some(1), Some(0x101), Some(1), false).await.unwrap();
+                print_door_state_events(&sub.priming_event_reports);
+                while let Some(update) = sub.next().await {
+                    print_door_state_events(&update.event_reports);
                 }
             }
             CommandCommand::Test2{} => {

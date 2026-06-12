@@ -66,8 +66,9 @@ pub struct Device {
     pub(crate) next_fabric_index: u8,
     /// Temporary root cert from AddTrustedRootCertificate, consumed by AddNOC.
     pub(crate) pending_root_cert: Option<Vec<u8>>,
-    // Duplicate detection
-    pub(crate) received_counters: HashSet<u32>,
+    /// Replay detection for unencrypted (handshake) messages, keyed by
+    /// source node id. Secure sessions carry their own reception state.
+    pub(crate) unencrypted_reception: HashMap<u64, session::MessageReceptionState>,
     /// Registered application endpoints (EP0 is always present).
     pub(crate) endpoints: Vec<u16>,
     // Attribute store: (endpoint, cluster, attribute) -> pre-tagged TLV at context tag 2
@@ -102,7 +103,7 @@ impl Device {
             fabrics: Vec::new(),
             next_fabric_index: 1,
             pending_root_cert: None,
-            received_counters: HashSet::new(),
+            unencrypted_reception: HashMap::new(),
             endpoints: vec![0],
             attributes: HashMap::new(),
             dirty_attributes: HashSet::new(),
@@ -200,17 +201,8 @@ impl Device {
             addr
         );
 
-        // Duplicate detection
-        if self.received_counters.contains(&msg_header.message_counter) {
-            log::debug!(
-                "Dropping duplicate message counter={}",
-                msg_header.message_counter
-            );
-            return Ok(());
-        }
-        self.received_counters.insert(msg_header.message_counter);
-
-        // Try to decrypt if we have a session
+        // Try to decrypt if we have a session. Replay/duplicate detection is
+        // per-session and runs only after the message authenticated.
         let payload = if msg_header.session_id != 0 {
             // Encrypted message - search CASE sessions, then PASE
             let session = self
@@ -225,6 +217,13 @@ impl Device {
             match session {
                 Some(ses) => {
                     let decrypted = ses.decode_message(data)?;
+                    if !ses.counter_is_new(msg_header.message_counter) {
+                        log::debug!(
+                            "Dropping duplicate message counter={}",
+                            msg_header.message_counter
+                        );
+                        return Ok(());
+                    }
                     let (_, proto_rest) = messages::MessageHeader::decode(&decrypted)?;
                     proto_rest
                 }
@@ -237,6 +236,23 @@ impl Device {
                 }
             }
         } else {
+            let peer = msg_header
+                .source_node_id
+                .as_deref()
+                .and_then(|b| b.try_into().ok())
+                .map(u64::from_le_bytes)
+                .unwrap_or(0);
+            if self.unencrypted_reception.len() > 16 {
+                self.unencrypted_reception.clear();
+            }
+            let state = self.unencrypted_reception.entry(peer).or_default();
+            if !state.counter_is_new(msg_header.message_counter) {
+                log::debug!(
+                    "Dropping duplicate unencrypted message counter={}",
+                    msg_header.message_counter
+                );
+                return Ok(());
+            }
             rest
         };
 
