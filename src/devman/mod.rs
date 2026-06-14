@@ -138,7 +138,22 @@ impl DeviceManager {
         node_id: u64,
         name: &str,
     ) -> Result<controller::Connection> {
+        self.commission_at(address, pin, node_id, name, (None, None, None)).await
+    }
+
+    /// Commission at a known address with optional advertised MRP intervals
+    /// (SII/SAI/SAT milliseconds), which are applied to the connection and
+    /// persisted in the registry.
+    async fn commission_at(
+        &self,
+        address: &str,
+        pin: u32,
+        node_id: u64,
+        name: &str,
+        mrp_ms: (Option<u32>, Option<u32>, Option<u32>),
+    ) -> Result<controller::Connection> {
         let conn = self.transport.create_connection(address).await;
+        conn.set_mrp_params(crate::mrp::MrpParameters::from_txt_ms(mrp_ms.0, mrp_ms.1, mrp_ms.2));
         let connection = self
             .controller
             .commission(&conn, pin, node_id, self.config.controller_id)
@@ -148,6 +163,9 @@ impl DeviceManager {
             node_id,
             address: address.to_owned(),
             name: name.to_owned(),
+            sii_ms: mrp_ms.0,
+            sai_ms: mrp_ms.1,
+            sat_ms: mrp_ms.2,
         };
         self.registry
             .lock()
@@ -187,9 +205,17 @@ impl DeviceManager {
     /// BUSY handling is delegated to Controller::auth_sigma_with_busy_retry so that
     /// in-place reauth uses identical retry semantics.
     async fn connect_with_rediscovery(&self, node_id: u64, address: &str) -> Result<controller::Connection> {
+        let stored_mrp = self
+            .registry
+            .lock()
+            .map_err(|e| anyhow::anyhow!("registry lock: {}", e))?
+            .get(node_id)
+            .map(|d| d.mrp_params())
+            .unwrap_or_default();
         let mut current_address = address.to_string();
         // Create connection once and reuse across retries; only replace if address changes.
         let mut conn = self.transport.create_connection(&current_address).await;
+        conn.set_mrp_params(stored_mrp);
 
         match self.controller.auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id).await {
             Ok(ses) => Ok(controller::Connection::from_parts(conn, ses)),
@@ -199,12 +225,13 @@ impl DeviceManager {
                     "Connection to {} failed ({}), attempting operational rediscovery...",
                     current_address, e
                 );
-                let new_address = self
-                    .discover_device(node_id, Duration::from_secs(10))
+                let (new_address, matter_info) = self
+                    .discover_device_info(node_id, Duration::from_secs(10))
                     .await
                     .context(format!("rediscovery for node {} after connect failure", node_id))?;
                 current_address = new_address;
                 conn = self.transport.create_connection(&current_address).await;
+                conn.set_mrp_params(matter_info.mrp_params());
                 let ses = self
                     .controller
                     .auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id)
@@ -257,6 +284,11 @@ impl DeviceManager {
             },
         ).await.context(format!("discovering device with discriminator {}", discriminator))?;
 
+        let mrp_ms = (
+            matter_info.session_idle_interval_ms,
+            matter_info.session_active_interval_ms,
+            matter_info.session_active_threshold_ms,
+        );
         let ips = matter_info.ips;
         let port = matter_info.port.unwrap_or(5540);
 
@@ -271,7 +303,7 @@ impl DeviceManager {
             } else {
                 format!("{}:{}", ip, port)
             };
-            match self.commission(&address, passcode, node_id, name).await {
+            match self.commission_at(&address, passcode, node_id, name, mrp_ms).await {
                 Ok(conn) => return Ok(conn),
                 Err(e) => {
                     log::debug!("Commission attempt at {} failed: {}", address, e);
@@ -322,6 +354,7 @@ impl DeviceManager {
             node_id,
             address: String::new(), // will be filled on first connect
             name: name.to_owned(),
+            ..Default::default()
         };
         self.registry
             .lock()
@@ -335,6 +368,17 @@ impl DeviceManager {
     /// Returns as soon as the device is found (no fixed timeout wait).
     /// Updates the stored address in the registry and returns the new address.
     pub async fn discover_device(&self, node_id: u64, timeout: Duration) -> Result<String> {
+        let (address, _) = self.discover_device_info(node_id, timeout).await?;
+        Ok(address)
+    }
+
+    /// Operational discovery returning the full mDNS info. Updates the stored
+    /// address and advertised MRP intervals in the registry.
+    async fn discover_device_info(
+        &self,
+        node_id: u64,
+        timeout: Duration,
+    ) -> Result<(String, MatterDeviceInfo)> {
         let ca_public_key = self.certmanager.get_ca_public_key()?;
         let fabric = Fabric::new(self.config.fabric_id, 0, &ca_public_key, &self.certmanager.get_ipk_epoch_key());
         let compressed = fabric.compressed().context("computing compressed fabric ID")?;
@@ -351,7 +395,7 @@ impl DeviceManager {
             move |target, _| target == expected_target,
         ).await.context(format!("operational discovery for node {}", node_id))?;
 
-        let ip = matter_info.ips.into_iter().next()
+        let ip = matter_info.ips.first()
             .context(format!("discovered {} but no IPs in response", instance_name))?;
         let port = matter_info.port.unwrap_or(5540);
         let address = if ip.is_ipv6() {
@@ -361,7 +405,19 @@ impl DeviceManager {
         };
 
         self.update_device_address(node_id, &address)?;
-        Ok(address)
+        if let Err(e) = self.registry
+            .lock()
+            .map_err(|e| anyhow::anyhow!("registry lock: {}", e))?
+            .update_mrp(
+                node_id,
+                matter_info.session_idle_interval_ms,
+                matter_info.session_active_interval_ms,
+                matter_info.session_active_threshold_ms,
+            )
+        {
+            log::debug!("failed to persist MRP intervals for node {}: {}", node_id, e);
+        }
+        Ok((address, matter_info))
     }
 
     pub async fn discover_commissionable_devices(&self, timeout: Duration) -> Result<Vec<(String, MatterDeviceInfo)>> {

@@ -74,6 +74,14 @@ pub trait ConnectionTrait: Send + Sync {
     /// True for transports (BTP) that guarantee delivery so Matter-layer MRP
     /// retransmit should be suppressed.  Default: false (UDP).
     fn is_reliable(&self) -> bool { false }
+    /// Peer MRP intervals used for retransmission timing. Defaults to spec
+    /// defaults unless overridden via [`ConnectionTrait::set_mrp_params`].
+    fn mrp_params(&self) -> crate::mrp::MrpParameters { Default::default() }
+    /// Set peer MRP intervals (typically from its mDNS SII/SAI/SAT TXT records).
+    fn set_mrp_params(&self, _params: crate::mrp::MrpParameters) {}
+    /// Time since the last message was received from the peer, if any.
+    /// Used to select the active vs idle retransmission interval.
+    fn last_received_elapsed(&self) -> Option<Duration> { None }
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +110,10 @@ pub struct Connection {
     remote_address: String,
     receiver: Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>,
     generation: u64,
+    mrp: std::sync::Mutex<crate::mrp::MrpParameters>,
+    created: tokio::time::Instant,
+    /// Milliseconds since `created` of the last received datagram; u64::MAX = never.
+    last_rx_ms: AtomicU64,
 }
 
 impl Transport {
@@ -204,6 +216,9 @@ impl Transport {
             remote_address: remote,
             receiver: Mutex::new(receiver),
             generation,
+            mrp: std::sync::Mutex::new(Default::default()),
+            created: tokio::time::Instant::now(),
+            last_rx_ms: AtomicU64::new(u64::MAX),
         })
     }
 }
@@ -228,7 +243,11 @@ impl Connection {
         match with_timeout.await {
             Err(_elapsed) => Err(anyhow::anyhow!("receive timeout")),
             Ok(None) => Err(anyhow::Error::new(ConnectionClosed)),
-            Ok(Some(v)) => Ok(v),
+            Ok(Some(v)) => {
+                self.last_rx_ms
+                    .store(self.created.elapsed().as_millis() as u64, Ordering::Relaxed);
+                Ok(v)
+            }
         }
     }
 }
@@ -247,6 +266,19 @@ impl ConnectionTrait for Connection {
     }
     async fn receive(&self, timeout: Duration) -> Result<Vec<u8>> {
         self.receive(timeout).await
+    }
+    fn mrp_params(&self) -> crate::mrp::MrpParameters {
+        *self.mrp.lock().unwrap()
+    }
+    fn set_mrp_params(&self, params: crate::mrp::MrpParameters) {
+        *self.mrp.lock().unwrap() = params;
+    }
+    fn last_received_elapsed(&self) -> Option<Duration> {
+        let ms = self.last_rx_ms.load(Ordering::Relaxed);
+        if ms == u64::MAX {
+            return None;
+        }
+        Some(self.created.elapsed().saturating_sub(Duration::from_millis(ms)))
     }
 }
 

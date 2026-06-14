@@ -138,6 +138,8 @@ impl Device {
                 ("CM".to_string(), "1".to_string()),
                 ("PH".to_string(), "33".to_string()),
                 ("DT".to_string(), "256".to_string()),
+                ("SII".to_string(), "500".to_string()),
+                ("SAI".to_string(), "300".to_string()),
             ],
             hostname: device.config.hostname.clone(),
             ttl: 120,

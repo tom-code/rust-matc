@@ -104,7 +104,10 @@ impl Device {
             instance_name: iname,
             service_type: "_matter._tcp.local".to_string(),
             port: op_port,
-            txt_records: vec![],
+            txt_records: vec![
+                ("SII".to_string(), "500".to_string()),
+                ("SAI".to_string(), "300".to_string()),
+            ],
             hostname: self.config.hostname.clone(),
             ttl: 120,
             subtypes: vec![],

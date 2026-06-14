@@ -292,6 +292,7 @@ pub mod im;
 pub mod mdns;
 pub mod mdns2;
 pub mod messages;
+pub mod mrp;
 pub mod onboarding;
 mod retransmit;
 mod session;

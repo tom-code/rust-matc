@@ -34,9 +34,25 @@ pub struct MatterDeviceInfo {
     pub pairing_hint: Option<String>,
     pub source_ip: String,
     pub port: Option<u16>,
+    /// MRP idle interval (SII TXT key, milliseconds)
+    pub session_idle_interval_ms: Option<u32>,
+    /// MRP active interval (SAI TXT key, milliseconds)
+    pub session_active_interval_ms: Option<u32>,
+    /// MRP active threshold (SAT TXT key, milliseconds)
+    pub session_active_threshold_ms: Option<u32>,
 }
 
 impl MatterDeviceInfo {
+    /// MRP timing parameters from the advertised SII/SAI/SAT values,
+    /// with spec defaults for missing keys.
+    pub fn mrp_params(&self) -> crate::mrp::MrpParameters {
+        crate::mrp::MrpParameters::from_txt_ms(
+            self.session_idle_interval_ms,
+            self.session_active_interval_ms,
+            self.session_active_threshold_ms,
+        )
+    }
+
     pub fn print_compact(&self) {
         let mut info = format!("{} ({})", self.instance, self.device);
         if let Some(name) = &self.name {
@@ -59,6 +75,12 @@ impl MatterDeviceInfo {
         }
         if let Some(port) = &self.port {
             info += &format!(", port: {}", port);
+        }
+        if let Some(sii) = &self.session_idle_interval_ms {
+            info += &format!(", sii_ms: {}", sii);
+        }
+        if let Some(sai) = &self.session_active_interval_ms {
+            info += &format!(", sai_ms: {}", sai);
         }
         println!("{}", info);
         if !self.ips.is_empty() {
@@ -86,6 +108,13 @@ pub fn parse_txt_records(data: &[u8]) -> Result<HashMap<String, String>> {
         }
     }
     Ok(out)
+}
+
+/// Extract (SII, SAI, SAT) millisecond values from parsed TXT records.
+/// Unparseable values are ignored.
+fn parse_mrp_txt(rec: &HashMap<String, String>) -> (Option<u32>, Option<u32>, Option<u32>) {
+    let get = |key: &str| rec.get(key).and_then(|v| v.parse::<u32>().ok());
+    (get("SII"), get("SAI"), get("SAT"))
 }
 
 fn remove_string_suffix(string: &str, suffix: &str) -> String {
@@ -163,6 +192,9 @@ pub fn to_matter_info2(msg: &DnsMessage, svc: &str) -> Result<Vec<MatterDeviceIn
                 vendor_id: None,
                 product_id: None,
                 port: Some(port),
+                session_idle_interval_ms: None,
+                session_active_interval_ms: None,
+                session_active_threshold_ms: None,
             };
             services.insert(service_name, mi);
         }
@@ -185,6 +217,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     let mut vendor_id = None;
     let mut product_id = None;
     let mut port: Option<u16> = None;
+    let mut mrp = (None, None, None);
 
     let mut matter_service = false;
     let svcname = ".".to_owned() + svc + ".";
@@ -223,6 +256,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
             name = rec.get("DN").cloned();
             discriminator = rec.get("D").cloned();
             pairing_hint = rec.get("PH").cloned();
+            mrp = parse_mrp_txt(&rec);
             if let Some(vp) = rec.get("VP") {
                 let mut split = vp.split("+");
                 vendor_id = split.next().map(str::to_owned);
@@ -256,6 +290,9 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         vendor_id,
         product_id,
         port,
+        session_idle_interval_ms: mrp.0,
+        session_active_interval_ms: mrp.1,
+        session_active_threshold_ms: mrp.2,
     })
 }
 
@@ -489,6 +526,7 @@ pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Res
                 None => None,
             };
     let pairing_hint = txt_info.get("PH").cloned();
+    let (sii, sai, sat) = parse_mrp_txt(&txt_info);
     Ok(MatterDeviceInfo {
         name,
         instance: target.trim_end_matches('.').to_owned(),
@@ -501,5 +539,34 @@ pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Res
         pairing_hint,
         source_ip: "".to_owned(),
         port: Some(port),
+        session_idle_interval_ms: sii,
+        session_active_interval_ms: sai,
+        session_active_threshold_ms: sat,
     })
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn txt_rdata(entries: &[&str]) -> Vec<u8> {
+        let mut out = Vec::new();
+        for e in entries {
+            out.push(e.len() as u8);
+            out.extend_from_slice(e.as_bytes());
+        }
+        out
+    }
+
+    #[test]
+    fn test_parse_mrp_txt() {
+        let rec = parse_txt_records(&txt_rdata(&["SII=5000", "SAI=300", "SAT=4000", "D=840"]))
+            .unwrap();
+        assert_eq!(parse_mrp_txt(&rec), (Some(5000), Some(300), Some(4000)));
+
+        let rec = parse_txt_records(&txt_rdata(&["SII=abc", "D=840"])).unwrap();
+        assert_eq!(parse_mrp_txt(&rec), (None, None, None));
+
+        let rec = parse_txt_records(&txt_rdata(&["D=840"])).unwrap();
+        assert_eq!(parse_mrp_txt(&rec), (None, None, None));
+    }
 }

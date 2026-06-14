@@ -11,20 +11,25 @@ use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{im, messages::{self, Message, ProtocolMessageHeader}, session::Session, transport::ConnectionTrait};
+use crate::{im, messages::{self, Message, ProtocolMessageHeader}, mrp, session::Session, transport::ConnectionTrait};
 
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(1);
 const EXCHANGE_CHANNEL_CAPACITY: usize = 8;
 const SUBSCRIPTION_CHANNEL_CAPACITY: usize = 16;
-const RETRANSMIT_THRESHOLD: Duration = Duration::from_secs(3);
-const MAX_RETRANSMIT_AGE: Duration = Duration::from_secs(10);
 const PARTIAL_REPORT_MAX_AGE: Duration = Duration::from_secs(60);
 
 struct UnackedMessage {
     data: Vec<u8>,
-    original_time: Instant,
-    last_sent: Instant,
+    transmissions: u32,
+    next_retransmit: tokio::time::Instant,
     exchange_id: Option<u16>,
+}
+
+/// Deadline for the first retransmission of a freshly sent message,
+/// per the peer's MRP intervals (spec 4.12 backoff, index 0).
+fn initial_retransmit_deadline(conn: &dyn ConnectionTrait) -> tokio::time::Instant {
+    let base = mrp::base_interval(&conn.mrp_params(), conn.last_received_elapsed());
+    tokio::time::Instant::now() + mrp::backoff_interval(base, 0)
 }
 
 struct ReadLoopState {
@@ -230,11 +235,10 @@ impl ActiveConnection {
         }
         if let Ok((header, _)) = messages::MessageHeader::decode(encoded) {
             let mut unacked = self.unacked.lock().await;
-            let now = Instant::now();
             unacked.insert(header.message_counter, UnackedMessage {
                 data: encoded.to_vec(),
-                original_time: now,
-                last_sent: now,
+                transmissions: 1,
+                next_retransmit: initial_retransmit_deadline(self.transport_conn.as_ref()),
                 exchange_id,
             });
             log::trace!("tracking sent message counter:{}", header.message_counter);
@@ -279,10 +283,24 @@ impl Drop for Exchange<'_> {
 async fn connection_read_loop(ctx: ReadLoopCtx, cancel: CancellationToken) {
     let mut partial_reports: HashMap<u16, PartialReport> = HashMap::new();
     loop {
+        if !ctx.transport_conn.is_reliable() {
+            check_retransmit(&ctx.transport_conn, &ctx.unacked, &ctx.pending_exchanges).await;
+        }
+        // Wake at the earliest pending retransmit deadline, capped at RECEIVE_TIMEOUT.
+        let timeout = {
+            let unacked = ctx.unacked.lock().await;
+            unacked
+                .values()
+                .map(|m| m.next_retransmit)
+                .min()
+                .map(|d| d.saturating_duration_since(tokio::time::Instant::now()))
+                .unwrap_or(RECEIVE_TIMEOUT)
+                .min(RECEIVE_TIMEOUT)
+        };
         tokio::select! {
             _ = cancel.cancelled() => break,
 
-            result = ctx.transport_conn.receive(RECEIVE_TIMEOUT) => {
+            result = ctx.transport_conn.receive(timeout) => {
                 match result {
                     Ok(data) => {
                         log::trace!("received {} bytes", data.len());
@@ -291,9 +309,6 @@ async fn connection_read_loop(ctx: ReadLoopCtx, cancel: CancellationToken) {
                         }
                     }
                     Err(_) => {
-                        if !ctx.transport_conn.is_reliable() {
-                            check_retransmit(&ctx.transport_conn, &ctx.unacked, &ctx.pending_exchanges).await;
-                        }
                         partial_reports.retain(|exchange, partial| {
                             let keep = partial.started.elapsed() < PARTIAL_REPORT_MAX_AGE;
                             if !keep {
@@ -425,11 +440,10 @@ async fn handle_unsolicited_report(
         let encoded = ctx.session.encode_message(&resp)?;
         if !ctx.transport_conn.is_reliable() {
             if let Ok((header, _)) = messages::MessageHeader::decode(&encoded) {
-                let now = Instant::now();
                 ctx.unacked.lock().await.insert(header.message_counter, UnackedMessage {
                     data: encoded.clone(),
-                    original_time: now,
-                    last_sent: now,
+                    transmissions: 1,
+                    next_retransmit: initial_retransmit_deadline(ctx.transport_conn.as_ref()),
                     exchange_id: None,
                 });
             }
@@ -510,22 +524,36 @@ async fn check_retransmit(
     {
         let mut unacked_lock = unacked.lock().await;
         let mut to_remove = Vec::new();
+        let now = tokio::time::Instant::now();
+        let base = mrp::base_interval(
+            &transport_conn.mrp_params(),
+            transport_conn.last_received_elapsed(),
+        );
 
         for (counter, msg) in unacked_lock.iter_mut() {
-            let age = msg.original_time.elapsed();
-            let since_last_send = msg.last_sent.elapsed();
-            log::trace!("counter {} age:{:?} since_last:{:?}", counter, age, since_last_send);
-
-            if age >= MAX_RETRANSMIT_AGE {
-                log::debug!("giving up on counter {} after {:?}", counter, age);
+            if msg.next_retransmit > now {
+                continue;
+            }
+            if msg.transmissions >= mrp::MRP_MAX_TRANSMISSIONS {
+                log::debug!(
+                    "giving up on counter {} after {} transmissions",
+                    counter,
+                    msg.transmissions
+                );
                 if let Some(exch) = msg.exchange_id {
                     pending_exchanges.lock().unwrap().remove(&exch);
                 }
                 to_remove.push(*counter);
-            } else if since_last_send >= RETRANSMIT_THRESHOLD {
-                log::trace!("retransmit counter = {} exchange = {}", counter, msg.exchange_id.unwrap_or(0));
+            } else {
+                log::trace!(
+                    "retransmit counter = {} exchange = {} attempt {}",
+                    counter,
+                    msg.exchange_id.unwrap_or(0),
+                    msg.transmissions + 1
+                );
                 to_retransmit.push(msg.data.clone());
-                msg.last_sent = Instant::now();
+                msg.next_retransmit = now + mrp::backoff_interval(base, msg.transmissions);
+                msg.transmissions += 1;
             }
         }
         for counter in to_remove {

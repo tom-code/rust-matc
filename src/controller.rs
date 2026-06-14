@@ -1027,6 +1027,8 @@ mod tests {
     struct MockConn {
         inbound: tokio::sync::Mutex<mpsc::Receiver<Vec<u8>>>,
         outbound: mpsc::UnboundedSender<Vec<u8>>,
+        reliable: bool,
+        mrp: std::sync::Mutex<crate::mrp::MrpParameters>,
     }
 
     #[async_trait::async_trait]
@@ -1045,7 +1047,13 @@ mod tests {
             }
         }
         fn is_reliable(&self) -> bool {
-            true
+            self.reliable
+        }
+        fn mrp_params(&self) -> crate::mrp::MrpParameters {
+            *self.mrp.lock().unwrap()
+        }
+        fn set_mrp_params(&self, params: crate::mrp::MrpParameters) {
+            *self.mrp.lock().unwrap() = params;
         }
     }
 
@@ -1097,14 +1105,31 @@ mod tests {
             self.tx.send(encoded).await.unwrap();
             header.message_counter
         }
+
+        async fn recv_within(&mut self, d: Duration) -> Option<Message> {
+            match tokio::time::timeout(d, self.rx.recv()).await {
+                Ok(Some(data)) => Some(Message::decode(&data).unwrap()),
+                _ => None,
+            }
+        }
     }
 
     fn mock_pair() -> (Connection, MockDevice) {
+        mock_pair_with(true, Default::default())
+    }
+
+    fn mock_pair_unreliable(mrp: crate::mrp::MrpParameters) -> (Connection, MockDevice) {
+        mock_pair_with(false, mrp)
+    }
+
+    fn mock_pair_with(reliable: bool, mrp: crate::mrp::MrpParameters) -> (Connection, MockDevice) {
         let (to_ctrl_tx, to_ctrl_rx) = mpsc::channel(32);
         let (to_dev_tx, to_dev_rx) = mpsc::unbounded_channel();
         let mock = Arc::new(MockConn {
             inbound: tokio::sync::Mutex::new(to_ctrl_rx),
             outbound: to_dev_tx,
+            reliable,
+            mrp: std::sync::Mutex::new(mrp),
         });
         let conn = Connection::from_parts(mock, session::Session::new());
         let device = MockDevice {
@@ -1374,5 +1399,92 @@ mod tests {
         let val = conn.read_request2(1, 6, 0).await.unwrap();
         assert_eq!(val, TlvItemValue::Bool(true));
         task.await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_retransmit_schedule_and_give_up() {
+        let mrp = crate::mrp::MrpParameters::from_txt_ms(Some(5000), None, None);
+        let (conn, mut device) = mock_pair_unreliable(mrp);
+        let req = tokio::spawn(async move { conn.read_request2(1, 6, 0).await });
+
+        let mut times = Vec::new();
+        let mut counters = Vec::new();
+        for i in 0..crate::mrp::MRP_MAX_TRANSMISSIONS {
+            let msg = device
+                .recv_within(Duration::from_secs(30))
+                .await
+                .unwrap_or_else(|| panic!("missing transmission {}", i));
+            times.push(tokio::time::Instant::now());
+            counters.push(msg.message_header.message_counter);
+        }
+        assert!(counters.iter().all(|c| *c == counters[0]));
+
+        // gap n follows backoff: 5s * 1.1 * 1.6^max(0, n-1) plus up to 25% jitter
+        for (n, w) in times.windows(2).enumerate() {
+            let gap = (w[1] - w[0]).as_secs_f64();
+            let lower = 5.0 * 1.1 * 1.6f64.powi(n.saturating_sub(1) as i32);
+            let upper = lower * 1.25;
+            assert!(
+                gap >= lower - 0.01 && gap <= upper + 0.1,
+                "gap {} = {} not in [{}, {}]",
+                n, gap, lower, upper
+            );
+        }
+
+        // after the final backoff period the exchange is dropped and the request fails
+        let res = req.await.unwrap();
+        assert!(res.is_err(), "request should fail after give-up");
+        assert!(
+            device.recv_within(Duration::from_secs(120)).await.is_none(),
+            "no transmissions expected after give-up"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_retransmit_stops_after_ack() {
+        let (conn, mut device) = mock_pair_unreliable(Default::default());
+        let _req = tokio::spawn(async move { conn.read_request2(1, 6, 0).await });
+
+        let msg = device.recv_within(Duration::from_secs(5)).await.expect("request");
+        let retr = device.recv_within(Duration::from_secs(5)).await.expect("retransmit");
+        assert_eq!(
+            msg.message_header.message_counter,
+            retr.message_header.message_counter
+        );
+
+        device
+            .send(&messages::ack(
+                msg.protocol_header.exchange_id,
+                msg.message_header.message_counter as i64,
+            ).unwrap())
+            .await;
+        assert!(
+            device.recv_within(Duration::from_secs(60)).await.is_none(),
+            "no retransmissions expected after ack"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_retransmit_not_starved_by_inbound_traffic() {
+        let (conn, mut device) = mock_pair_unreliable(Default::default());
+        let _req = tokio::spawn(async move { conn.read_request2(1, 6, 0).await });
+
+        let first = device.recv_within(Duration::from_secs(2)).await.expect("request");
+        let counter = first.message_header.message_counter;
+
+        // keep the read loop busy with inbound messages so it never hits a
+        // receive timeout; the retransmit (due at ~550-690ms) must still fire
+        let mut seen_retransmit = false;
+        for _ in 0..10 {
+            device.send(&messages::ack(0x7777, 999_999).unwrap()).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            while let Ok(data) = device.rx.try_recv() {
+                let m = Message::decode(&data).unwrap();
+                if m.message_header.message_counter == counter {
+                    seen_retransmit = true;
+                }
+            }
+        }
+        assert!(seen_retransmit, "retransmit starved by continuous inbound traffic");
     }
 }

@@ -1,11 +1,28 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Device {
     pub node_id: u64,
     pub address: String,
     pub name: String,
+    /// MRP idle interval advertised by the device (SII, milliseconds)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sii_ms: Option<u32>,
+    /// MRP active interval advertised by the device (SAI, milliseconds)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sai_ms: Option<u32>,
+    /// MRP active threshold advertised by the device (SAT, milliseconds)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sat_ms: Option<u32>,
+}
+
+impl Device {
+    /// MRP timing parameters from the stored SII/SAI/SAT values,
+    /// with spec defaults for missing ones.
+    pub fn mrp_params(&self) -> crate::mrp::MrpParameters {
+        crate::mrp::MrpParameters::from_txt_ms(self.sii_ms, self.sai_ms, self.sat_ms)
+    }
 }
 
 pub(crate) struct DeviceRegistry {
@@ -70,6 +87,21 @@ impl DeviceRegistry {
         self.save()
     }
 
+    pub fn update_mrp(
+        &mut self,
+        node_id: u64,
+        sii_ms: Option<u32>,
+        sai_ms: Option<u32>,
+        sat_ms: Option<u32>,
+    ) -> Result<()> {
+        let dev = self.devices.iter_mut().find(|d| d.node_id == node_id)
+            .context(format!("device {} not found", node_id))?;
+        dev.sii_ms = sii_ms;
+        dev.sai_ms = sai_ms;
+        dev.sat_ms = sat_ms;
+        self.save()
+    }
+
     pub fn rename(&mut self, node_id: u64, name: &str) -> Result<()> {
         // Check for duplicate name
         if let Some(existing) = self.devices.iter().find(|d| d.name == name) {
@@ -103,8 +135,8 @@ mod tests {
         let mut reg = DeviceRegistry::load(&path).unwrap();
         assert!(reg.list().is_empty());
 
-        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into() }).unwrap();
-        reg.add(Device { node_id: 2, address: "1.2.3.5:5540".into(), name: "switch".into() }).unwrap();
+        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into(), ..Default::default() }).unwrap();
+        reg.add(Device { node_id: 2, address: "1.2.3.5:5540".into(), name: "switch".into(), ..Default::default() }).unwrap();
         assert_eq!(reg.list().len(), 2);
 
         // reload from disk
@@ -119,8 +151,8 @@ mod tests {
         let path = test_path("reg_replace");
 
         let mut reg = DeviceRegistry::load(&path).unwrap();
-        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into() }).unwrap();
-        reg.add(Device { node_id: 1, address: "1.2.3.5:5540".into(), name: "light2".into() }).unwrap();
+        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into(), ..Default::default() }).unwrap();
+        reg.add(Device { node_id: 1, address: "1.2.3.5:5540".into(), name: "light2".into(), ..Default::default() }).unwrap();
         assert_eq!(reg.list().len(), 1);
         assert_eq!(reg.get(1).unwrap().name, "light2");
     }
@@ -130,8 +162,8 @@ mod tests {
         let path = test_path("reg_unique");
 
         let mut reg = DeviceRegistry::load(&path).unwrap();
-        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into() }).unwrap();
-        let err = reg.add(Device { node_id: 2, address: "1.2.3.5:5540".into(), name: "light".into() });
+        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into(), ..Default::default() }).unwrap();
+        let err = reg.add(Device { node_id: 2, address: "1.2.3.5:5540".into(), name: "light".into(), ..Default::default() });
         assert!(err.is_err());
     }
 
@@ -140,7 +172,7 @@ mod tests {
         let path = test_path("reg_rename");
 
         let mut reg = DeviceRegistry::load(&path).unwrap();
-        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into() }).unwrap();
+        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into(), ..Default::default() }).unwrap();
         reg.rename(1, "kitchen light").unwrap();
         assert_eq!(reg.get(1).unwrap().name, "kitchen light");
 
@@ -153,7 +185,7 @@ mod tests {
         let path = test_path("reg_remove");
 
         let mut reg = DeviceRegistry::load(&path).unwrap();
-        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into() }).unwrap();
+        reg.add(Device { node_id: 1, address: "1.2.3.4:5540".into(), name: "light".into(), ..Default::default() }).unwrap();
         reg.remove(1).unwrap();
         assert!(reg.list().is_empty());
     }
