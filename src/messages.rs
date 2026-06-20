@@ -652,6 +652,7 @@ pub fn im_write_request(endpoint: u16, cluster: u32, attr: u32, exchange: u16, d
     tlv.write_struct_end()?;
     tlv.write_struct_end()?;
     tlv.write_bool(3, false)?;
+    tlv.write_uint8(0xff, 10)?; // InteractionModelRevision
     tlv.write_struct_end()?;
     Ok(tlv.data)
 }
@@ -786,6 +787,7 @@ pub fn im_status_response(exchange: u16, flags: u8, ack: u32) -> Result<Vec<u8>>
     let mut tlv = tlv::TlvBuffer::from_vec(b);
     tlv.write_anon_struct()?;
     tlv.write_uint8(0, 0)?;
+    tlv.write_uint8(0xff, 10)?; // InteractionModelRevision
     tlv.write_struct_end()?;
     Ok(tlv.data)
 }
