@@ -40,6 +40,8 @@ pub struct MatterDeviceInfo {
     pub session_active_interval_ms: Option<u32>,
     /// MRP active threshold (SAT TXT key, milliseconds)
     pub session_active_threshold_ms: Option<u32>,
+    /// Device type (DT TXT key) from the commissionable advertisement, decimal string.
+    pub device_type: Option<String>,
 }
 
 impl MatterDeviceInfo {
@@ -195,6 +197,7 @@ pub fn to_matter_info2(msg: &DnsMessage, svc: &str) -> Result<Vec<MatterDeviceIn
                 session_idle_interval_ms: None,
                 session_active_interval_ms: None,
                 session_active_threshold_ms: None,
+                device_type: None,
             };
             services.insert(service_name, mi);
         }
@@ -218,6 +221,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
     let mut product_id = None;
     let mut port: Option<u16> = None;
     let mut mrp = (None, None, None);
+    let mut device_type = None;
 
     let mut matter_service = false;
     let svcname = ".".to_owned() + svc + ".";
@@ -256,6 +260,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
             name = rec.get("DN").cloned();
             discriminator = rec.get("D").cloned();
             pairing_hint = rec.get("PH").cloned();
+            device_type = rec.get("DT").cloned();
             mrp = parse_mrp_txt(&rec);
             if let Some(vp) = rec.get("VP") {
                 let mut split = vp.split("+");
@@ -293,6 +298,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         session_idle_interval_ms: mrp.0,
         session_active_interval_ms: mrp.1,
         session_active_threshold_ms: mrp.2,
+        device_type,
     })
 }
 
@@ -526,6 +532,7 @@ pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Res
                 None => None,
             };
     let pairing_hint = txt_info.get("PH").cloned();
+    let device_type = txt_info.get("DT").cloned();
     let (sii, sai, sat) = parse_mrp_txt(&txt_info);
     Ok(MatterDeviceInfo {
         name,
@@ -542,6 +549,7 @@ pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Res
         session_idle_interval_ms: sii,
         session_active_interval_ms: sai,
         session_active_threshold_ms: sat,
+        device_type,
     })
 }
 #[cfg(test)]
