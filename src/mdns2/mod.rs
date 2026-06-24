@@ -43,6 +43,9 @@ struct MdnsServiceInner {
     services: Vec<ServiceRegistration>,
     local_ips_v4: Vec<Ipv4Addr>,
     local_ips_v6: Vec<Ipv6Addr>,
+    /// Device link-local IPv6 -> index of the interface its mDNS reply arrived
+    /// on. That index is the correct scope_id for sending to `fe80::...`.
+    link_local_scopes: std::collections::HashMap<Ipv6Addr, u32>,
 }
 
 const EVENT_CHANNEL_CAPACITY: usize = 256;
@@ -57,6 +60,7 @@ pub struct MdnsService {
 
 async fn recv_loop(
     socket: Arc<UdpSocket>,
+    interface: Option<u32>,
     inner: Arc<Mutex<MdnsServiceInner>>,
     send_tx: UnboundedSender<SendCommand>,
     event_tx: broadcast::Sender<MdnsEvent>,
@@ -101,6 +105,12 @@ async fn recv_loop(
             let mut new_ptr_records = Vec::new();
             for rr in &all_records {
                 state.cache.ingest(rr);
+                // Remember the receive interface for link-local AAAA records
+                if let (Some(idx), mdns::RRData::AAAA(ip)) = (interface, &rr.data) {
+                    if (ip.segments()[0] & 0xffc0) == 0xfe80 {
+                        state.link_local_scopes.insert(*ip, idx);
+                    }
+                }
                 if rr.typ == mdns::TYPE_PTR {
                     if let mdns::RRData::PTR(ref target) = rr.data {
                         new_ptr_records.push((rr.name.clone(), target.clone()));
@@ -212,6 +222,7 @@ impl MdnsService {
             services: Vec::new(),
             local_ips_v4: v4,
             local_ips_v6: v6,
+            link_local_scopes: std::collections::HashMap::new(),
         }));
 
         // Create sockets
@@ -223,6 +234,7 @@ impl MdnsService {
                 Ok(s) => mcast_sockets.push(McastSocket {
                     sock: Arc::new(s),
                     multicast_addr: MDNS_ADDR_V4,
+                    interface: None,
                 }),
                 Err(e) => log::warn!("mdns2: failed to wrap v4 socket: {}", e),
             },
@@ -244,6 +256,7 @@ impl MdnsService {
                             Ok(s) => mcast_sockets.push(McastSocket {
                                 sock: Arc::new(s),
                                 multicast_addr: MDNS_ADDR_V6,
+                                interface: Some(idx),
                             }),
                             Err(e) => {
                                 log::debug!("mdns2: failed to wrap v6 socket idx={}: {}", idx, e)
@@ -264,12 +277,13 @@ impl MdnsService {
         // Spawn recv loops (one per socket)
         for ms in &mcast_sockets {
             let sock = ms.sock.clone();
+            let interface = ms.interface;
             let inner = inner.clone();
             let send_tx = send_tx.clone();
             let event_tx = event_tx.clone();
             let cancel = cancel.child_token();
             tokio::spawn(async move {
-                recv_loop(sock, inner, send_tx, event_tx, cancel).await;
+                recv_loop(sock, interface, inner, send_tx, event_tx, cancel).await;
             });
         }
 
@@ -300,6 +314,10 @@ impl MdnsService {
         });
 
         Ok(service)
+    }
+
+    pub async fn scope_for(&self, ip: &Ipv6Addr) -> Option<u32> {
+        self.inner.lock().await.link_local_scopes.get(ip).copied()
     }
 
     /// Subscribe to discovery events.

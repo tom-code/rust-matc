@@ -108,6 +108,8 @@ pub struct Transport {
 pub struct Connection {
     transport: Arc<Transport>,
     remote_address: String,
+    /// scope_id (interface zone) for a link-local IPv6 peer, from mDNS.
+    scope_id: Option<u32>,
     receiver: Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>,
     generation: u64,
     mrp: std::sync::Mutex<crate::mrp::MrpParameters>,
@@ -142,7 +144,7 @@ impl Transport {
                 .upgrade()
                 .context("weakpointer to self is gone - just stop")?;
             let cons = self_strong.connections.lock().await;
-            if let Some(c) = cons.get(&addr.to_string()) {
+            if let Some(c) = cons.get(&scopeless_key(addr)) {
                 _ = c.sender.send(buf).await;
             }
         }
@@ -206,7 +208,8 @@ impl Transport {
 
     /// Create (or replace) a logical connection entry for the given remote address.
     pub async fn create_connection(self: &Arc<Self>, remote: &str) -> Arc<dyn ConnectionTrait> {
-        let remote = normalize_remote_for_socket(&self.socket, remote);
+        let (remote, scope_id) = split_scope(remote);
+        let remote = normalize_remote_for_socket(&self.socket, &remote);
         let mut clock = self.connections.lock().await;
         let generation = self.next_generation.fetch_add(1, Ordering::Relaxed);
         let (sender, receiver) = tokio::sync::mpsc::channel(32);
@@ -214,6 +217,7 @@ impl Transport {
         Arc::new(Connection {
             transport: self.clone(),
             remote_address: remote,
+            scope_id,
             receiver: Mutex::new(receiver),
             generation,
             mrp: std::sync::Mutex::new(Default::default()),
@@ -223,13 +227,54 @@ impl Transport {
     }
 }
 
+/// True for IPv6 link-local (fe80::/10).
+fn is_link_local_v6(ip: &std::net::Ipv6Addr) -> bool {
+    (ip.segments()[0] & 0xffc0) == 0xfe80
+}
+
+/// Split the zone out of `[fe80::...%<idx>]:port`: returns the zone-less address and the scope_id.
+fn split_scope(remote: &str) -> (String, Option<u32>) {
+    if let Some(pct) = remote.find('%') {
+        let (head, tail) = remote.split_at(pct);
+        let after = &tail[1..];
+        let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let rest = &after[digits.len()..];
+        if let Ok(idx) = digits.parse::<u32>() {
+            return (format!("{head}{rest}"), Some(idx));
+        }
+    }
+    (remote.to_owned(), None)
+}
+
+/// Connection key without the zone.
+fn scopeless_key(addr: SocketAddr) -> String {
+    match addr {
+        // SocketAddrV6 is Copy: `mut v6` copies, so the original addr is untouched.
+        SocketAddr::V6(mut v6) if v6.scope_id() != 0 => {
+            v6.set_scope_id(0);
+            v6.to_string()
+        }
+        _ => addr.to_string(),
+    }
+}
+
 impl Connection {
     /// Send a datagram to the remote address.
     pub async fn send(&self, data: &[u8]) -> Result<()> {
-        self.transport
-            .socket
-            .send_to(data, &self.remote_address)
-            .await?;
+        let socket = &self.transport.socket;
+
+        // For link-local IPv6 attach the scope_id (interface zone from mDNS).
+        if let (Some(scope), Ok(SocketAddr::V6(v6))) =
+            (self.scope_id, self.remote_address.parse::<SocketAddr>())
+        {
+            if is_link_local_v6(v6.ip()) {
+                let target = std::net::SocketAddrV6::new(*v6.ip(), v6.port(), v6.flowinfo(), scope);
+                socket.send_to(data, SocketAddr::V6(target)).await?;
+                return Ok(());
+            }
+        }
+
+        socket.send_to(data, &self.remote_address).await?;
         Ok(())
     }
     /// Receive the next datagram for this connection (with timeout).

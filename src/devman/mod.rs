@@ -289,6 +289,7 @@ impl DeviceManager {
             matter_info.session_active_interval_ms,
             matter_info.session_active_threshold_ms,
         );
+        let scope_id = matter_info.scope_id;
         let ips = matter_info.ips;
         let port = matter_info.port.unwrap_or(5540);
 
@@ -298,11 +299,7 @@ impl DeviceManager {
 
         let mut last_err = anyhow::anyhow!("no IPs to try");
         for ip in &ips {
-            let address = if ip.is_ipv6() {
-                format!("[{}]:{}", ip, port)
-            } else {
-                format!("{}:{}", ip, port)
-            };
+            let address = crate::discover::addr_string(ip, port, scope_id);
             match self.commission_at(&address, passcode, node_id, name, mrp_ms).await {
                 Ok(conn) => return Ok(conn),
                 Err(e) => {
@@ -398,11 +395,7 @@ impl DeviceManager {
         let ip = matter_info.ips.first()
             .context(format!("discovered {} but no IPs in response", instance_name))?;
         let port = matter_info.port.unwrap_or(5540);
-        let address = if ip.is_ipv6() {
-            format!("[{}]:{}", ip, port)
-        } else {
-            format!("{}:{}", ip, port)
-        };
+        let address = crate::discover::addr_string(ip, port, matter_info.scope_id);
 
         self.update_device_address(node_id, &address)?;
         if let Err(e) = self.registry

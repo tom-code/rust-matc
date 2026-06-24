@@ -227,6 +227,9 @@ pub(super) fn get_local_ips() -> (Vec<Ipv4Addr>, Vec<Ipv6Addr>) {
 pub(super) struct McastSocket {
     pub sock: Arc<UdpSocket>,
     pub multicast_addr: &'static str,
+    /// Network interface index (IPv6 sockets); used as the scope_id when sending
+    /// to a device's link-local address. None for IPv4.
+    pub interface: Option<u32>,
 }
 
 pub(super) async fn send_loop(

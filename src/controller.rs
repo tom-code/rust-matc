@@ -386,9 +386,11 @@ impl Controller {
         log::debug!("Operational mDNS discovered device: {:?}", info);
 
         let port = info.port.unwrap_or(5540);
-        let addresses: Vec<String> = info.ips.iter().map(|ip| {
-            if ip.is_ipv6() { format!("[{}]:{}", ip, port) } else { format!("{}:{}", ip, port) }
-        }).collect();
+        let addresses: Vec<String> = info
+            .ips
+            .iter()
+            .map(|ip| crate::discover::addr_string(ip, port, info.scope_id))
+            .collect();
         log::info!("Device discovered at {}", addresses.join(", "));
         Ok(addresses)
     }

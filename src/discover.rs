@@ -42,6 +42,9 @@ pub struct MatterDeviceInfo {
     pub session_active_threshold_ms: Option<u32>,
     /// Device type (DT TXT key) from the commissionable advertisement, decimal string.
     pub device_type: Option<String>,
+    /// scope_id (interface index) for the device's link-local IPv6 addresses: the
+    /// interface on which its mDNS reply arrived. Needed to send to `fe80::...`.
+    pub scope_id: Option<u32>,
 }
 
 impl MatterDeviceInfo {
@@ -198,6 +201,7 @@ pub fn to_matter_info2(msg: &DnsMessage, svc: &str) -> Result<Vec<MatterDeviceIn
                 session_active_interval_ms: None,
                 session_active_threshold_ms: None,
                 device_type: None,
+                scope_id: None,
             };
             services.insert(service_name, mi);
         }
@@ -299,6 +303,7 @@ pub fn to_matter_info(msg: &DnsMessage, svc: &str) -> Result<MatterDeviceInfo> {
         session_active_interval_ms: mrp.1,
         session_active_threshold_ms: mrp.2,
         device_type,
+        scope_id: None,
     })
 }
 
@@ -534,6 +539,19 @@ pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Res
     let pairing_hint = txt_info.get("PH").cloned();
     let device_type = txt_info.get("DT").cloned();
     let (sii, sai, sat) = parse_mrp_txt(&txt_info);
+    // Correct scope_id for link-local addresses: the interface on which mDNS
+    // received the device's reply (see MdnsService::scope_for).
+    let mut scope_id = None;
+    for ip in &ips {
+        if let IpAddr::V6(v6) = ip {
+            if (v6.segments()[0] & 0xffc0) == 0xfe80 {
+                scope_id = mdns.scope_for(v6).await;
+                if scope_id.is_some() {
+                    break;
+                }
+            }
+        }
+    }
     Ok(MatterDeviceInfo {
         name,
         instance: target.trim_end_matches('.').to_owned(),
@@ -550,7 +568,22 @@ pub async fn extract_matter_info(target: &str, mdns: &mdns2::MdnsService) -> Res
         session_active_interval_ms: sai,
         session_active_threshold_ms: sat,
         device_type,
+        scope_id,
     })
+}
+
+/// Build the address string for a UDP connection. For link-local IPv6 it appends
+/// the zone `%<scope_id>` (interface index); without it the OS cannot send to
+/// `fe80::...`.
+pub fn addr_string(ip: &IpAddr, port: u16, scope_id: Option<u32>) -> String {
+    match ip {
+        IpAddr::V6(v6) if (v6.segments()[0] & 0xffc0) == 0xfe80 => match scope_id {
+            Some(idx) => format!("[{}%{}]:{}", v6, idx, port),
+            None => format!("[{}]:{}", v6, port),
+        },
+        IpAddr::V6(v6) => format!("[{}]:{}", v6, port),
+        IpAddr::V4(v4) => format!("{}:{}", v4, port),
+    }
 }
 #[cfg(test)]
 mod tests {
