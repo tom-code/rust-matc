@@ -21,6 +21,14 @@ from .models import (
 )
 
 
+def get_cluster_ids(root) -> List[str]:
+    """Extract cluster IDs from the clusterIds element."""
+    return [cluster_id.attrib['id']
+        for cluster_ids in root.findall('clusterIds')
+        for cluster_id in cluster_ids.findall('clusterId')
+        if 'id' in cluster_id.attrib]
+
+
 def _parse_field_element(field_elem) -> MatterField:
     """Parse a field XML element and return a MatterField object.
 
@@ -62,7 +70,7 @@ class ClusterParser:
         self.tree = ET.parse(xml_file)
         self.root = self.tree.getroot()
         self.cluster_name = self.root.get('name', 'Unknown')
-        self.cluster_id = self.root.get('id', '0x0000')
+        self.cluster_ids = get_cluster_ids(self.root)
 
     def parse_commands(self) -> List[MatterCommand]:
         """Parse all commands from the XML."""
