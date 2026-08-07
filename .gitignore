@@ -3,3 +3,4 @@
 dec.sh
 /target
 src/clusters/xml
+__pycache__/
