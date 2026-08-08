@@ -24,6 +24,8 @@ class MatterType:
         'int16':        ('Int16',       'i16'),
         'int32':        ('Int32',       'i32'),
         'int64':        ('Int64',       'i64'),
+        'single':       ('Float32',     'f32'),
+        'double':       ('Float64',     'f64'),
         'bool':         ('Bool',        'bool'),
         'string':       ('String',      'String'),
         'epoch-s':      ('UInt64',      'u64'),
@@ -61,11 +63,13 @@ class MatterType:
     TLV_TO_RUST = {
         'UInt8': 'u8', 'UInt16': 'u16', 'UInt32': 'u32', 'UInt64': 'u64',
         'Int8': 'i8', 'Int16': 'i16', 'Int32': 'i32', 'Int64': 'i64',
+        'Float32': 'f32', 'Float64': 'f64',
     }
 
     RUST_TO_TLV = {
         'u8': 'UInt8', 'u16': 'UInt16', 'u32': 'UInt32', 'u64': 'UInt64',
         'i8': 'Int8', 'i16': 'Int16', 'i32': 'Int32', 'i64': 'Int64',
+        'f32': 'Float32', 'f64': 'Float64',
     }
 
     @classmethod

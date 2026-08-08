@@ -198,6 +198,9 @@ def _generate_single_value_decoder(attr_type: str, nullable: bool, enums: Option
     elif tlv_type == "OctetString":
         match_pattern = 'tlv::TlvItemValue::OctetString(v)'
         value_expr = 'v.clone()'
+    elif tlv_type.startswith("Float"):
+        match_pattern = 'tlv::TlvItemValue::Float(v)'
+        value_expr = _get_value_cast_expr('*v', attr_type, enums, bitmaps)
     elif tlv_type.startswith("UInt") or tlv_type.startswith("Int"):
         match_pattern = 'tlv::TlvItemValue::Int(v)'
         # Check if this is an enum type
@@ -379,6 +382,10 @@ def _generate_struct_field_assignments(struct_fields: List[Tuple[int, str, str, 
                         None
                     }}
                 }},''')
+        elif field_type == 'single':
+            field_assignments.append(f"                {rust_field_name}: {item_var}.get_float(&[{field_id}]).map(|v| v as f32),")
+        elif field_type == 'double':
+            field_assignments.append(f"                {rust_field_name}: {item_var}.get_float(&[{field_id}]),")
         elif is_numeric_or_id_type(field_type):
             from ..naming import build_numeric_field_assignment
             field_assignments.append(build_numeric_field_assignment(rust_field_name, field_id, field_type, enums=enums, indent='                ', item_var=item_var))

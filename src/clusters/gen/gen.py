@@ -23,7 +23,12 @@ default_types = {
   'enum8': 'u8',
   'enum16': 'u16',
   'epoch-s': 'u64',
-  'int16': 'u16',
+  'int8': 'i8',
+  'int16': 'i16',
+  'int32': 'i32',
+  'int64': 'i64',
+  'single': 'f32',
+  'double': 'f64',
 }
 
 tlv_getters = {

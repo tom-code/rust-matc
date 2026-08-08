@@ -306,6 +306,7 @@ impl TlvItem {
             Some(self)
         }
     }
+
     pub fn get_int(&self, tag: &[u8]) -> Option<u64> {
         let found = self.get(tag);
         if let Some(TlvItemValue::Int(i)) = found {
@@ -314,6 +315,16 @@ impl TlvItem {
             None
         }
     }
+
+    pub fn get_float(&self, tag: &[u8]) -> Option<f64> {
+        let found = self.get(tag);
+        if let Some(TlvItemValue::Float(f)) = found {
+            Some(*f)
+        } else {
+            None
+        }
+    }
+
     pub fn get_t<T>(&self, tag: &[u8]) -> Option<T>
     where
         T: From<TlvItemValue>,
