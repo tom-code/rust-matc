@@ -312,6 +312,21 @@ pub fn parse_dns(data: &[u8], source: std::net::SocketAddr) -> Result<DnsMessage
     })
 }
 
+/// Non-loopback IPv4 addresses of the local interfaces.
+fn ipv4_interfaces() -> Vec<std::net::Ipv4Addr> {
+    let mut ips: Vec<std::net::Ipv4Addr> = if_addrs::get_if_addrs()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|iface| match iface.ip() {
+            std::net::IpAddr::V4(ip) if !ip.is_loopback() => Some(ip),
+            _ => None,
+        })
+        .collect();
+    ips.sort();
+    ips.dedup();
+    ips
+}
+
 async fn discoverv4(
     label: &str,
     qtype: u16,
@@ -325,11 +340,28 @@ async fn discoverv4(
     let addr: std::net::SocketAddrV4 = "0.0.0.0:5353".parse()?;
     stdsocket.bind(&socket2::SockAddr::from(addr))?;
     let maddr: std::net::Ipv4Addr = "224.0.0.251".parse()?;
-    stdsocket.join_multicast_v4(&maddr, &std::net::Ipv4Addr::UNSPECIFIED)?;
+    let query = create_query(label, qtype)?;
+    let group = socket2::SockAddr::from(std::net::SocketAddrV4::new(maddr, 5353));
+    // Join the group and send the query on every IPv4 interface. Using only the OS default
+    // multicast interface (UNSPECIFIED) misses the LAN when the default is a virtual adapter
+    // (Hyper-V/WSL/VPN on Windows, docker bridges on Linux).
+    let mut joined = 0;
+    for ip in ipv4_interfaces() {
+        if let Err(e) = stdsocket.join_multicast_v4(&maddr, &ip) {
+            log::debug!("mdns join on {}: {}", ip, e);
+            continue;
+        }
+        joined += 1;
+        if let Err(e) = stdsocket.set_multicast_if_v4(&ip).and_then(|_| stdsocket.send_to(&query, &group)) {
+            log::debug!("mdns query on {}: {}", ip, e);
+        }
+    }
+    if joined == 0 {
+        stdsocket.join_multicast_v4(&maddr, &std::net::Ipv4Addr::UNSPECIFIED)?;
+        stdsocket.send_to(&query, &group)?;
+    }
     stdsocket.set_nonblocking(true)?;
     let socket = tokio::net::UdpSocket::from_std(stdsocket.into())?;
-    let query = create_query(label, qtype)?;
-    socket.send_to(&query, "224.0.0.251:5353").await?;
     loop {
         let mut buf = vec![0; 9000];
         let (n, addr) = tokio::select! {
