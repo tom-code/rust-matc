@@ -8,12 +8,14 @@
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+use btleplug::api::{ScanFilter, WriteType};
+#[cfg(not(test))]
 use btleplug::{
-    api::{
-        Central, CentralEvent, Manager as _, Peripheral as _, ScanFilter, WriteType,
-    },
+    api::{Central, CentralEvent, Manager as _, Peripheral as _},
     platform::{Manager, Peripheral},
 };
+#[cfg(test)]
+use self::tests::backend::{CentralEvent, Manager, Peripheral};
 use futures::StreamExt;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -51,55 +53,94 @@ pub async fn find_by_discriminator(discriminator: u16, short_match: bool, scan_t
     let adapters = manager.adapters().await.context("listing BLE adapters")?;
     let central = adapters.into_iter().next().context("no BLE adapter found")?;
 
-    let filter = ScanFilter {
-        services: vec![MATTER_SERVICE_UUID],
-    };
-    central.start_scan(filter).await.context("start BLE scan")?;
-
     let mut events = central.events().await.context("BLE event stream")?;
+    // Matter UUID can be present only in service data, which BlueZ's UUID filter can omit.
+    central.start_scan(ScanFilter::default()).await.context("start BLE scan")?;
     let deadline = tokio::time::Instant::now() + scan_timeout;
 
-    loop {
-        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() {
-            bail!("BLE scan timeout: no device with discriminator {} found", discriminator);
-        }
-        let event = tokio::time::timeout(remaining, events.next())
-            .await
-            .context("BLE scan timeout")?
-            .context("BLE event stream ended")?;
+    let found: Result<Peripheral> = async {
+        loop {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
+                bail!("BLE scan timeout: no device with discriminator {} found", discriminator);
+            }
+            let event = tokio::time::timeout(remaining, events.next())
+                .await
+                .context("BLE scan timeout")?
+                .context("BLE event stream ended")?;
 
-        match event {
-            CentralEvent::DeviceDiscovered(id) | CentralEvent::DeviceUpdated(id) => {
-                let peripheral = central.peripheral(&id).await?;
-                let props = match peripheral.properties().await? {
-                    Some(p) => p,
-                    None => continue,
-                };
-                // Look for service data for our UUID
-                let svc_data = props
-                    .service_data
-                    .get(&MATTER_SERVICE_UUID)
-                    .cloned()
-                    .unwrap_or_default();
-                if svc_data.len() < 8 {
-                    continue;
+            let (id, peripheral, svc_data) = match event {
+                CentralEvent::DeviceDiscovered(id) | CentralEvent::DeviceUpdated(id) => {
+                    let peripheral = match central.peripheral(&id).await {
+                        Ok(peripheral) => peripheral,
+                        Err(error) => {
+                            log::debug!(
+                                "Skipping BLE candidate {}: peripheral lookup failed: {:?}",
+                                id, error,
+                            );
+                            continue;
+                        }
+                    };
+                    let props = match peripheral.properties().await {
+                        Ok(Some(props)) => props,
+                        Ok(None) => continue,
+                        Err(error) => {
+                            log::debug!(
+                                "Skipping BLE candidate {}: properties unavailable: {:?}",
+                                id, error,
+                            );
+                            continue;
+                        }
+                    };
+                    (
+                        id,
+                        Some(peripheral),
+                        props.service_data.get(&MATTER_SERVICE_UUID).cloned(),
+                    )
                 }
-                let (disc, vid, pid, cm_flag) = parse_service_data(&svc_data);
-                log::debug!("BLE found device: disc={} vid={} pid={} cm={}", disc, vid, pid, cm_flag);
-                let matches = if short_match {
-                    disc >> 8 == discriminator >> 8
-                } else {
-                    disc == discriminator
-                };
-                if matches {
-                    central.stop_scan().await.ok();
-                    log::debug!("BLE device with matching discriminator found, connecting...");
-                    return connect_peripheral(peripheral).await;
+                CentralEvent::ServiceDataAdvertisement { id, service_data } => {
+                    (id, None, service_data.get(&MATTER_SERVICE_UUID).cloned())
+                }
+                _ => continue,
+            };
+            let Some(svc_data) = svc_data else {
+                continue;
+            };
+            if matches_discriminator(&svc_data, discriminator, short_match) {
+                if let Some(peripheral) = peripheral {
+                    return Ok(peripheral);
+                }
+                match central.peripheral(&id).await {
+                    Ok(peripheral) => return Ok(peripheral),
+                    Err(error) => {
+                        log::debug!(
+                            "Skipping BLE candidate {}: peripheral lookup failed: {:?}",
+                            id, error,
+                        );
+                    }
                 }
             }
-            _ => {}
         }
+    }
+    .await;
+    if let Err(error) = central.stop_scan().await {
+        log::warn!("BLE stop_scan failed: {:?}", error);
+    }
+    let peripheral = found?;
+    log::debug!("BLE device with matching discriminator found, connecting...");
+    connect_peripheral(peripheral).await
+}
+
+fn matches_discriminator(svc_data: &[u8], discriminator: u16, short_match: bool) -> bool {
+    if svc_data.len() < 8 {
+        return false;
+    }
+    let (disc, vid, pid, cm_flag) = parse_service_data(svc_data);
+    log::debug!("BLE found device: disc={} vid={} pid={} cm={}", disc, vid, pid, cm_flag);
+    if short_match {
+        disc >> 8 == discriminator >> 8
+    } else {
+        disc == discriminator
     }
 }
 
@@ -109,18 +150,28 @@ pub async fn scan_commissionable(scan_timeout: Duration) -> Result<Vec<Commissio
     let central = adapters.into_iter().next().context("no BLE adapter found")?;
 
     log::debug!("Starting BLE scan for commissionable devices ({}s timeout)...", scan_timeout.as_secs());
-    central.start_scan(ScanFilter { services: vec![MATTER_SERVICE_UUID] }).await?;
+    // Filter Matter service data below; the UUID need not be in the advertised service list.
+    central.start_scan(ScanFilter::default()).await.context("start BLE scan")?;
     log::debug!("Scanning for BLE devices...");
     tokio::time::sleep(scan_timeout).await;
     log::debug!("BLE scan complete, processing results...");
-    central.stop_scan().await.ok();
+    if let Err(error) = central.stop_scan().await {
+        log::warn!("BLE stop_scan failed: {:?}", error);
+    }
     log::debug!("Retrieving discovered BLE peripherals...");
 
     let mut found = Vec::new();
     for peripheral in central.peripherals().await? {
-        let props = match peripheral.properties().await? {
-            Some(p) => p,
-            None => continue,
+        let props = match peripheral.properties().await {
+            Ok(Some(props)) => props,
+            Ok(None) => continue,
+            Err(error) => {
+                log::debug!(
+                    "Skipping BLE candidate {}: properties unavailable: {:?}",
+                    peripheral.id(), error,
+                );
+                continue;
+            }
         };
         if let Some(svc_data) = props.service_data.get(&MATTER_SERVICE_UUID) {
             if svc_data.len() >= 8 {
@@ -257,3 +308,6 @@ fn hex_dump(data: &[u8]) -> String {
     }
     s.trim_end().to_string()
 }
+
+#[cfg(test)]
+mod tests;
