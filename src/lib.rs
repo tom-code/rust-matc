@@ -283,6 +283,7 @@ pub mod clusters;
 mod commission;
 pub use commission::NetworkCreds;
 pub mod controller;
+pub mod connection_budget;
 pub mod device;
 mod device_messages;
 pub mod devman;

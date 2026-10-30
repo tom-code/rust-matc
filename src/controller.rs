@@ -124,9 +124,33 @@ impl Controller {
         node_id: u64,
         controller_id: u64,
     ) -> Result<session::Session> {
-        if let Some(ses) = self.try_auth_sigma_resume(connection, node_id, controller_id).await? {
-            return Ok(ses);
-        }
+        self.auth_sigma_with_budget(connection, node_id, controller_id, None)
+            .await
+    }
+
+    /// CASE with one caller-owned deadline, including resumption and BUSY waits.
+    /// A deferred BUSY is returned as `connection_budget::ConnectBusy`; it is not
+    /// a stale-address failure and must not trigger immediate rediscovery/retry.
+    pub async fn auth_sigma_with_busy_retry_until(
+        &self,
+        connection: &Arc<dyn ConnectionTrait>,
+        node_id: u64,
+        controller_id: u64,
+        deadline: tokio::time::Instant,
+    ) -> Result<session::Session> {
+        self.auth_sigma_with_budget(connection, node_id, controller_id, Some(deadline))
+            .await
+    }
+
+    async fn auth_sigma_with_budget(
+        &self,
+        connection: &Arc<dyn ConnectionTrait>,
+        node_id: u64,
+        controller_id: u64,
+        deadline: Option<tokio::time::Instant>,
+    ) -> Result<session::Session> {
+        use crate::connection_budget::{ConnectStage, ConnectionBudget};
+        let budget = ConnectionBudget::new(node_id, deadline);
 
         const MAX_BUSY_RETRIES: u32 = 5;
         const DEFAULT_BUSY_WAIT: Duration = Duration::from_millis(3000);
@@ -134,31 +158,63 @@ impl Controller {
 
         let mut busy_retries = 0u32;
         loop {
-            match auth_sigma(connection.as_ref(), &self.fabric, self.certmanager.as_ref(), node_id, controller_id).await {
-                Ok((ses, resumption)) => {
+            let result = match budget
+                .run(
+                    ConnectStage::Resume,
+                    self.try_auth_sigma_resume(connection, node_id, controller_id),
+                )
+                .await
+            {
+                Ok(Some(session)) => return Ok(session),
+                Ok(None) => {
+                    budget
+                        .run(
+                            ConnectStage::Case,
+                            auth_sigma(
+                                connection.as_ref(),
+                                &self.fabric,
+                                self.certmanager.as_ref(),
+                                node_id,
+                                controller_id,
+                            ),
+                        )
+                        .await
+                }
+                Err(error) => Err(error),
+            };
+            match result {
+                Ok((session, resumption)) => {
                     if let Some(record) = resumption {
                         self.resumption.lock().await.insert(node_id, record);
                     }
-                    return Ok(ses);
+                    return Ok(session);
                 }
                 Err(e) => {
                     if let Some(busy) = e.downcast_ref::<SigmaBusy>() {
                         if busy_retries < MAX_BUSY_RETRIES {
-                            let wait = busy.wait_ms
+                            let requested = busy
+                                .wait_ms
                                 .map(|ms| Duration::from_millis(ms.into()))
-                                .unwrap_or(DEFAULT_BUSY_WAIT)
-                                .min(MAX_BUSY_WAIT);
+                                .unwrap_or(DEFAULT_BUSY_WAIT);
+                            // Bounded callers defer instead of shortening a peer's
+                            // minimum wait. Retain the legacy unbounded API cap.
+                            let wait = if deadline.is_some() {
+                                requested
+                            } else {
+                                requested.min(MAX_BUSY_WAIT)
+                            };
                             log::info!(
-                                "CASE responder BUSY, waiting {:?} before retry ({}/{})",
-                                wait, busy_retries + 1, MAX_BUSY_RETRIES
+                                "Matter CASE BUSY node={} wait_ms={} retry={}",
+                                node_id,
+                                wait.as_millis(),
+                                busy_retries + 1
                             );
-                            tokio::time::sleep(wait).await;
+                            budget.busy_wait(wait).await?;
                             busy_retries += 1;
                             continue;
                         }
-                        return Err(e).context(format!(
-                            "still BUSY after {} retries", MAX_BUSY_RETRIES
-                        ));
+                        return Err(e)
+                            .context(format!("still BUSY after {} retries", MAX_BUSY_RETRIES));
                     }
                     return Err(e);
                 }
@@ -201,6 +257,9 @@ impl Controller {
         if sigma2.protocol_header.protocol_id == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
             && sigma2.protocol_header.opcode == messages::ProtocolMessageHeader::OPCODE_STATUS
         {
+            if let Some(status) = sigma2.status_report_info.as_ref().filter(|status| status.is_busy()) {
+                return Err(SigmaBusy { wait_ms: status.minimum_wait_time_ms() }.into());
+            }
             log::debug!(
                 "CASE resume: responder rejected with status report, falling back to full SIGMA (exchange:{} {:?})",
                 exchange,
@@ -1017,6 +1076,10 @@ pub(crate) async fn auth_sigma(
 
     Ok((ses, resumption))
 }
+
+#[cfg(test)]
+#[path = "controller/connect_deadline_tests.rs"]
+mod connect_deadline_tests;
 
 #[cfg(test)]
 mod tests {
