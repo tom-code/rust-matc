@@ -890,11 +890,13 @@ pub(crate) async fn auth_spake(connection: &dyn ConnectionTrait, pin: u32) -> Re
         }
     }
 
-    session.set_encrypt_key(&ctx.encrypt_key.context("encrypt key missing")?);
-    session.set_decrypt_key(&ctx.decrypt_key.context("decrypt key missing")?);
-    session.session_id = p_session as u16;
-    log::debug!("auth_spake ok; session: {}", session.session_id);
-    Ok(session)
+    let mut ses = session::Session::new();
+    ses.my_session_id = session.my_session_id;
+    ses.set_encrypt_key(&ctx.encrypt_key.context("encrypt key missing")?);
+    ses.set_decrypt_key(&ctx.decrypt_key.context("decrypt key missing")?);
+    ses.session_id = p_session as u16;
+    log::debug!("auth_spake ok; session: {}", ses.session_id);
+    Ok(ses)
 }
 
 pub(crate) async fn auth_sigma(
