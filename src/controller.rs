@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+pub use crate::active_connection::RequestTimeout;
 use crate::{
     active_connection::{ActiveConnection, Exchange},
     cert_matter, certmanager, commission, fabric, im,
@@ -396,7 +397,92 @@ impl Controller {
     }
 }
 
+/// Everything needed to invoke one command, passed to [Connection::invoke].
+///
+/// New options are added here as fields rather than as parameters of
+/// [Connection::invoke], so existing call sites keep working. Construct it either
+/// with `..Default::default()`, which stays source compatible when a field is
+/// added, or with [InvokeRequest::new] and the setters, which additionally cannot
+/// leave a required field at zero:
+///
+/// ```no_run
+/// # use matc::controller::{Connection, InvokeRequest};
+/// # use std::time::Duration;
+/// # async fn f(conn: &Connection, payload: &[u8]) -> anyhow::Result<()> {
+/// conn.invoke(InvokeRequest {
+///     endpoint: 0,
+///     cluster: 0x31,
+///     command: 0,
+///     payload,
+///     response_timeout: Some(Duration::from_secs(60)),
+///     ..Default::default()
+/// })
+/// .await?;
+///
+/// conn.invoke(
+///     InvokeRequest::new(0, 0x31, 0)
+///         .payload(payload)
+///         .response_timeout(Duration::from_secs(60)),
+/// )
+/// .await?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone, Copy, Default)]
+pub struct InvokeRequest<'a> {
+    pub endpoint: u16,
+    pub cluster: u32,
+    pub command: u32,
+    /// TLV encoded command fields, empty for commands without arguments.
+    pub payload: &'a [u8],
+    /// Deadline for each message of this transaction. `None` uses the
+    /// connection setting ([Connection::set_response_timeout]), which in turn
+    /// falls back to the MRP-derived default.
+    pub response_timeout: Option<Duration>,
+    /// Run the command as a timed interaction: a TimedRequest with this timeout
+    /// in milliseconds is sent first and its status checked.
+    pub timed_ms: Option<u16>,
+}
+
+impl<'a> InvokeRequest<'a> {
+    pub fn new(endpoint: u16, cluster: u32, command: u32) -> Self {
+        Self {
+            endpoint,
+            cluster,
+            command,
+            ..Default::default()
+        }
+    }
+
+    pub fn payload(self, payload: &'a [u8]) -> Self {
+        Self { payload, ..self }
+    }
+
+    pub fn response_timeout(self, timeout: Duration) -> Self {
+        Self {
+            response_timeout: Some(timeout),
+            ..self
+        }
+    }
+
+    pub fn timed(self, timeout_ms: u16) -> Self {
+        Self {
+            timed_ms: Some(timeout_ms),
+            ..self
+        }
+    }
+}
+
 /// Authenticated virtual connection can be used to send commands to device.
+///
+/// Every message awaited by the methods below is bounded: if the device goes
+/// silent the call fails with [RequestTimeout] instead of hanging. The deadline
+/// restarts on each received message, so multi-message transactions (chunked
+/// reports, subscribe priming) are not cut short while they make progress. It
+/// defaults to the peer's worst-case MRP transmission time plus a processing
+/// allowance. Precedence of the overrides, narrowest first:
+/// [InvokeRequest::response_timeout], then [Connection::set_response_timeout],
+/// then the MRP-derived default.
 impl Connection {
     /// Build a Connection from a transport-layer connection and an established session.
     pub(crate) fn from_parts(conn: Arc<dyn ConnectionTrait>, session: session::Session) -> Self {
@@ -487,6 +573,63 @@ impl Connection {
         }
     }
 
+    /// Invoke command described by [InvokeRequest]. All other invoke methods are
+    /// thin wrappers around this one.
+    ///
+    /// `response_timeout` applies to every message of the transaction and takes
+    /// precedence over [Connection::set_response_timeout]; use it for commands that
+    /// are expected to run long (ScanNetworks, ConnectNetwork, OTA) instead of
+    /// stretching the deadline of the whole connection.
+    pub async fn invoke(&self, req: InvokeRequest<'_>) -> Result<Message> {
+        let exchange: u16 = rand::random();
+        log::debug!(
+            "invoke exch:{} endpoint:{} cluster:{} command:{} timed:{:?}",
+            exchange,
+            req.endpoint,
+            req.cluster,
+            req.command,
+            req.timed_ms
+        );
+        let mut ex = self.active.open_exchange_with(exchange, req.response_timeout);
+
+        if let Some(timeout) = req.timed_ms {
+            let tr = messages::im_timed_request(exchange, timeout)?;
+            ex.send(&tr).await?;
+            let result = ex.recv().await?;
+            if result.protocol_header.protocol_id
+                != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
+                || result.protocol_header.opcode
+                    != messages::ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
+            {
+                return Err(anyhow::anyhow!(
+                    "invoke: unexpected response to timed request {:?}",
+                    result
+                ));
+            }
+            let status = result
+                .tlv
+                .get_int(&[0])
+                .context("invoke: status not found in timed request response")?;
+            if status != 0 {
+                return Err(anyhow::anyhow!(
+                    "invoke: unexpected status {} for timed request",
+                    status
+                ));
+            }
+        }
+
+        let msg = messages::im_invoke_request(
+            req.endpoint,
+            req.cluster,
+            req.command,
+            exchange,
+            req.payload,
+            req.timed_ms.is_some(),
+        )?;
+        ex.send(&msg).await?;
+        ex.recv().await
+    }
+
     /// Invoke command
     pub async fn invoke_request(
         &self,
@@ -495,16 +638,8 @@ impl Connection {
         command: u32,
         payload: &[u8],
     ) -> Result<Message> {
-        let exchange: u16 = rand::random();
-        log::debug!(
-            "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
-            exchange,
-            endpoint,
-            cluster,
-            command
-        );
-        let msg = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, false)?;
-        self.active.request(exchange, &msg).await
+        self.invoke(InvokeRequest::new(endpoint, cluster, command).payload(payload))
+            .await
     }
 
     /// Invoke command and return result TLV
@@ -520,6 +655,7 @@ impl Connection {
         Ok(o.clone())
     }
 
+    /// Write attribute value and check the status in the write response.
     pub async fn write_request(
         &self,
         endpoint: u16,
@@ -687,6 +823,22 @@ impl Connection {
         self.active.set_auto_status_response(enabled);
     }
 
+    /// Override how long to wait for each message of a request/response
+    /// transaction. `None` restores the default, which is derived from the
+    /// peer's advertised MRP intervals (worst-case time to exhaust all MRP
+    /// transmissions plus an allowance for device-side processing).
+    ///
+    /// The deadline applies per awaited message, not per transaction: it
+    /// restarts whenever the device sends something, so chunked reports and
+    /// subscribe transactions are not cut short while they progress.
+    ///
+    /// This is connection wide and stays in effect until changed. To wait longer
+    /// for one slow command only, set [InvokeRequest::response_timeout] instead -
+    /// it takes precedence and cannot leak into other requests.
+    pub fn set_response_timeout(&self, timeout: Option<Duration>) {
+        self.active.set_response_timeout(timeout);
+    }
+
     /// Invoke command with timed interaction
     pub async fn invoke_request_timed(
         &self,
@@ -696,42 +848,12 @@ impl Connection {
         payload: &[u8],
         timeout: u16,
     ) -> Result<Message> {
-        let exchange: u16 = rand::random();
-
-        // Send timed request first
-        let tr = messages::im_timed_request(exchange, timeout)?;
-        let result = self.active.request(exchange, &tr).await?;
-
-        if result.protocol_header.protocol_id
-            != messages::ProtocolMessageHeader::PROTOCOL_ID_INTERACTION
-            || result.protocol_header.opcode
-                != messages::ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP
-        {
-            return Err(anyhow::anyhow!(
-                "invoke_request_timed: unexpected response {:?}",
-                result
-            ));
-        }
-        let status = result
-            .tlv
-            .get_int(&[0])
-            .context("invoke_request_timed: status not found")?;
-        if status != 0 {
-            return Err(anyhow::anyhow!(
-                "invoke_request_timed: unexpected status {}",
-                status
-            ));
-        }
-
-        log::debug!(
-            "invoke_request exch:{} endpoint:{} cluster:{} command:{}",
-            exchange,
-            endpoint,
-            cluster,
-            command
-        );
-        let msg = messages::im_invoke_request(endpoint, cluster, command, exchange, payload, true)?;
-        self.active.request(exchange, &msg).await
+        self.invoke(
+            InvokeRequest::new(endpoint, cluster, command)
+                .payload(payload)
+                .timed(timeout),
+        )
+        .await
     }
 
     /// Receive next unsolicited raw message not handled elsewhere (subscription
@@ -1189,6 +1311,23 @@ mod tests {
         t.data
     }
 
+    fn status_response(exchange: u16, flags: u8) -> Vec<u8> {
+        let b = ProtocolMessageHeader {
+            exchange_flags: flags,
+            opcode: ProtocolMessageHeader::INTERACTION_OPCODE_STATUS_RESP,
+            exchange_id: exchange,
+            protocol_id: ProtocolMessageHeader::PROTOCOL_ID_INTERACTION,
+            ack_counter: 0,
+        }
+        .encode()
+        .unwrap();
+        let mut t = tlv::TlvBuffer::from_vec(b);
+        t.write_anon_struct().unwrap();
+        t.write_uint8(0, 0).unwrap();
+        t.write_struct_end().unwrap();
+        t.data
+    }
+
     fn subscribe_response(exchange: u16, sub_id: u32, max_interval: u16) -> Vec<u8> {
         let b = ProtocolMessageHeader {
             exchange_flags: 0,
@@ -1488,5 +1627,165 @@ mod tests {
             }
         }
         assert!(seen_retransmit, "retransmit starved by continuous inbound traffic");
+    }
+
+    /// Default deadline with spec MRP defaults: worst case transmission time
+    /// (7.051 s at 500 ms base) plus the 2 s processing allowance.
+    const DEFAULT_DEADLINE: Duration = Duration::from_millis(9051);
+
+    #[tokio::test(start_paused = true)]
+    async fn test_request_times_out() {
+        // reliable transport: no MRP give-up, so only the response deadline
+        // can end the wait
+        let (conn, _device) = mock_pair();
+        let start = tokio::time::Instant::now();
+
+        let err = conn.read_request(1, 6, 0).await.unwrap_err();
+
+        let timeout = err
+            .downcast_ref::<RequestTimeout>()
+            .unwrap_or_else(|| panic!("expected RequestTimeout, got: {}", err));
+        assert_eq!(timeout.waited, DEFAULT_DEADLINE);
+        assert_eq!(start.elapsed(), DEFAULT_DEADLINE);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_chunked_report_resets_idle_timer() {
+        let (conn, mut device) = mock_pair();
+        // each gap is below the deadline, their sum is not
+        let gap = DEFAULT_DEADLINE.mul_f64(0.8);
+        let task = tokio::spawn(async move {
+            let req = device.recv().await;
+            let exchange = req.protocol_header.exchange_id;
+            tokio::time::sleep(gap).await;
+            let counter = device
+                .send(&report_data(exchange, FLAGS_RESPONDER, None, &[(1, true)], true, false))
+                .await;
+            device.expect_status_response(ACK_AND_INITIATOR, counter).await;
+            tokio::time::sleep(gap).await;
+            device
+                .send(&report_data(exchange, FLAGS_RESPONDER, None, &[(2, false)], false, true))
+                .await;
+        });
+
+        let start = tokio::time::Instant::now();
+        let val = conn.read_request2(1, 6, 0).await.unwrap();
+
+        assert_eq!(val, TlvItemValue::Bool(true));
+        assert!(start.elapsed() > DEFAULT_DEADLINE, "test did not outlast the deadline");
+        task.await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_response_timeout_override() {
+        let (conn, _device) = mock_pair();
+        conn.set_response_timeout(Some(Duration::from_secs(1)));
+        let start = tokio::time::Instant::now();
+
+        let err = conn.read_request(1, 6, 0).await.unwrap_err();
+
+        assert!(err.downcast_ref::<RequestTimeout>().is_some(), "got: {}", err);
+        assert_eq!(start.elapsed(), Duration::from_secs(1));
+
+        conn.set_response_timeout(None);
+        let start = tokio::time::Instant::now();
+        let _ = conn.read_request(1, 6, 0).await;
+        assert_eq!(start.elapsed(), DEFAULT_DEADLINE, "None must restore the default");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_sleepy_peer_gets_longer_deadline() {
+        let sleepy = crate::mrp::MrpParameters {
+            session_idle_interval: Duration::from_secs(30),
+            ..Default::default()
+        };
+        let (conn, _device) = mock_pair_unreliable(sleepy);
+
+        // a peer this slow must still be waited for well past the default
+        let res = tokio::time::timeout(
+            DEFAULT_DEADLINE * 4,
+            conn.read_request(1, 6, 0),
+        )
+        .await;
+
+        assert!(res.is_err(), "sleepy peer request gave up too early");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_invoke_per_request_timeout() {
+        let (conn, _device) = mock_pair();
+        let start = tokio::time::Instant::now();
+
+        let err = conn
+            .invoke(InvokeRequest::new(1, 6, 1).response_timeout(Duration::from_secs(1)))
+            .await
+            .unwrap_err();
+
+        let timeout = err
+            .downcast_ref::<RequestTimeout>()
+            .unwrap_or_else(|| panic!("expected RequestTimeout, got: {}", err));
+        assert_eq!(timeout.waited, Duration::from_secs(1));
+        assert_eq!(start.elapsed(), Duration::from_secs(1));
+    }
+
+    /// The per-request deadline wins over the connection wide one in both directions.
+    #[tokio::test(start_paused = true)]
+    async fn test_invoke_timeout_precedence() {
+        let (conn, _device) = mock_pair();
+
+        conn.set_response_timeout(Some(Duration::from_secs(30)));
+        let start = tokio::time::Instant::now();
+        let _ = conn
+            .invoke(InvokeRequest::new(1, 6, 1).response_timeout(Duration::from_secs(1)))
+            .await;
+        assert_eq!(start.elapsed(), Duration::from_secs(1));
+
+        conn.set_response_timeout(Some(Duration::from_secs(1)));
+        let start = tokio::time::Instant::now();
+        let _ = conn
+            .invoke(InvokeRequest::new(1, 6, 1).response_timeout(Duration::from_secs(30)))
+            .await;
+        assert_eq!(start.elapsed(), Duration::from_secs(30));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_invoke_without_timeout_uses_connection_default() {
+        let (conn, _device) = mock_pair();
+        let start = tokio::time::Instant::now();
+
+        let _ = conn.invoke(InvokeRequest::new(1, 6, 1)).await;
+        assert_eq!(start.elapsed(), DEFAULT_DEADLINE);
+
+        conn.set_response_timeout(Some(Duration::from_secs(2)));
+        let start = tokio::time::Instant::now();
+        let _ = conn.invoke(InvokeRequest::new(1, 6, 1)).await;
+        assert_eq!(start.elapsed(), Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn test_invoke_timed_sends_timed_request_first() {
+        let (conn, mut device) = mock_pair();
+        let task = tokio::spawn(async move {
+            let tr = device.recv().await;
+            assert_eq!(
+                tr.protocol_header.opcode,
+                ProtocolMessageHeader::INTERACTION_OPCODE_TIMED_REQ
+            );
+            assert_eq!(tr.tlv.get_int(&[0]), Some(1000));
+            let exchange = tr.protocol_header.exchange_id;
+            device.send(&status_response(exchange, FLAGS_RESPONDER)).await;
+
+            let inv = device.recv().await;
+            assert_eq!(
+                inv.protocol_header.opcode,
+                ProtocolMessageHeader::INTERACTION_OPCODE_INVOKE_REQ
+            );
+            assert_eq!(inv.protocol_header.exchange_id, exchange, "timed interaction must stay on one exchange");
+            assert_eq!(inv.tlv.get_bool(&[1]), Some(true), "invoke not marked as timed");
+            device.send(&status_response(exchange, FLAGS_RESPONDER)).await;
+        });
+
+        conn.invoke(InvokeRequest::new(1, 6, 1).timed(1000)).await.unwrap();
+        task.await.unwrap();
     }
 }

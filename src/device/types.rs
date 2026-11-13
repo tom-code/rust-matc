@@ -111,7 +111,7 @@ pub struct PersistedDeviceState {
 }
 
 /// A single attribute value snapshot, encoded as hex TLV.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct AttributeOverride {
     pub endpoint: u16,
     pub cluster: u32,

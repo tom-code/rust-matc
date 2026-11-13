@@ -44,7 +44,8 @@ impl DeviceRegistry {
 
     fn save(&self) -> Result<()> {
         let data = serde_json::to_string_pretty(&self.devices)?;
-        std::fs::write(&self.path, data).context(format!("writing devices to {}", self.path))
+        crate::util::fileutil::write_atomically(&self.path, data.as_bytes())
+            .context(format!("writing devices to {}", self.path))
     }
 
     pub fn add(&mut self, device: Device) -> Result<()> {

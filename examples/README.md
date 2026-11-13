@@ -20,6 +20,9 @@ A feature-rich CLI built on top of `DeviceManager` - the high-level API that han
 | `commission-ble-thread <code> <node_id> <name> <dataset_hex>` | Commission a Thread device over BLE *(requires `--features ble`)* |
 | `list` | List all registered devices |
 | `on/off/toggle <device>` | Send On/Off cluster commands (device by name or node ID) |
+| `read-attribute <device> <endpoint> <cluster> <attribute>` | Read one attribute and print its decoded value |
+| `write-attribute <device> <endpoint> <cluster> <attribute> <value> [--type T]` | Write an attribute; `T` is `string` (default), `bool`, `u8`, `u16`, `u32` or `u64` |
+| `list-attributes <device>` | Read every attribute of every cluster on every endpoint |
 | `remove <device>` | Remove a device from the registry |
 | `rename <device> <new_name>` | Rename a device |
 
@@ -213,6 +216,19 @@ Runs `matc` as a commissionable Matter device: an On/Off light with a custom `Ap
 multiple endpoints, and state persistence. Use a controller (e.g. `devman_demo` or another Matter
 ecosystem) to commission and control it.
 
+All hardcoded values have environment variable overrides, so several instances (or the
+end-to-end test script) can run side by side:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MATC_DEVICE_STATE_DIR` | `device-state` | directory with persisted device state |
+| `MATC_DEVICE_CERT_DIR` | `device-cert` | directory with `dac-cert.pem`, `pai-cert.pem`, `dac-key.pem` |
+| `MATC_DEVICE_LISTEN` | `0.0.0.0:5540` | UDP listen address |
+| `MATC_DEVICE_PIN` | `123456` | commissioning passcode |
+| `MATC_DEVICE_DISCRIMINATOR` | `3840` | commissioning discriminator |
+| `MATC_DEVICE_HOSTNAME` | `111111111111.local` | mDNS hostname |
+| `MATC_DEVICE_ADVERTISE` | `192.168.1.23` | comma separated IPs to advertise, `auto` to let mDNS decide |
+
 
 ### [`device-pki.rs`](device-pki.rs) - Device PKI / Certificate Setup
 
@@ -233,6 +249,23 @@ Low-level debugging helper that sends a raw mDNS response packet supplied as a h
 ```bash
 cargo run --example mdns_send -- <hex_packet>
 ```
+
+
+## End-to-end test
+
+[`scripts/test-device-e2e.sh`](../scripts/test-device-e2e.sh) drives `device.rs` with
+`devman_demo.rs` on the loopback interface. It generates the device attestation PKI and the
+controller CA into a fresh work directory, starts the device, commissions it, verifies
+attribute reads, On/Off/Toggle commands, a write, the full attribute enumeration, and that the
+device state survives a restart. Nothing outside the work directory is touched.
+
+```bash
+scripts/test-device-e2e.sh                 # work dir target/e2e-test, ports 5540 / 5555
+scripts/test-device-e2e.sh --verbose       # show every controller command and debug device logs
+scripts/test-device-e2e.sh --device-port 5541 --controller-port 5556
+```
+
+Logs of the device and of every controller invocation are kept in `<work-dir>/logs`.
 
 
 ## Running Examples

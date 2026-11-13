@@ -1,3 +1,17 @@
+//! Per-exchange message routing, retransmit tracking and duplicate detection
+//! for an authenticated connection.
+//!
+//! Every message awaited on an exchange is bounded by an idle deadline: the
+//! timer is reset whenever a message arrives, so a multi-message transaction
+//! (chunked report, subscribe priming + SubscribeResponse) can run arbitrarily
+//! long as long as the device keeps making progress, while genuine silence
+//! fails with [`RequestTimeout`]. The deadline defaults to the worst-case MRP
+//! transmission time of the peer ([`mrp::max_transmission_time`]) plus an
+//! allowance for device-side processing, which keeps sleepy devices (large
+//! advertised SII) from being cut off early. It can be overridden for the whole
+//! connection ([`ActiveConnection::set_response_timeout`]) or for a single
+//! exchange ([`ActiveConnection::open_exchange_with`]), the latter winning.
+
 use anyhow::{Context, Result};
 use std::{
     collections::HashMap,
@@ -18,6 +32,31 @@ const EXCHANGE_CHANNEL_CAPACITY: usize = 8;
 const SUBSCRIPTION_CHANNEL_CAPACITY: usize = 16;
 const PARTIAL_REPORT_MAX_AGE: Duration = Duration::from_secs(60);
 
+/// Allowance for device-side processing on top of the MRP transport time when
+/// deriving the response deadline.
+const IM_PROCESSING_ALLOWANCE: Duration = Duration::from_secs(2);
+const MIN_RESPONSE_WAIT: Duration = Duration::from_secs(5);
+const MAX_RESPONSE_WAIT: Duration = Duration::from_secs(600);
+
+/// No message arrived on an exchange within the deadline. The deadline is
+/// derived from the peer's advertised MRP intervals unless overridden via
+/// [`crate::controller::Connection::set_response_timeout`].
+#[derive(Debug, Clone, Copy)]
+pub struct RequestTimeout {
+    pub exchange_id: u16,
+    pub waited: Duration,
+}
+impl std::fmt::Display for RequestTimeout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "no response on exchange {} within {:?}",
+            self.exchange_id, self.waited
+        )
+    }
+}
+impl std::error::Error for RequestTimeout {}
+
 struct UnackedMessage {
     data: Vec<u8>,
     transmissions: u32,
@@ -30,6 +69,15 @@ struct UnackedMessage {
 fn initial_retransmit_deadline(conn: &dyn ConnectionTrait) -> tokio::time::Instant {
     let base = mrp::base_interval(&conn.mrp_params(), conn.last_received_elapsed());
     tokio::time::Instant::now() + mrp::backoff_interval(base, 0)
+}
+
+/// How long to wait for a single message on an exchange, derived from the
+/// peer's MRP intervals: worst case time to exhaust all transmissions plus an
+/// allowance for the device to process the request.
+fn derived_response_wait(conn: &dyn ConnectionTrait) -> Duration {
+    let base = mrp::base_interval(&conn.mrp_params(), conn.last_received_elapsed());
+    (mrp::max_transmission_time(base) + IM_PROCESSING_ALLOWANCE)
+        .clamp(MIN_RESPONSE_WAIT, MAX_RESPONSE_WAIT)
 }
 
 struct ReadLoopState {
@@ -74,6 +122,9 @@ pub struct ActiveConnection {
     // When set, the read loop replies to unsolicited ReportData with an IM StatusResponse.
     auto_status_response: Arc<AtomicBool>,
 
+    // Overrides the MRP-derived response deadline when set.
+    response_timeout: std::sync::Mutex<Option<Duration>>,
+
     // Fired by Drop to permanently shut down the read loop.
     cancel: CancellationToken,
     // Current read loop task; replaced on each reauth.
@@ -117,6 +168,7 @@ impl ActiveConnection {
             event_rx: Mutex::new(event_rx),
             subscriptions,
             auto_status_response,
+            response_timeout: std::sync::Mutex::new(None),
             cancel,
             read_loop_state: Mutex::new(Some(ReadLoopState { pause, handle })),
         }
@@ -186,13 +238,32 @@ impl ActiveConnection {
     /// routed to the returned handle until it is dropped. Allows multi-message
     /// transactions (chunked reports, subscribe priming + response).
     pub(crate) fn open_exchange(&self, exchange_id: u16) -> Exchange<'_> {
+        self.open_exchange_with(exchange_id, None)
+    }
+
+    /// Open an exchange with its own response deadline, which takes precedence
+    /// over [`ActiveConnection::set_response_timeout`] and the MRP-derived default.
+    pub(crate) fn open_exchange_with(
+        &self,
+        exchange_id: u16,
+        response_timeout: Option<Duration>,
+    ) -> Exchange<'_> {
         let (tx, rx) = mpsc::channel(EXCHANGE_CHANNEL_CAPACITY);
         self.pending_exchanges.lock().unwrap().insert(exchange_id, tx);
-        Exchange { conn: self, id: exchange_id, rx }
+        Exchange { conn: self, id: exchange_id, rx, response_timeout }
     }
 
     pub async fn request(&self, exchange_id: u16, data: &[u8]) -> Result<Message> {
-        let mut exchange = self.open_exchange(exchange_id);
+        self.request_with(exchange_id, data, None).await
+    }
+
+    pub async fn request_with(
+        &self,
+        exchange_id: u16,
+        data: &[u8],
+        response_timeout: Option<Duration>,
+    ) -> Result<Message> {
+        let mut exchange = self.open_exchange_with(exchange_id, response_timeout);
         exchange.send(data).await?;
         exchange.recv().await
     }
@@ -215,6 +286,22 @@ impl ActiveConnection {
     /// ReportData (enabled by default).
     pub fn set_auto_status_response(&self, enabled: bool) {
         self.auto_status_response.store(enabled, Ordering::Relaxed);
+    }
+
+    /// Override the per-message response deadline for every exchange on this
+    /// connection; `None` restores the MRP-derived default. An exchange opened
+    /// with its own deadline ([`ActiveConnection::open_exchange_with`]) ignores this.
+    pub fn set_response_timeout(&self, timeout: Option<Duration>) {
+        *self.response_timeout.lock().unwrap() = timeout;
+    }
+
+    /// Deadline for a single message on an exchange: the override if set,
+    /// otherwise derived from the peer's MRP parameters.
+    fn response_wait(&self) -> Duration {
+        match *self.response_timeout.lock().unwrap() {
+            Some(t) => t,
+            None => derived_response_wait(self.transport_conn.as_ref()),
+        }
     }
 
     pub async fn recv_event(&self) -> Option<Message> {
@@ -259,6 +346,7 @@ pub(crate) struct Exchange<'a> {
     conn: &'a ActiveConnection,
     pub(crate) id: u16,
     rx: mpsc::Receiver<Message>,
+    response_timeout: Option<Duration>,
 }
 
 impl Exchange<'_> {
@@ -266,11 +354,17 @@ impl Exchange<'_> {
         self.conn.send_internal(self.id, data).await
     }
 
+    /// Wait for the next message on this exchange. Bounded by this exchange's
+    /// deadline if it has one, otherwise by the connection's; the timer restarts
+    /// on every call, so a transaction that keeps making progress is never cut short.
     pub(crate) async fn recv(&mut self) -> Result<Message> {
-        self.rx
-            .recv()
-            .await
-            .context("channel closed while waiting for response")
+        let waited = self
+            .response_timeout
+            .unwrap_or_else(|| self.conn.response_wait());
+        match tokio::time::timeout(waited, self.rx.recv()).await {
+            Ok(msg) => msg.context("channel closed while waiting for response"),
+            Err(_) => Err(RequestTimeout { exchange_id: self.id, waited }.into()),
+        }
     }
 }
 

@@ -94,6 +94,24 @@ pub fn backoff_interval(base: Duration, retransmission_index: u32) -> Duration {
     Duration::from_secs_f64(t)
 }
 
+/// Worst-case wall time to exhaust all [`MRP_MAX_TRANSMISSIONS`] of a single
+/// message: the sum of every backoff interval at maximum jitter. Deterministic
+/// counterpart to [`backoff_interval`] (which draws random jitter and so cannot
+/// be summed), used to derive response deadlines. With the default 500 ms idle
+/// interval this is about 7 s.
+pub fn max_transmission_time(base: Duration) -> Duration {
+    let total: f64 = (0..MRP_MAX_TRANSMISSIONS)
+        .map(|n| {
+            let exponent = n.saturating_sub(MRP_BACKOFF_THRESHOLD);
+            base.as_secs_f64()
+                * MRP_BACKOFF_MARGIN
+                * MRP_BACKOFF_BASE.powi(exponent as i32)
+                * (1.0 + MRP_BACKOFF_JITTER)
+        })
+        .sum();
+    Duration::from_secs_f64(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +167,26 @@ mod tests {
             assert!(lower >= prev_lower);
             prev_lower = lower;
         }
+    }
+
+    #[test]
+    fn test_max_transmission_time() {
+        let base = Duration::from_millis(500);
+        let max = max_transmission_time(base);
+        // 0.5 * 1.1 * (1 + 1 + 1.6 + 2.56 + 4.096) * 1.25
+        assert!((max.as_secs_f64() - 7.051).abs() < 1e-3, "got {:?}", max);
+
+        // Must bound any actual sequence of jittered intervals.
+        for _ in 0..100 {
+            let sampled: Duration = (0..MRP_MAX_TRANSMISSIONS)
+                .map(|n| backoff_interval(base, n))
+                .sum();
+            assert!(sampled <= max, "sampled {:?} exceeds max {:?}", sampled, max);
+        }
+
+        assert_eq!(max_transmission_time(Duration::ZERO), Duration::ZERO);
+        // Scales linearly with the base interval.
+        let double = max_transmission_time(Duration::from_millis(1000));
+        assert!((double.as_secs_f64() - 2.0 * max.as_secs_f64()).abs() < 1e-6);
     }
 }

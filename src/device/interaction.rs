@@ -276,6 +276,7 @@ impl Device {
                     .await
             }
             _ => {
+                let persisted_before = self.collect_attribute_overrides();
                 let mut ctx = super::AttrContext {
                     attributes: &mut self.attributes,
                     dirty: &mut self.dirty_attributes,
@@ -287,6 +288,7 @@ impl Device {
                     &invoke_tlv,
                     &mut ctx,
                 );
+                self.save_if_persisted_attributes_changed(&persisted_before);
                 let status_code = match result {
                     super::CommandResult::Success => 0u16,
                     super::CommandResult::Error(code) => code,
@@ -471,6 +473,7 @@ impl Device {
         // tag 2 = WriteRequests array; within each AttributeDataIB: tag 1 = AttributePathIB,
         // then tag 2 = Endpoint, tag 3 = Cluster, tag 4 = Attribute.
         let mut paths: Vec<(u16, u32, u32)> = Vec::new();
+        let persisted_before = self.collect_attribute_overrides();
         if let std::result::Result::Ok(write_tlv) = tlv::decode_tlv(proto_payload) {
             if let Some(writes_item) = write_tlv.get_item(&[2]) {
                 if let tlv::TlvItemValue::List(entries) = &writes_item.value {
@@ -492,6 +495,7 @@ impl Device {
                 }
             }
         }
+        self.save_if_persisted_attributes_changed(&persisted_before);
         let resp = device_messages::im_write_response_success(
             proto_header.exchange_id,
             msg_header.message_counter as i64,

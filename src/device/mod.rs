@@ -78,6 +78,9 @@ pub struct Device {
     pub(crate) mdns: Arc<crate::mdns2::MdnsService>,
     /// Extra attributes to include in persistence (registered by user code).
     pub(crate) extra_persisted: Vec<(u16, u32, u32)>,
+    /// Attribute values loaded from persisted state, re-applied when [`Device::run`] starts so
+    /// that defaults the application sets after construction do not overwrite them.
+    pub(crate) restored_attributes: Vec<types::AttributeOverride>,
 }
 
 impl Device {
@@ -109,6 +112,7 @@ impl Device {
             dirty_attributes: HashSet::new(),
             mdns,
             extra_persisted: Vec::new(),
+            restored_attributes: Vec::new(),
         };
         device.setup_default_attributes()?;
         device.dirty_attributes.clear();
@@ -158,6 +162,7 @@ impl Device {
 
     pub async fn run(&mut self, handler: &mut dyn AppHandler) -> Result<()> {
         let mut buf = [0u8; 4096];
+        self.apply_restored_attributes();
         log::info!(
             "Device listening on {} (PIN: {})",
             self.config.listen_address,
@@ -247,13 +252,36 @@ impl Device {
             if self.unencrypted_reception.len() > 16 {
                 self.unencrypted_reception.clear();
             }
+            let opens_session = messages::ProtocolMessageHeader::decode(&rest)
+                .map(|(h, _)| {
+                    h.protocol_id == messages::ProtocolMessageHeader::PROTOCOL_ID_SECURE_CHANNEL
+                        && matches!(
+                            h.opcode,
+                            messages::ProtocolMessageHeader::OPCODE_PBKDF_REQ
+                                | messages::ProtocolMessageHeader::OPCODE_CASE_SIGMA1
+                        )
+                })
+                .unwrap_or(false);
             let state = self.unencrypted_reception.entry(peer).or_default();
             if !state.counter_is_new(msg_header.message_counter) {
-                log::debug!(
-                    "Dropping duplicate unencrypted message counter={}",
-                    msg_header.message_counter
-                );
-                return Ok(());
+                // PBKDFParamRequest and Sigma1 open a new unsecured session context, for which
+                // the initiator picks a fresh random message counter. A counter outside the
+                // replay window on such a message means the peer restarted, not a replay of
+                // this handshake, so the reception state starts over.
+                if opens_session && state.counter_is_out_of_window(msg_header.message_counter) {
+                    log::debug!(
+                        "Peer {:016x} restarted its unsecured session, resetting counter state",
+                        peer
+                    );
+                    *state = session::MessageReceptionState::default();
+                    state.counter_is_new(msg_header.message_counter);
+                } else {
+                    log::debug!(
+                        "Dropping duplicate unencrypted message counter={}",
+                        msg_header.message_counter
+                    );
+                    return Ok(());
+                }
             }
             rest
         };

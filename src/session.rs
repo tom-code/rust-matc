@@ -11,6 +11,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 /// of the MSG_COUNTER_WINDOW_SIZE counters below it. Counters older than the
 /// window are rejected. No-rollover semantics (secure unicast counters never
 /// wrap; initial counters are random in [1, 2^28]).
+///
+/// The state belongs to one counter space. A secure session gets its own space, so the state
+/// is reset when the session's decryption key is installed ([`Session::set_decrypt_key`]).
 #[derive(Default)]
 pub(crate) struct MessageReceptionState {
     max_counter: u32,
@@ -53,6 +56,12 @@ impl MessageReceptionState {
         self.window |= bit;
         true
     }
+
+    /// True if `counter` is older than the replay window, so it cannot be told apart from a
+    /// counter freshly picked by a peer that restarted.
+    pub(crate) fn counter_is_out_of_window(&self, counter: u32) -> bool {
+        self.initialized && counter < self.max_counter && (self.max_counter - counter) > 32
+    }
 }
 
 pub struct Session {
@@ -85,8 +94,13 @@ impl Session {
     pub fn set_encrypt_key(&mut self, k: &[u8]) {
         self.encrypt_key = Some(*crypto_common::Key::<Aes128Ccm>::from_slice(k))
     }
+    /// Installs the decryption key. A secure session has its own message counter space, which
+    /// the peer starts at a fresh random value, so the reception state of the unencrypted
+    /// handshake that established the session must not be applied to it.
     pub fn set_decrypt_key(&mut self, k: &[u8]) {
-        self.decrypt_key = Some(*crypto_common::Key::<Aes128Ccm>::from_slice(k))
+        self.decrypt_key = Some(*crypto_common::Key::<Aes128Ccm>::from_slice(k));
+        *self.reception_state.lock().unwrap_or_else(|e| e.into_inner()) =
+            MessageReceptionState::default();
     }
 
     pub fn encode_message(&self, data: &[u8]) -> Result<Vec<u8>> {
@@ -196,6 +210,26 @@ mod tests {
         for c in 100..=105 {
             assert!(!s.counter_is_new(c), "counter {} must be duplicate", c);
         }
+    }
+
+    #[test]
+    fn out_of_window_detection() {
+        let mut s = MessageReceptionState::default();
+        assert!(!s.counter_is_out_of_window(100));
+        assert!(s.counter_is_new(1000));
+        assert!(s.counter_is_out_of_window(900));
+        assert!(!s.counter_is_out_of_window(1000 - 32));
+        assert!(!s.counter_is_out_of_window(2000));
+    }
+
+    /// A secure session has its own counter space: the peer picks a fresh random counter for
+    /// it, which is not comparable with the counters of the handshake that established it.
+    #[test]
+    fn decrypt_key_resets_reception_state() {
+        let mut s = super::Session::new();
+        assert!(s.counter_is_new(4_000_000));
+        s.set_decrypt_key(&[0u8; 16]);
+        assert!(s.counter_is_new(1_000));
     }
 
     #[test]

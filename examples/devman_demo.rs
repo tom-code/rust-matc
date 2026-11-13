@@ -158,6 +158,17 @@ enum Commands {
         /// Device name or node ID
         device: String,
     },
+    /// Read a single attribute and print its decoded value
+    ReadAttribute {
+        /// Device name or node ID
+        device: String,
+        /// Endpoint ID
+        endpoint: u16,
+        /// Cluster ID
+        cluster: u32,
+        /// Attribute ID
+        attribute: u32,
+    },
     /// Write attribute
     WriteAttribute {
         /// Device name or node ID
@@ -170,6 +181,9 @@ enum Commands {
         attribute: u32,
         /// Value to write
         value: String,
+        /// Value type: string, bool, u8, u16, u32 or u64
+        #[clap(long = "type", default_value = "string")]
+        value_type: String,
     },
     /// Remove device from registry
     Remove {
@@ -463,12 +477,26 @@ async fn main() -> Result<()> {
             dm.rename_device(node_id, &new_name)?;
             println!("Renamed device (node {}) to '{}'", node_id, new_name);
         }
-        Commands::WriteAttribute { device, endpoint, cluster, attribute, value } => {
+        Commands::ReadAttribute { device, endpoint, cluster, attribute } => {
+            let dm = DeviceManager::load(data_dir).await?;
+            let conn = connect_by_name_or_id(&dm, &device).await?;
+            let out = conn.read_request2(endpoint, cluster, attribute).await?;
+            println!("{}", clusters::codec::decode_attribute_json(cluster, attribute, &out));
+        }
+        Commands::WriteAttribute { device, endpoint, cluster, attribute, value, value_type } => {
             let dm = DeviceManager::load(data_dir).await?;
             let conn = connect_by_name_or_id(&dm, &device).await?;
             println!("Writing attribute 0x{:x} on cluster 0x{:x} at endpoint {} of device '{}'", attribute, cluster, endpoint, device);
             let mut tlv_value = tlv::TlvBuffer::new();
-            tlv_value.write_string(2, &value)?;
+            match value_type.as_str() {
+                "string" => tlv_value.write_string(2, &value)?,
+                "bool" => tlv_value.write_bool(2, value.parse()?)?,
+                "u8" => tlv_value.write_uint8(2, value.parse()?)?,
+                "u16" => tlv_value.write_uint16(2, value.parse()?)?,
+                "u32" => tlv_value.write_uint32(2, value.parse()?)?,
+                "u64" => tlv_value.write_uint64(2, value.parse()?)?,
+                other => anyhow::bail!("unsupported value type '{}'", other),
+            }
             conn.write_request(endpoint, cluster, attribute, &tlv_value.data).await?;
             println!("Write successful");
         },

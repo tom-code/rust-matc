@@ -5,6 +5,7 @@ use std::sync::atomic::AtomicU32;
 use anyhow::{Context, Result};
 
 use crate::fabric;
+use crate::util::fileutil::write_atomically;
 
 use super::Device;
 use super::types::{AttributeOverride, DeviceConfig, FabricInfo, PersistedDeviceState, PersistedFabricState};
@@ -32,6 +33,47 @@ impl Device {
         let key = (endpoint, cluster, attribute);
         if !self.extra_persisted.contains(&key) {
             self.extra_persisted.push(key);
+        }
+    }
+
+    /// Re-apply attribute values loaded from persisted state. Called when the receive loop
+    /// starts, at which point the application has registered its endpoints and default values;
+    /// only attributes registered for persistence are restored.
+    pub(crate) fn apply_restored_attributes(&mut self) {
+        for ov in std::mem::take(&mut self.restored_attributes) {
+            let key = (ov.endpoint, ov.cluster, ov.attribute);
+            if !PERSISTED_ATTRIBUTES.contains(&key) && !self.extra_persisted.contains(&key) {
+                continue;
+            }
+            match hex::decode(&ov.tlv_hex) {
+                std::result::Result::Ok(tlv) => {
+                    self.attributes.insert(key, tlv);
+                }
+                std::result::Result::Err(e) => log::warn!(
+                    "Ignoring persisted value for ({},{:#06x},{:#06x}): {}",
+                    ov.endpoint,
+                    ov.cluster,
+                    ov.attribute,
+                    e
+                ),
+            }
+        }
+        self.dirty_attributes.clear();
+    }
+
+    /// Save the state when an attribute registered with [`Device::add_persisted_attribute`]
+    /// changed since `before`, so application state survives a restart. Does nothing when the
+    /// device runs without a state directory or is not commissioned yet.
+    pub(crate) fn save_if_persisted_attributes_changed(&self, before: &[AttributeOverride]) {
+        let state_dir = match self.config.state_dir.as_deref() {
+            Some(dir) => dir,
+            None => return,
+        };
+        if self.fabrics.is_empty() || self.collect_attribute_overrides() == before {
+            return;
+        }
+        if let Err(e) = self.save_state(state_dir) {
+            log::warn!("Cannot persist attribute state: {:?}", e);
         }
     }
 
@@ -72,7 +114,8 @@ impl Device {
         std::fs::create_dir_all(state_dir)?;
         let path = format!("{}/device_state.json", state_dir);
         let json = serde_json::to_string_pretty(&state)?;
-        std::fs::write(&path, json)?;
+        write_atomically(&path, json.as_bytes())
+            .with_context(|| format!("Cannot write device state to {}", path))?;
         log::info!("Device state saved to {}", path);
         Ok(())
     }
@@ -183,6 +226,7 @@ impl Device {
             dirty_attributes: HashSet::new(),
             mdns,
             extra_persisted: Vec::new(),
+            restored_attributes: Vec::new(),
         };
 
         device.setup_default_attributes()?;
@@ -195,6 +239,8 @@ impl Device {
                 .with_context(|| format!("Bad tlv_hex for ({},{},{})", ov.endpoint, ov.cluster, ov.attribute))?;
             device.attributes.insert((ov.endpoint, ov.cluster, ov.attribute), tlv);
         }
+
+        device.restored_attributes = state.attribute_overrides;
 
         // Rebuild Fabrics and CommissionedFabrics from the restored fabric list.
         device.rebuild_fabrics_attribute()?;

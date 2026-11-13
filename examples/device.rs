@@ -1,7 +1,23 @@
+//! On/Off light device example.
+//!
+//! Runs `matc` as a commissionable Matter device. Defaults match the values used in the
+//! documentation; every one of them can be overridden with an environment variable so that
+//! several instances (or automated tests) can run side by side:
+//!
+//! | Variable | Default | Meaning |
+//! |---|---|---|
+//! | `MATC_DEVICE_STATE_DIR` | `device-state` | directory with persisted device state |
+//! | `MATC_DEVICE_CERT_DIR` | `device-cert` | directory with `dac-cert.pem`, `pai-cert.pem`, `dac-key.pem` |
+//! | `MATC_DEVICE_LISTEN` | `0.0.0.0:5540` | UDP listen address |
+//! | `MATC_DEVICE_PIN` | `123456` | commissioning passcode |
+//! | `MATC_DEVICE_DISCRIMINATOR` | `3840` | commissioning discriminator |
+//! | `MATC_DEVICE_HOSTNAME` | `111111111111.local` | mDNS hostname |
+//! | `MATC_DEVICE_ADVERTISE` | `192.168.1.23` | comma separated IPs to advertise, `auto` to let mDNS decide |
 use anyhow::Result;
 use matc::clusters::defs::*;
 use matc::device::{AppHandler, AttrContext, CommandResult, Device, DeviceConfig};
 use matc::tlv;
+use std::net::IpAddr;
 
 
 struct OnOffHandler;
@@ -95,6 +111,39 @@ fn setup_app_endpoints(device: &mut Device) -> Result<()> {
     Ok(())
 }
 
+fn env_str(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_owned())
+}
+
+fn env_parse<T>(key: &str, default: T) -> Result<T>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    match std::env::var(key) {
+        Ok(v) => v
+            .parse()
+            .map_err(|e| anyhow::anyhow!("invalid value of {}: {}", key, e)),
+        Err(_) => Ok(default),
+    }
+}
+
+fn env_advertise_addresses() -> Result<Option<Vec<IpAddr>>> {
+    let value = env_str("MATC_DEVICE_ADVERTISE", "192.168.1.23");
+    if value.is_empty() || value == "auto" {
+        return Ok(None);
+    }
+    let mut out = Vec::new();
+    for addr in value.split(',') {
+        out.push(
+            addr.trim()
+                .parse()
+                .map_err(|e| anyhow::anyhow!("invalid value of MATC_DEVICE_ADVERTISE: {}", e))?,
+        );
+    }
+    Ok(Some(out))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::new()
@@ -105,17 +154,18 @@ async fn main() -> Result<()> {
         .init();
 
     let mdns = matc::mdns2::MdnsService::new().await.unwrap();
-    let state_dir = "device-state".to_string();
+    let state_dir = env_str("MATC_DEVICE_STATE_DIR", "device-state");
+    let cert_dir = env_str("MATC_DEVICE_CERT_DIR", "device-cert");
     let config = DeviceConfig {
-        pin: 123456,
-        discriminator: 3840,
-        listen_address: "0.0.0.0:5540".to_string(),
+        pin: env_parse("MATC_DEVICE_PIN", 123456)?,
+        discriminator: env_parse("MATC_DEVICE_DISCRIMINATOR", 3840)?,
+        listen_address: env_str("MATC_DEVICE_LISTEN", "0.0.0.0:5540"),
         vendor_id: 0xFFF1,
         product_id: 0x8000,
-        dac_cert_path: "device-cert/dac-cert.pem".to_string(),
-        pai_cert_path: "device-cert/pai-cert.pem".to_string(),
-        dac_key_path: "device-cert/dac-key.pem".to_string(),
-        hostname: "111111111111.local".to_string(),
+        dac_cert_path: format!("{}/dac-cert.pem", cert_dir),
+        pai_cert_path: format!("{}/pai-cert.pem", cert_dir),
+        dac_key_path: format!("{}/dac-key.pem", cert_dir),
+        hostname: env_str("MATC_DEVICE_HOSTNAME", "111111111111.local"),
         state_dir: Some(state_dir.clone()),
         vendor_name: "YUTANI".to_string(),
         product_name: "ForeverLight".to_string(),
@@ -123,7 +173,7 @@ async fn main() -> Result<()> {
         software_version: 3,
         serial_number: "YULISN00001".to_string(),
         unique_id: "YULIUID00001".to_string(),
-        advertise_addresses: Some(["192.168.1.23".parse().unwrap()].to_vec()),
+        advertise_addresses: env_advertise_addresses()?,
     };
     println!("Device listening on {}", config.listen_address);
 
@@ -133,7 +183,7 @@ async fn main() -> Result<()> {
             d
         }
         Err(_) => {
-            println!("No saved state found — starting fresh");
+            println!("No saved state found - starting fresh");
             println!(
                 "manual pairing code: {}",
                 matc::onboarding::encode_manual_pairing_code(&matc::onboarding::OnboardingInfo {
