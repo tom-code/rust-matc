@@ -425,6 +425,25 @@ fn read_tag(tagctrl: u8, cursor: &mut Cursor<&[u8]>) -> Result<u8> {
     }
 }
 
+fn read_value_bytes(cursor: &mut Cursor<&[u8]>, size: u64) -> Result<Vec<u8>> {
+    let remaining = (cursor.get_ref().len() as u64).saturating_sub(cursor.position());
+    if size > remaining {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "TLV value length exceeds remaining input",
+        ));
+    }
+    let size = usize::try_from(size).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "TLV value length does not fit usize",
+        )
+    })?;
+    let mut value = vec![0; size];
+    cursor.read_exact(&mut value)?;
+    Ok(value)
+}
+
 fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()> {
     while cursor.position() < cursor.get_ref().len() as u64 {
         let fb = cursor.read_u8()?;
@@ -529,8 +548,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             TYPE_UTF8_L1 => {
                 // utf8 string
                 let size = cursor.read_u8()?;
-                let mut value = vec![0; size as usize];
-                cursor.read_exact(&mut value)?;
+                let value = read_value_bytes(cursor, u64::from(size))?;
                 let str = String::from_utf8(value);
                 let typ = match str {
                     Ok(s) => TlvItemValue::String(s),
@@ -542,8 +560,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             TYPE_OCTET_STRING_L1 => {
                 // octet string
                 let size = cursor.read_u8()?;
-                let mut value = vec![0; size as usize];
-                cursor.read_exact(&mut value)?;
+                let value = read_value_bytes(cursor, u64::from(size))?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::OctetString(value),
@@ -553,8 +570,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             TYPE_OCTET_STRING_L2 => {
                 // octet string large
                 let size = cursor.read_u16::<LittleEndian>()?;
-                let mut value = vec![0; size as usize];
-                cursor.read_exact(&mut value)?;
+                let value = read_value_bytes(cursor, u64::from(size))?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::OctetString(value),
@@ -564,8 +580,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             TYPE_OCTET_STRING_L4 => {
                 // octet string very large
                 let size = cursor.read_u32::<LittleEndian>()?;
-                let mut value = vec![0; size as usize];
-                cursor.read_exact(&mut value)?;
+                let value = read_value_bytes(cursor, u64::from(size))?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::OctetString(value),
@@ -575,8 +590,7 @@ fn decode(cursor: &mut Cursor<&[u8]>, container: &mut Vec<TlvItem>) -> Result<()
             TYPE_OCTET_STRING_L8 => {
                 // octet string very very xtra large
                 let size = cursor.read_u64::<LittleEndian>()?;
-                let mut value = vec![0; size as usize];
-                cursor.read_exact(&mut value)?;
+                let value = read_value_bytes(cursor, size)?;
                 let item = TlvItem {
                     tag,
                     value: TlvItemValue::OctetString(value),
@@ -787,6 +801,9 @@ impl TlvItemEnc {
         Ok(tlv.data)
     }
 }
+
+#[cfg(test)]
+mod length_tests;
 
 #[cfg(test)]
 mod tests {

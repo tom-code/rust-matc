@@ -20,3 +20,17 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+
+  ble:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install BLE build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install --yes libdbus-1-dev pkg-config
+    - name: Build BLE library and all targets
+      run: cargo build --locked --all-targets --features ble --verbose
+    - name: Run BLE-enabled tests without hardware
+      run: cargo test --locked --features ble --verbose

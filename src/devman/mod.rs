@@ -188,6 +188,27 @@ impl DeviceManager {
         self.connect_with_rediscovery(node_id, &address).await
     }
 
+    /// Connect under one absolute deadline. BUSY wait and deadline errors retain
+    /// their typed, safe diagnostics and never trigger immediate rediscovery.
+    pub async fn connect_until(
+        &self,
+        node_id: u64,
+        deadline: tokio::time::Instant,
+    ) -> Result<controller::Connection> {
+        let address = {
+            let reg = self
+                .registry
+                .lock()
+                .map_err(|e| anyhow::anyhow!("registry lock: {}", e))?;
+            reg.get(node_id)
+                .context("Matter device not found in registry")?
+                .address
+                .clone()
+        };
+        self.connect_with_budget(node_id, &address, Some(deadline))
+            .await
+    }
+
     /// Connect to a previously commissioned device by friendly name.
     /// If the stored address fails, automatically re-discovers the device via operational mDNS.
     pub async fn connect_by_name(&self, name: &str) -> Result<controller::Connection> {
@@ -204,7 +225,24 @@ impl DeviceManager {
     /// Connect with BUSY retry and one round of mDNS rediscovery on non-BUSY failure.
     /// BUSY handling is delegated to Controller::auth_sigma_with_busy_retry so that
     /// in-place reauth uses identical retry semantics.
-    async fn connect_with_rediscovery(&self, node_id: u64, address: &str) -> Result<controller::Connection> {
+    async fn connect_with_rediscovery(
+        &self,
+        node_id: u64,
+        address: &str,
+    ) -> Result<controller::Connection> {
+        self.connect_with_budget(node_id, address, None).await
+    }
+
+    async fn connect_with_budget(
+        &self,
+        node_id: u64,
+        address: &str,
+        deadline: Option<tokio::time::Instant>,
+    ) -> Result<controller::Connection> {
+        use crate::connection_budget::{
+            ConnectBusy, ConnectDeadline, ConnectStage, ConnectionBudget,
+        };
+        let budget = ConnectionBudget::new(node_id, deadline);
         let stored_mrp = self
             .registry
             .lock()
@@ -214,31 +252,80 @@ impl DeviceManager {
             .unwrap_or_default();
         let mut current_address = address.to_string();
         // Create connection once and reuse across retries; only replace if address changes.
-        let mut conn = self.transport.create_connection(&current_address).await;
+        let mut conn = budget
+            .run(ConnectStage::Transport, async {
+                Ok(self.transport.create_connection(&current_address).await)
+            })
+            .await?;
         conn.set_mrp_params(stored_mrp);
 
-        match self.controller.auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id).await {
-            Ok(ses) => Ok(controller::Connection::from_parts(conn, ses)),
-            Err(e) => {
-                // Try operational mDNS rediscovery once, then one more attempt.
-                log::info!(
-                    "Connection to {} failed ({}), attempting operational rediscovery...",
-                    current_address, e
-                );
-                let (new_address, matter_info) = self
-                    .discover_device_info(node_id, Duration::from_secs(10))
+        let result = match deadline {
+            Some(deadline) => {
+                self.controller
+                    .auth_sigma_with_busy_retry_until(
+                        &conn,
+                        node_id,
+                        self.config.controller_id,
+                        deadline,
+                    )
                     .await
-                    .context(format!("rediscovery for node {} after connect failure", node_id))?;
-                current_address = new_address;
-                conn = self.transport.create_connection(&current_address).await;
-                conn.set_mrp_params(matter_info.mrp_params());
-                let ses = self
-                    .controller
+            }
+            None => {
+                self.controller
                     .auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id)
                     .await
+            }
+        };
+        match result {
+            Ok(ses) => Ok(controller::Connection::from_parts(conn, ses)),
+            Err(error) if error.is::<ConnectBusy>() || error.is::<ConnectDeadline>() => Err(error),
+            Err(e) => {
+                // Try operational mDNS rediscovery once, then one more attempt.
+                if deadline.is_none() {
+                    log::info!(
+                        "Connection to {} failed ({}), attempting operational rediscovery...",
+                        current_address,
+                        e
+                    );
+                }
+                let (new_address, matter_info) = budget
+                    .run(
+                        ConnectStage::Rediscovery,
+                        self.discover_device_info(node_id, Duration::from_secs(10)),
+                    )
+                    .await
                     .context(format!(
-                        "connection still failed after rediscovery at {}", current_address
+                        "rediscovery for node {} after connect failure",
+                        node_id
                     ))?;
+                current_address = new_address;
+                conn = budget
+                    .run(ConnectStage::Transport, async {
+                        Ok(self.transport.create_connection(&current_address).await)
+                    })
+                    .await?;
+                conn.set_mrp_params(matter_info.mrp_params());
+                let ses = match deadline {
+                    Some(deadline) => {
+                        self.controller
+                            .auth_sigma_with_busy_retry_until(
+                                &conn,
+                                node_id,
+                                self.config.controller_id,
+                                deadline,
+                            )
+                            .await
+                    }
+                    None => {
+                        self.controller
+                            .auth_sigma_with_busy_retry(&conn, node_id, self.config.controller_id)
+                            .await
+                    }
+                }
+                .context(format!(
+                    "connection still failed after rediscovery at {}",
+                    current_address
+                ))?;
                 Ok(controller::Connection::from_parts(conn, ses))
             }
         }
